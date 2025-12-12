@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__supabase__list_projects",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__execute_sql",
+      "WebFetch(domain:mcp.supabase.com)",
+      "Bash(claude mcp add:*)",
+      "Bash(claude mcp remove:*)",
+      "Bash(supabase login:*)",
+      "Bash(setx SUPABASE_ACCESS_TOKEN \"sb_secret_Sj6H6Qi7Loyv7BNc-SVvQQ_eCDKZrqJ\")",
+      "Bash(setx:*)",
+      "mcp__supabase__get_project",
+      "mcp__supabase__list_tables",
+      "Bash(cat:*)",
+      "Bash(claude /mcp)",
+      "WebSearch",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(claude /mcp list:*)",
+      "Bash(claude mcp:*)",
+      "Bash(supabase logout:*)",
+      "mcp__supabase__get_project_url",
+      "mcp__supabase__get_publishable_keys",
+      "Bash(npm install:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

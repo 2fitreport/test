@@ -1,0 +1,71 @@
+.container {
+    padding: 40px;
+    margin-left: 240px;
+    background-color: #f9fafb;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 40px;
+    color: var(--black-color);
+}
+
+.loading {
+    padding: 40px;
+    text-align: center;
+    font-size: 16px;
+    color: #999;
+}
+
+/* 차트 그리드 */
+.chartsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Two columns, equal width */
+    gap: 40px; /* Adjusted gap for horizontal layout */
+}
+
+.chartContainer {
+    background-color: #ffffff;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.chartTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin-bottom: 24px;
+    text-align: left;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.chartWrapper {
+    position: relative;
+    height: 280px; /* Increased height slightly for better aspect ratio */
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+    .chartsGrid {
+        grid-template-columns: 1fr; /* Stack vertically on smaller screens */
+        gap: 32px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        margin-left: 0;
+        padding: 20px;
+    }
+
+    .title {
+        font-size: 22px;
+        margin-bottom: 28px;
+    }
+}
+
