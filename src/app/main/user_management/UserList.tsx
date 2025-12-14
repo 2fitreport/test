@@ -564,109 +564,121 @@ export default function UserList() {
             </div>
 
             <div className={styles.tableWrapper}>
-                <table className={styles.userTable}>
-                    <thead>
-                        <tr>
-                            <th className={styles.checkboxHeader}>
-                                <input
-                                    type="checkbox"
-                                    checked={
-                                        (() => {
-                                            const selectableUsers = getPaginatedUsers().filter(u => u.position?.level !== 1);
-                                            return selectableUsers.length > 0 && selectableUsers.every(u => selectedUsers.has(u.id));
-                                        })()
-                                    }
-                                    onChange={handleSelectAll}
-                                />
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
-                                사용자 ID{getSortIcon('user_id')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('name')}>
-                                이름{getSortIcon('name')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('position')}>
-                                직급{getSortIcon('position')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('phone')}>
-                                연락처{getSortIcon('phone')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('email_display')}>
-                                이메일{getSortIcon('email_display')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('address')}>
-                                주소{getSortIcon('address')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
-                                소속{getSortIcon('company_name')}
-                            </th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
-                                상태{getSortIcon('status')}
-                            </th>
-                            <th>관리</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {getPaginatedUsers().map((user) => (
-                            <tr key={user.id} className={styles.userRow}>
-                                <td className={styles.checkboxCell}>
-                                    {user.position?.level !== 1 && (
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedUsers.has(user.id)}
-                                            onChange={() => handleSelectUser(user.id)}
-                                        />
-                                    )}
-                                </td>
-                                <td className={styles.userId}>{user.user_id}</td>
-                                <td className={styles.name}>{user.name}</td>
-                                <td className={styles.position}>{user.position?.name}</td>
-                                <td className={styles.phone}>{user.phone || '-'}</td>
-                                <td className={styles.email}>{user.email_display || '-'}</td>
-                                <td className={styles.address}>
-                                    <div className={styles.addressText}>
-                                        {user.address && user.address_detail
-                                            ? `${user.address} ${user.address_detail}`
-                                            : user.address || user.address_detail || '-'}
-                                    </div>
-                                </td>
-                                <td className={styles.company}>{user.company_name || '-'}</td>
-                                <td className={styles.status}>
-                                    {user.position?.level === 1 ? (
-                                        <span></span>
-                                    ) : (
-                                        <span
-                                            className={`${styles.statusBadge} ${
-                                                user.status === 'active'
-                                                    ? styles.active
-                                                    : styles.inactive
-                                            }`}
-                                            onClick={() => handleStatusChange(user.id, user.status)}
-                                            style={{ cursor: 'pointer' }}
-                                        >
-                                            {user.status === 'active' ? '활성' : '비활성'}
-                                        </span>
-                                    )}
-                                </td>
-                                <td className={styles.actions}>
-                                    <button className={styles.editButton}>수정</button>
-                                    <button
-                                        className={styles.deleteButton}
-                                        onClick={() => handleDeleteSingle(user.id)}
-                                    >
-                                        삭제
-                                    </button>
-                                    <button
-                                        className={styles.viewButton}
-                                        onClick={() => handleViewUser(user)}
-                                    >
-                                        보기
-                                    </button>
-                                </td>
+                {getFilteredAndSortedUsers().length === 0 ? (
+                    <div className={styles.noDataContainer}>
+                        <Image
+                            src="/error.svg"
+                            alt="데이터 없음"
+                            width={60}
+                            height={60}
+                        />
+                        <p className={styles.noDataText}>해당 데이터가 존재하지 않습니다.</p>
+                    </div>
+                ) : (
+                    <table className={styles.userTable}>
+                        <thead>
+                            <tr>
+                                <th className={styles.checkboxHeader}>
+                                    <input
+                                        type="checkbox"
+                                        checked={
+                                            (() => {
+                                                const selectableUsers = getPaginatedUsers().filter(u => u.position?.level !== 1);
+                                                return selectableUsers.length > 0 && selectableUsers.every(u => selectedUsers.has(u.id));
+                                            })()
+                                        }
+                                        onChange={handleSelectAll}
+                                    />
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
+                                    사용자 ID{getSortIcon('user_id')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('name')}>
+                                    이름{getSortIcon('name')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('position')}>
+                                    직급{getSortIcon('position')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('phone')}>
+                                    연락처{getSortIcon('phone')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('email_display')}>
+                                    이메일{getSortIcon('email_display')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('address')}>
+                                    주소{getSortIcon('address')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
+                                    소속{getSortIcon('company_name')}
+                                </th>
+                                <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
+                                    상태{getSortIcon('status')}
+                                </th>
+                                <th>관리</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {getPaginatedUsers().map((user) => (
+                                <tr key={user.id} className={styles.userRow}>
+                                    <td className={styles.checkboxCell}>
+                                        {user.position?.level !== 1 && (
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedUsers.has(user.id)}
+                                                onChange={() => handleSelectUser(user.id)}
+                                            />
+                                        )}
+                                    </td>
+                                    <td className={styles.userId}>{user.user_id}</td>
+                                    <td className={styles.name}>{user.name}</td>
+                                    <td className={styles.position}>{user.position?.name}</td>
+                                    <td className={styles.phone}>{user.phone || '-'}</td>
+                                    <td className={styles.email}>{user.email_display || '-'}</td>
+                                    <td className={styles.address}>
+                                        <div className={styles.addressText}>
+                                            {user.address && user.address_detail
+                                                ? `${user.address} ${user.address_detail}`
+                                                : user.address || user.address_detail || '-'}
+                                        </div>
+                                    </td>
+                                    <td className={styles.company}>{user.company_name || '-'}</td>
+                                    <td className={styles.status}>
+                                        {user.position?.level === 1 ? (
+                                            <span></span>
+                                        ) : (
+                                            <span
+                                                className={`${styles.statusBadge} ${
+                                                    user.status === 'active'
+                                                        ? styles.active
+                                                        : styles.inactive
+                                                }`}
+                                                onClick={() => handleStatusChange(user.id, user.status)}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                {user.status === 'active' ? '활성' : '비활성'}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className={styles.actions}>
+                                        <button className={styles.editButton}>수정</button>
+                                        <button
+                                            className={styles.deleteButton}
+                                            onClick={() => handleDeleteSingle(user.id)}
+                                        >
+                                            삭제
+                                        </button>
+                                        <button
+                                            className={styles.viewButton}
+                                            onClick={() => handleViewUser(user)}
+                                        >
+                                            보기
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
             <Pagination

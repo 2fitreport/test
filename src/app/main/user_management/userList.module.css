@@ -140,6 +140,29 @@
     overflow-y: visible;
 }
 
+.noDataContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    background-color: #ffffff;
+}
+
+.noDataContainer img {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 24px;
+    opacity: 1;
+}
+
+.noDataText {
+    font-size: 16px;
+    color: #999;
+    font-weight: 500;
+    margin: 0;
+}
+
 .userTable {
     width: 100%;
     border-collapse: collapse;
