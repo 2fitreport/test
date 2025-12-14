@@ -482,11 +482,15 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     const handleConfirmDeleteSelected = async () => {
         try {
             const count = selectedUsers.size;
-            for (const userId of selectedUsers) {
-                const response = await fetch(`/api/users/${userId}`, {
+            const deletePromises = Array.from(selectedUsers).map(userId =>
+                fetch(`/api/users/${userId}`, {
                     method: 'DELETE',
-                });
+                })
+            );
 
+            const responses = await Promise.all(deletePromises);
+
+            for (const response of responses) {
                 if (!response.ok) {
                     throw new Error('사용자 삭제 실패');
                 }
@@ -546,25 +550,26 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     const handleConfirmDeleteAll = async () => {
         try {
             // 대표(level 1)를 제외한 모든 사용자 삭제
-            let deleteCount = 0;
-            for (const user of users) {
-                if (user.position?.level === 1) continue;
-
-                const response = await fetch(`/api/users/${user.id}`, {
+            const usersToDelete = users.filter(user => user.position?.level !== 1);
+            const deletePromises = usersToDelete.map(user =>
+                fetch(`/api/users/${user.id}`, {
                     method: 'DELETE',
-                });
+                })
+            );
 
+            const responses = await Promise.all(deletePromises);
+
+            for (const response of responses) {
                 if (!response.ok) {
                     throw new Error('사용자 삭제 실패');
                 }
-                deleteCount++;
             }
 
             fetchUsers();
             setSelectedUsers(new Set());
             setIsModalOpen(false);
             setIsDeleteAllMode(false);
-            setSuccessMessage(`${deleteCount}명의 사용자가 삭제되었습니다.`);
+            setSuccessMessage(`${usersToDelete.length}명의 사용자가 삭제되었습니다.`);
             setSuccessModalOpen(true);
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : '사용자 삭제 중 오류가 발생했습니다.');
