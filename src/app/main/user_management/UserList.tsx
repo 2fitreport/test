@@ -719,6 +719,7 @@ export default function UserList() {
                         ? handleConfirmDeleteAll
                         : handleConfirmDeleteSelected
                 }
+                type="warning"
                 confirmText="확인"
                 cancelText="취소"
             />

@@ -26,6 +26,7 @@ export default function ConfirmModal({
   const getIconSrc = () => {
     if (type === 'success') return '/check.svg';
     if (type === 'error') return '/error.svg';
+    if (type === 'warning') return '/question.svg';
     return null;
   };
 
