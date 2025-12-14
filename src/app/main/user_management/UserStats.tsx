@@ -24,10 +24,16 @@ ChartJS.register(
     Legend
 );
 
+interface PositionData {
+    name: string;
+    count: number;
+    level: number;
+}
+
 interface UserStatsData {
     total: number;
     byStatus: { active: number; inactive: number };
-    byPosition: { [key: string]: number };
+    byPosition: PositionData[];
     byCompany: { [key: string]: number };
 }
 
@@ -35,7 +41,7 @@ export default function UserStats() {
     const [stats, setStats] = useState<UserStatsData>({
         total: 0,
         byStatus: { active: 0, inactive: 0 },
-        byPosition: {},
+        byPosition: [],
         byCompany: {},
     });
     const [loading, setLoading] = useState(true);
@@ -72,11 +78,11 @@ export default function UserStats() {
     };
 
     const positionChartData = {
-        labels: Object.keys(stats.byPosition),
+        labels: stats.byPosition.map(p => p.name),
         datasets: [
             {
                 label: '인원',
-                data: Object.values(stats.byPosition),
+                data: stats.byPosition.map(p => p.count),
                 fill: true,
                 backgroundColor: 'rgba(15, 26, 77, 0.2)',
                 borderColor: 'rgba(15, 26, 77, 1)',
@@ -140,10 +146,10 @@ export default function UserStats() {
             <div className={styles.chartContainer}>
                 <h2 className={styles.chartTitle}>직급별 인원</h2>
                 <div className={styles.statsList}>
-                    {Object.entries(stats.byPosition).map(([position, count]) => (
-                        <div key={position} className={styles.statItem}>
-                            <span className={styles.statLabel}>{position}:</span>
-                            <span className={styles.statValue}>{count}명</span>
+                    {stats.byPosition.map((position) => (
+                        <div key={position.name} className={styles.statItem}>
+                            <span className={styles.statLabel}>{position.name}:</span>
+                            <span className={styles.statValue}>{position.count}명</span>
                         </div>
                     ))}
                 </div>

@@ -53,11 +53,18 @@ export async function GET(request: NextRequest) {
       companyCounts[companyName] = (companyCounts[companyName] || 0) + 1;
     });
 
+    // 직급을 level 순서대로 배열로 변환
+    const byPositionArray = positions.map((position: any) => ({
+      name: position.name,
+      count: positionCounts[position.name] || 0,
+      level: position.level,
+    }));
+
     return NextResponse.json(
       {
         total: users.length,
         byStatus: statusCounts,
-        byPosition: positionCounts,
+        byPosition: byPositionArray,
         byCompany: companyCounts,
       },
       { status: 200 }

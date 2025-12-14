@@ -68,8 +68,10 @@ font-size: 16px;
 color: var(--black-color);
 line-height: 1.6;
 word-break: break-word;
+white-space: normal;
 text-align: center;
 font-weight: 700;
+max-width: 300px;
 }
 
 .footer {

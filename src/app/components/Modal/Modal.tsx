@@ -32,7 +32,7 @@ export default function Modal({
 
   const getIconSrc = () => {
     if (type === 'success') return '/check.svg';
-    if (type === 'error') return '/error.svg';
+    if (type === 'error' || type === 'warning') return '/error.svg';
     return null;
   };
 
@@ -47,7 +47,7 @@ export default function Modal({
               <img src={iconSrc} alt={type} className={styles.icon} />
             </div>
           )}
-          <p className={styles.message}>{message}</p>
+          <p className={styles.message} dangerouslySetInnerHTML={{ __html: message }}></p>
         </div>
         <div className={styles.footer}>
           {showConfirmButton ? (

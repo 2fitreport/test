@@ -22,6 +22,7 @@ export default function RootLayout({
                     crossOrigin="anonymous"
                     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
                 />
+                <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
             </head>
             <body>{children}</body>
         </html>

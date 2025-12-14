@@ -7,11 +7,46 @@
     box-sizing: border-box;
 }
 
+.titleWrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
 .title {
     font-size: 28px;
     font-weight: 700;
-    margin-bottom: 30px;
     color: var(--black-color);
+    margin: 0 !important;
+}
+
+.createButton {
+    padding: 10px 20px;
+    background-color: var(--main-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
+    height: fit-content;
+}
+
+@media (min-width: 769px) {
+    .createButton:hover {
+        opacity: 0.9;
+    }
+}
+
+@media (max-width: 450px) {
+    .createButton {
+        padding: 8px 14px;
+        font-size: 12px;
+    }
 }
 
 .tabMenu {
@@ -38,6 +73,7 @@
     background-color: #ffffff;
     color: #333;
     transition: all 0.2s ease;
+    box-sizing: border-box;
 }
 
 @media (min-width: 769px) {
@@ -49,7 +85,7 @@
 .tabMenu ul li.on {
     background: var(--main-color);
     color: #fff;
-    border: 1px solid var(--main-color);
+    border-color: var(--main-color);
 }
 
 .tabContent {
