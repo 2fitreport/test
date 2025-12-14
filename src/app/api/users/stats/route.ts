@@ -8,22 +8,36 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase
+    const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select(`
         id,
         status,
         position_id,
         company_name,
-        position(name)
+        position(id, name, level)
       `);
 
-    if (error) throw error;
+    if (usersError) throw usersError;
 
-    const users = data || [];
+    // position 테이블에서 모든 직급 정보를 가져오기
+    const { data: positionsData, error: positionsError } = await supabase
+      .from('position')
+      .select('id, name, level')
+      .order('level', { ascending: true });
+
+    if (positionsError) throw positionsError;
+
+    const users = usersData || [];
+    const positions = positionsData || [];
     const statusCounts = { active: 0, inactive: 0 };
     const positionCounts: { [key: string]: number } = {};
     const companyCounts: { [key: string]: number } = {};
+
+    // 모든 직급을 먼저 초기화
+    positions.forEach((position: any) => {
+      positionCounts[position.name] = 0;
+    });
 
     users.forEach((user: any) => {
       if (user.status === 'active') {
