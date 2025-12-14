@@ -40,8 +40,10 @@
     transition: all 0.2s ease;
 }
 
-.tabMenu ul li:hover {
-    background-color: #efefef;
+@media (min-width: 769px) {
+    .tabMenu ul li:hover {
+        background-color: #efefef;
+    }
 }
 
 .tabMenu ul li.on {
