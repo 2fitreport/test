@@ -590,7 +590,7 @@
 }
 
 @media (max-width: 450px) {
-    .header {
-        padding: 24px 12px;
+    .searchSection {
+        padding: 0 12px;
     }
 }
