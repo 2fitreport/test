@@ -531,6 +531,7 @@
     align-items: center;
     justify-content: center;
     z-index: 999;
+    overflow-y: auto;
 }
 
 .viewModalContent {
@@ -542,7 +543,7 @@
     padding: 32px;
     max-height: 90vh;
     overflow-y: auto;
-    margin-top: 30px;
+    margin: auto 0;
 }
 
 .viewModalTitle {
