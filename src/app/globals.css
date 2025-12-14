@@ -1,5 +1,7 @@
 @charset "UTF-8";
 
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/static/pretendard.css");
+
 :root {
     --main-color: #0f1a4d;
     --black-color: #292929;
@@ -98,9 +100,13 @@ video {
     border: 0;
     font-size: 100%;
     font: inherit;
-    font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+    font-family: Pretendard, sans-serif;
     vertical-align: baseline;
     box-sizing: border-box;
+}
+
+body {
+    font-family: Pretendard, sans-serif;
 }
 /* HTML5 display-role reset for older browsers */
 article,

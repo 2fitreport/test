@@ -1,0 +1,94 @@
+/* 차트 그리드 */
+.chartsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px;
+}
+
+.chartContainer {
+    background-color: #ffffff;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.chartContainer:nth-child(3) {
+    grid-column: 1 / -1;
+}
+
+.chartTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin-bottom: 24px;
+    text-align: left;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.chartWrapper {
+    position: relative;
+    height: 280px;
+    margin-top: 16px;
+    width: 100%;
+}
+
+.statsList {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.statItem {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 100px;
+    background-color: var(--main-color);
+    padding: 6px 12px;
+    text-align: center;
+}
+
+.statLabel {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.statValue {
+    font-weight: 700;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.loading {
+    padding: 40px;
+    text-align: center;
+    font-size: 16px;
+    color: #999;
+}
+
+/* 반응형 */
+@media (max-width: 1080px) {
+    .chartsGrid {
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+
+    .chartContainer:nth-child(3) {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .chartContainer {
+        padding: 16px;
+    }
+
+    .chartTitle {
+        font-size: 16px;
+    }
+}

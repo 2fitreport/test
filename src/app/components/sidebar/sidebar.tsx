@@ -3,17 +3,13 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { FiUser, FiUsers, FiLogOut } from 'react-icons/fi';
 import { clearAuthToken, getAdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
 interface MenuItem {
     path: string;
     label: string;
-}
-
-interface AdminData {
-    name?: string;
-    position?: string;
 }
 
 const menuItems: MenuItem[] = [
@@ -23,17 +19,23 @@ const menuItems: MenuItem[] = [
 export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
-    const [adminData, setAdminData] = useState<AdminData | null>(null);
+    const [adminData, setAdminData] = useState(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     useEffect(() => {
-        const data = getAdminData();
-        setAdminData(data);
+        setAdminData(getAdminData());
     }, []);
+
+    const handleMenuClick = (path: string) => {
+        router.push(path);
+        setIsMenuOpen(false);
+    };
 
     const getNameDisplay = () => {
         if (!adminData?.name) return '';
 
-        const isRepresentative = adminData.position === '대표';
+        const positionLevel = adminData.position?.level;
+        const isRepresentative = positionLevel === 1;
         const suffix = isRepresentative ? ' 대표님' : '님';
 
         return `${adminData.name}${suffix}`;
@@ -46,22 +48,48 @@ export default function Sidebar() {
     };
 
     return (
-        <aside className={styles.sidebar}>
-            <div className={styles.logoWrapper}>
-                <Image src="/logo.png" alt="로고" width={120} height={80} className={styles.logoImage} priority />
+        <aside className={`${styles.sidebar} ${isMenuOpen ? styles.open : ''}`}>
+            <div className={styles.headerWrapper}>
+                <div className={styles.logoWrapper}>
+                    <Image src="/logo.png" alt="로고" width={120} height={80} className={styles.logoImage} priority />
+                </div>
+                <div className={styles.headerUserName}>
+                    <FiUser className={styles.headerUserIcon} />
+                    <p className={styles.headerUserText}>{getNameDisplay()}</p>
+                </div>
+                <button
+                    className={`${styles.hamburger} ${isMenuOpen ? styles.active : ''}`}
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    aria-label="메뉴 토글"
+                >
+                    <Image src="/menu.svg" alt="메뉴" width={24} height={24} />
+                </button>
             </div>
-            <nav className={styles.nav}>
+            <nav className={`${styles.nav} ${isMenuOpen ? styles.open : ''}`}>
                 <ul className={styles.menuList}>
                     {menuItems.map((item) => (
                         <li key={item.path}>
                             <button
                                 className={`${styles.menuItem} ${pathname === item.path ? styles.active : ''}`}
-                                onClick={() => router.push(item.path)}
+                                onClick={() => handleMenuClick(item.path)}
                             >
+                                <FiUsers className={styles.menuIcon} />
                                 {item.label}
                             </button>
                         </li>
                     ))}
+                    <li className={styles.logoutMenuItem}>
+                        <button
+                            className={styles.menuItem}
+                            onClick={() => {
+                                handleLogout();
+                                handleMenuClick('');
+                            }}
+                        >
+                            <FiLogOut className={styles.menuIcon} />
+                            로그아웃
+                        </button>
+                    </li>
                 </ul>
             </nav>
             <div className={styles.userInfo}>

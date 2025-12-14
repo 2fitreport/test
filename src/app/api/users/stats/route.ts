@@ -8,13 +8,22 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabase.from('users').select('*');
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        status,
+        position_id,
+        company_name,
+        position(name)
+      `);
 
     if (error) throw error;
 
     const users = data || [];
     const statusCounts = { active: 0, inactive: 0 };
     const positionCounts: { [key: string]: number } = {};
+    const companyCounts: { [key: string]: number } = {};
 
     users.forEach((user: any) => {
       if (user.status === 'active') {
@@ -23,8 +32,11 @@ export async function GET(request: NextRequest) {
         statusCounts.inactive++;
       }
 
-      const position = user.position || '미지정';
-      positionCounts[position] = (positionCounts[position] || 0) + 1;
+      const positionName = user.position?.name || '미지정';
+      positionCounts[positionName] = (positionCounts[positionName] || 0) + 1;
+
+      const companyName = user.company_name || '미지정';
+      companyCounts[companyName] = (companyCounts[companyName] || 0) + 1;
     });
 
     return NextResponse.json(
@@ -32,6 +44,7 @@ export async function GET(request: NextRequest) {
         total: users.length,
         byStatus: statusCounts,
         byPosition: positionCounts,
+        byCompany: companyCounts,
       },
       { status: 200 }
     );

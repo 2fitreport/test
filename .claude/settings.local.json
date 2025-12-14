@@ -23,9 +23,28 @@
       "mcp__supabase__get_project_url",
       "mcp__supabase__get_publishable_keys",
       "Bash(npm install:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:registry.modelcontextprotocol.io)",
+      "mcp__playwright__playwright_navigate",
+      "mcp__playwright__playwright_fill",
+      "mcp__playwright__playwright_click",
+      "mcp__playwright__playwright_screenshot",
+      "mcp__playwright__playwright_get_visible_html",
+      "mcp__playwright__playwright_console_logs",
+      "mcp__playwright__playwright_get_visible_text",
+      "mcp__supabase__get_logs",
+      "mcp__playwright__playwright_resize",
+      "mcp__playwright__playwright_press_key",
+      "Bash(npx tsc:*)",
+      "mcp__playwright__playwright_close",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

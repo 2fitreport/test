@@ -18,10 +18,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 데이터베이스에서 사용자 정보 조회
+    // 데이터베이스에서 사용자 정보 조회 (position 정보 포함)
     const { data: user, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, position(name, level)')
       .eq('user_id', user_id)
       .single();
 

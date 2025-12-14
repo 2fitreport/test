@@ -9,63 +9,80 @@
 .title {
     font-size: 28px;
     font-weight: 700;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     color: var(--black-color);
 }
 
-.loading {
-    padding: 40px;
-    text-align: center;
-    font-size: 16px;
-    color: #999;
+.tabMenu {
+    margin-bottom: 20px;
 }
 
-/* 차트 그리드 */
-.chartsGrid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr); /* Two columns, equal width */
-    gap: 40px; /* Adjusted gap for horizontal layout */
+.tabMenu ul {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    border-bottom: 1px solid #ddd;
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
-.chartContainer {
+.tabMenu ul li {
+    border: 1px solid #ccc;
+    border-bottom: 0;
+    border-radius: 4px 4px 0 0;
+    padding: 12px 25px;
+    font-size: 15px;
+    cursor: pointer;
     background-color: #ffffff;
-    padding: 24px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
+    color: #333;
+    transition: all 0.2s ease;
 }
 
-.chartTitle {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--black-color);
-    margin-bottom: 24px;
-    text-align: left;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #e5e7eb;
+.tabMenu ul li:hover {
+    background-color: #efefef;
 }
 
-.chartWrapper {
-    position: relative;
-    height: 280px; /* Increased height slightly for better aspect ratio */
+.tabMenu ul li.on {
+    background: var(--main-color);
+    color: #fff;
+    border: 1px solid var(--main-color);
 }
 
-/* 반응형 */
-@media (max-width: 1024px) {
-    .chartsGrid {
-        grid-template-columns: 1fr; /* Stack vertically on smaller screens */
-        gap: 32px;
+.tabContent {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
     }
 }
 
-@media (max-width: 768px) {
+.userListSection {
+    margin-top: 0;
+}
+
+/* 반응형 */
+@media (max-width: 1080px) {
     .container {
         margin-left: 0;
-        padding: 20px;
+        padding: 40px;
+        padding-top: 120px;
     }
 
     .title {
         font-size: 22px;
         margin-bottom: 28px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding-top: 100px;
     }
 }
 

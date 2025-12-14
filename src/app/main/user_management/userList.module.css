@@ -1,0 +1,251 @@
+.userListContainer {
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 0;
+}
+
+.count {
+    font-size: 14px;
+    color: #999;
+    font-weight: 500;
+}
+
+.searchSection {
+    padding: 16px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background-color: #fafafa;
+}
+
+.searchContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 300px;
+    padding: 8px 12px;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.searchIcon {
+    width: 20px;
+    height: 20px;
+    color: #999;
+    flex-shrink: 0;
+}
+
+.searchInput {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    color: var(--black-color);
+}
+
+.searchInput::placeholder {
+    color: #ccc;
+}
+
+.loading {
+    padding: 40px;
+    text-align: center;
+    color: #999;
+}
+
+.tableWrapper {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.userTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.userTable thead {
+    background-color: #f5f5f5;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.userTable th {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--black-color);
+    white-space: nowrap;
+}
+
+.sortableHeader {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortIcon {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0;
+    margin-left: 12px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #ccc;
+    vertical-align: middle;
+    align-items: center;
+}
+
+.sortIcon span {
+    display: block;
+    line-height: 1;
+}
+
+.sortIcon .active {
+    color: var(--main-color);
+    font-weight: bold;
+}
+
+.userTable tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.userTable tbody tr:hover {
+    background-color: #fafafa;
+}
+
+.userRow td {
+    padding: 14px 12px;
+    color: #333;
+}
+
+.userRow .position {
+    color: #ffffff !important;
+}
+
+.userId {
+    color: #666;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.name {
+    font-weight: 600;
+    color: var(--black-color);
+}
+
+.position {
+    background-color: var(--main-color);
+    border-radius: 100px;
+    display: block;
+    font-size: 13px;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 6px 12px !important;
+    width: fit-content;
+    text-align: center;
+}
+
+.phone {
+    color: #666;
+    font-size: 13px;
+}
+
+.email {
+    color: #666;
+    font-size: 13px;
+}
+
+.address {
+    max-width: 200px;
+}
+
+.addressText {
+    color: #333;
+    font-size: 13px;
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+.company {
+    color: #666;
+    font-size: 13px;
+}
+
+.status {
+}
+
+.statusBadge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.active {
+    background-color: #ecf9f0;
+    color: #0f661a;
+}
+
+.inactive {
+    background-color: #fff5f5;
+    color: #7a0f0f;
+}
+
+/* 반응형 */
+@media (max-width: 1080px) {
+    .userTable th,
+    .userTable td {
+        padding: 12px 8px;
+        font-size: 13px;
+    }
+
+    .position {
+        font-size: 12px;
+        padding: 3px 6px;
+    }
+}
+
+@media (max-width: 768px) {
+    .userListContainer {
+        border-radius: 0;
+    }
+
+    .header {
+        padding: 16px;
+    }
+
+    .header h2 {
+        font-size: 16px;
+    }
+
+    .tableWrapper {
+        overflow-x: auto;
+    }
+
+    .userTable {
+        font-size: 12px;
+    }
+
+    .userTable th,
+    .userTable td {
+        padding: 10px 6px;
+    }
+}

@@ -5,7 +5,7 @@ export const getAuthToken = () => {
 };
 
 // 로컬스토리지에 로그인 정보 저장 (무한 유지)
-export const setAuthToken = (token: string, adminData: any) => {
+export const setAuthToken = (token: string, adminData: { name: string; position: string }) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem('auth_token', token);
   localStorage.setItem('admin_data', JSON.stringify(adminData));
@@ -22,7 +22,12 @@ export const clearAuthToken = () => {
 export const getAdminData = () => {
   if (typeof window === 'undefined') return null;
   const data = localStorage.getItem('admin_data');
-  return data ? JSON.parse(data) : null;
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return null;
+  }
 };
 
 // 로그인 상태 확인
