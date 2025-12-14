@@ -64,29 +64,64 @@
 
 @media (max-width: 768px) {
     .pagination {
-        padding: 16px;
-        gap: 6px;
+        padding: 12px;
+        gap: 4px;
+        flex-wrap: wrap;
+        justify-content: center;
     }
 
     .pageNumbers {
-        margin: 0 12px;
+        margin: 0 8px;
+        flex-wrap: wrap;
     }
 
     .doubleNavButton,
     .navButton {
-        padding: 6px;
-        width: 36px;
-        height: 36px;
+        padding: 4px;
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
     }
 
     .pageButton {
-        padding: 6px 10px;
-        font-size: 13px;
+        padding: 4px 8px;
+        font-size: 12px;
+        flex-shrink: 0;
     }
 
     .doubleNavButton img,
     .navButton img {
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@media (max-width: 450px) {
+    .pagination {
+        padding: 8px;
+        gap: 3px;
+    }
+
+    .pageNumbers {
+        margin: 0 4px;
+        gap: 2px;
+    }
+
+    .doubleNavButton,
+    .navButton {
+        padding: 3px;
+        width: 28px;
+        height: 28px;
+    }
+
+    .pageButton {
+        padding: 3px 6px;
+        font-size: 11px;
+    }
+
+    .doubleNavButton img,
+    .navButton img {
+        width: 14px;
+        height: 14px;
     }
 }

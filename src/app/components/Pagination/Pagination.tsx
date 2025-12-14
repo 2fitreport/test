@@ -20,7 +20,7 @@ export default function Pagination({
 
     const getPageNumbers = () => {
         const pages: (number | string)[] = [];
-        const maxPagesToShow = 5;
+        const maxPagesToShow = 3;
         const halfWindow = Math.floor(maxPagesToShow / 2);
 
         let startPage = Math.max(1, currentPage - halfWindow);

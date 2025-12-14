@@ -33,6 +33,7 @@
     display: flex;
     align-items: center;
     gap: 20px;
+    flex-wrap: wrap;
 }
 
 .searchContainer {
@@ -44,6 +45,20 @@
     background-color: #ffffff;
     border: 1px solid #e5e7eb;
     border-radius: 6px;
+}
+
+.filtersContainer {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.selectorsContainer {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
 .itemsPerPageContainer {
@@ -241,6 +256,131 @@
 .status {
 }
 
+.checkboxHeader,
+.checkboxCell {
+    width: 50px;
+    padding: 12px !important;
+    vertical-align: middle;
+}
+
+.checkboxHeader input,
+.checkboxCell input {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--main-color);
+    display: block;
+    margin: 0 auto;
+}
+
+.deleteButtonsContainer {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.deleteSelectedButton {
+    background-color: #d32f2f;
+    color: #ffffff;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+    flex: 1;
+    min-width: 100px;
+}
+
+.deleteSelectedButton:hover:not(:disabled) {
+    background-color: #b71c1c;
+}
+
+.deleteSelectedButton:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.deleteAllButton {
+    background-color: #ff6b6b;
+    color: #ffffff;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+    flex: 1;
+    min-width: 100px;
+}
+
+.deleteAllButton:hover {
+    background-color: #ff5252;
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.editButton,
+.deleteButton {
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.editButton {
+    background-color: #ffffff;
+    color: var(--main-color);
+    border-color: var(--main-color);
+}
+
+.editButton:hover {
+    background-color: var(--main-color);
+    color: #ffffff;
+}
+
+.deleteButton {
+    background-color: #ffffff;
+    color: #d32f2f;
+    border-color: #d32f2f;
+}
+
+.deleteButton:hover {
+    background-color: #d32f2f;
+    color: #ffffff;
+}
+
+.viewButton {
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+    color: #666;
+    border-color: #999;
+    display: none;
+}
+
+.viewButton:hover {
+    background-color: #f5f5f5;
+}
+
 .statusBadge {
     padding: 4px 10px;
     border-radius: 12px;
@@ -260,6 +400,26 @@
 }
 
 /* 반응형 */
+@media (max-width: 1400px) {
+    .phone,
+    .email,
+    .address,
+    .company {
+        display: none !important;
+    }
+
+    .userTable thead tr th:nth-child(5),
+    .userTable thead tr th:nth-child(6),
+    .userTable thead tr th:nth-child(7),
+    .userTable thead tr th:nth-child(8) {
+        display: none !important;
+    }
+
+    .viewButton {
+        display: block !important;
+    }
+}
+
 @media (max-width: 1080px) {
     .userTable th,
     .userTable td {
@@ -298,4 +458,110 @@
     .userTable td {
         padding: 10px 6px;
     }
+
+    .checkboxHeader input,
+    .checkboxCell input {
+        width: 14px;
+        height: 14px;
+    }
+
+    .editButton,
+    .deleteButton,
+    .viewButton {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .position,
+    .status {
+        display: none !important;
+    }
+
+    .userTable thead tr th:nth-child(4),
+    .userTable thead tr th:nth-child(9) {
+        display: none !important;
+    }
+}
+
+.viewModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.viewModalContent {
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    max-width: 500px;
+    width: 90%;
+    padding: 32px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.viewModalTitle {
+    text-align: center;
+    margin-bottom: 32px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--black-color);
+}
+
+.viewModalItem {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.viewModalLabel {
+    font-weight: 600;
+    color: #666;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.viewModalValue {
+    color: #333;
+    font-size: 14px;
+    text-align: right;
+    max-width: 75%;
+    overflow-wrap: break-word;
+}
+
+.viewModalStatusBadge {
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.viewModalCloseButton {
+    width: 100%;
+    padding: 12px 24px;
+    margin-top: 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background-color: var(--main-color);
+    color: #fff;
+    transition: opacity 0.2s;
+}
+
+.viewModalCloseButton:hover {
+    opacity: 0.9;
 }

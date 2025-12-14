@@ -44,3 +44,32 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const userId = parseInt(id, 10);
+
+    const { data, error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', userId)
+      .select();
+
+    if (error) throw error;
+
+    return NextResponse.json(
+      { message: '사용자가 삭제되었습니다', data },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('사용자 삭제 실패:', error);
+    return NextResponse.json(
+      { message: '사용자 삭제 실패' },
+      { status: 500 }
+    );
+  }
+}
