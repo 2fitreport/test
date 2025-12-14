@@ -162,7 +162,7 @@ export default function CreateUserModal({
 
                 <div className={styles.createFormGroup}>
                     <label className={styles.createLabel}>사용자 ID <span className={styles.required}>*</span></label>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
                         <input
                             ref={userIdRef}
                             type="text"
@@ -196,6 +196,7 @@ export default function CreateUserModal({
                             onBlur={() => handleFieldBlur('user_id')}
                             style={{
                                 flex: 1,
+                                minWidth: 0,
                                 borderColor: errors.user_id ? '#d32f2f' : undefined,
                             }}
                         />
@@ -204,19 +205,20 @@ export default function CreateUserModal({
                             onClick={handleCheckDuplicateUserId}
                             disabled={isCheckingDuplicate}
                             style={{
-                                padding: '8px 16px',
+                                padding: '8px 12px',
                                 whiteSpace: 'nowrap',
                                 backgroundColor: 'var(--main-color)',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '4px',
                                 cursor: isCheckingDuplicate ? 'not-allowed' : 'pointer',
-                                fontSize: '14px',
+                                fontSize: '12px',
                                 fontWeight: '500',
                                 opacity: isCheckingDuplicate ? 0.6 : 1,
+                                flexShrink: 0,
                             }}
                         >
-                            {isCheckingDuplicate ? '확인 중...' : '중복확인'}
+                            {isCheckingDuplicate ? '중...' : '확인'}
                         </button>
                     </div>
                     {isDuplicateUserIdChecked && (
