@@ -33,7 +33,7 @@ export default function UserList() {
     const [pendingStatusChange, setPendingStatusChange] = useState<{ userId: number; newStatus: string } | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         fetchUsers();
@@ -185,6 +185,35 @@ export default function UserList() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
+                </div>
+
+                <div className={styles.itemsPerPageContainer}>
+                    <label className={styles.itemsLabel}>표시 개수:</label>
+                    <div className={styles.selectWrapper}>
+                        <select
+                            className={styles.itemsSelect}
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                        >
+                            <option value={5}>5개씩 보기</option>
+                            <option value={10}>10개씩 보기</option>
+                            <option value={20}>20개씩 보기</option>
+                            <option value={30}>30개씩 보기</option>
+                            <option value={40}>40개씩 보기</option>
+                            <option value={50}>50개씩 보기</option>
+                            <option value={100}>100개씩 보기</option>
+                        </select>
+                        <Image
+                            src="/arrow.svg"
+                            alt="드롭다운"
+                            width={16}
+                            height={16}
+                            className={styles.selectArrow}
+                        />
+                    </div>
                 </div>
             </div>
 
