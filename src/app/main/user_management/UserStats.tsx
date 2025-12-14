@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import 'swiper/css';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -139,14 +141,14 @@ export default function UserStats() {
         <div className={styles.chartsGrid}>
             <div className={styles.chartContainer}>
                 <h2 className={styles.chartTitle}>직급별 인원</h2>
-                <div className={styles.statsList}>
+                <Swiper className={styles.statsList} slidesPerView="auto" spaceBetween={8} freeMode={true}>
                     {Object.entries(stats.byPosition).map(([position, count]) => (
-                        <div key={position} className={styles.statItem}>
+                        <SwiperSlide key={position} className={styles.statItem}>
                             <span className={styles.statLabel}>{position}:</span>
                             <span className={styles.statValue}>{count}명</span>
-                        </div>
+                        </SwiperSlide>
                     ))}
-                </div>
+                </Swiper>
                 <div className={styles.chartWrapper}>
                     <Line
                         key={`position-${chartKey}`}
@@ -157,30 +159,30 @@ export default function UserStats() {
             </div>
             <div className={styles.chartContainer}>
                 <h2 className={styles.chartTitle}>계정 상태</h2>
-                <div className={styles.statsList}>
-                    <div className={styles.statItem}>
+                <Swiper className={styles.statsList} slidesPerView="auto" spaceBetween={8} freeMode={true}>
+                    <SwiperSlide className={styles.statItem}>
                         <span className={styles.statLabel}>활성:</span>
                         <span className={styles.statValue}>{stats.byStatus.active}명</span>
-                    </div>
-                    <div className={styles.statItem}>
+                    </SwiperSlide>
+                    <SwiperSlide className={styles.statItem}>
                         <span className={styles.statLabel}>비활성:</span>
                         <span className={styles.statValue}>{stats.byStatus.inactive}명</span>
-                    </div>
-                </div>
+                    </SwiperSlide>
+                </Swiper>
                 <div className={styles.chartWrapper}>
                     <Line key={`status-${chartKey}`} data={statusChartData} options={chartOptions} />
                 </div>
             </div>
             <div className={styles.chartContainer}>
                 <h2 className={styles.chartTitle}>기업별 현황</h2>
-                <div className={styles.statsList}>
+                <Swiper className={styles.statsList} slidesPerView="auto" spaceBetween={8} freeMode={true}>
                     {Object.entries(stats.byCompany).map(([company, count]) => (
-                        <div key={company} className={styles.statItem}>
+                        <SwiperSlide key={company} className={styles.statItem}>
                             <span className={styles.statLabel}>{company}:</span>
                             <span className={styles.statValue}>{count}명</span>
-                        </div>
+                        </SwiperSlide>
                     ))}
-                </div>
+                </Swiper>
                 <div className={styles.chartWrapper}>
                     <Line
                         key={`company-${chartKey}`}
