@@ -407,7 +407,7 @@ export default function UserList() {
                 <span className={styles.count}>총 {getFilteredAndSortedUsers().length}명</span>
             </div>
 
-            <div className={styles.searchSection}>
+            <div className={styles.headerWrapper}>
                 <div className={styles.searchContainer}>
                     <Image
                         src="/search.svg"
