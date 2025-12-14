@@ -588,3 +588,9 @@
 .viewModalCloseButton:hover {
     opacity: 0.9;
 }
+
+@media (max-width: 450px) {
+    .header {
+        padding: 24px 12px;
+    }
+}
