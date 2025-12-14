@@ -265,11 +265,7 @@ export default function UserList() {
                                 <td className={styles.company}>{user.company_name || '-'}</td>
                                 <td className={styles.status}>
                                     {user.position?.name === '대표' ? (
-                                        <span
-                                            className={`${styles.statusBadge} ${styles.active}`}
-                                        >
-                                            활성
-                                        </span>
+                                        '-'
                                     ) : (
                                         <span
                                             className={`${styles.statusBadge} ${

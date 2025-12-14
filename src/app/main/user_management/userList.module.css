@@ -122,8 +122,7 @@
 
 .tableWrapper {
     overflow-x: auto;
-    overflow-y: auto;
-    max-height: 600px;
+    overflow-y: visible;
 }
 
 .userTable {
