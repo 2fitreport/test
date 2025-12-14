@@ -34,11 +34,14 @@
 }
 
 .statsList {
+    display: flex;
+    gap: 8px;
     margin-bottom: 24px;
+    flex-wrap: wrap;
 }
 
 .statItem {
-    display: flex !important;
+    display: flex;
     flex-direction: row;
     gap: 8px;
     align-items: center;
@@ -47,8 +50,6 @@
     background-color: var(--main-color);
     padding: 6px 12px;
     text-align: center;
-    white-space: nowrap;
-    width: auto !important;
 }
 
 .statLabel {
@@ -80,7 +81,6 @@
     .chartContainer:nth-child(3) {
         grid-column: auto;
     }
-
 }
 
 @media (max-width: 768px) {
@@ -90,24 +90,6 @@
 
     .chartTitle {
         font-size: 16px;
-    }
-
-    .statsList {
-        gap: 6px;
-    }
-
-    .statItem {
-        padding: 4px 6px;
-        font-size: 12px;
-        gap: 4px;
-    }
-
-    .statLabel {
-        font-size: 12px;
-    }
-
-    .statValue {
-        font-size: 12px;
     }
 }
 
@@ -124,23 +106,5 @@
 
     .chartWrapper {
         height: 200px;
-    }
-
-    .statsList {
-        gap: 4px;
-    }
-
-    .statItem {
-        padding: 2px 4px;
-        font-size: 11px;
-        gap: 3px;
-    }
-
-    .statLabel {
-        font-size: 11px;
-    }
-
-    .statValue {
-        font-size: 11px;
     }
 }
