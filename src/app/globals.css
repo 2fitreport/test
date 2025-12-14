@@ -170,10 +170,12 @@ input {
 }
 input[type='text'],
 input[type='tel'],
+input[type='password'],
 textarea {
     font-family: inherit;
     border: none;
     outline: none;
+    font-size: 16px;
 }
 input:-webkit-autofill {
     box-shadow: 0 0 0px 1000px #fff inset;
