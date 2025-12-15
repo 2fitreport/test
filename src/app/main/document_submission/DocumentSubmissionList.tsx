@@ -42,6 +42,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'submit' } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string } | null>(null);
+    const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
+    const [isDeleteAllMode, setIsDeleteAllMode] = useState(false);
 
     useEffect(() => {
         fetchDocuments();
@@ -84,6 +86,29 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     };
 
     const handleConfirmAction = () => {
+        // 전체 삭제 모드 처리
+        if (isDeleteAllMode) {
+            const allDocs = getFilteredAndSortedDocuments();
+            setDocuments(docs => docs.filter(doc => !allDocs.some(d => d.id === doc.id)));
+            setSelectedDocuments(new Set());
+            setIsDeleteAllMode(false);
+            setSuccessMessage(`${allDocs.length}건의 서류가 삭제되었습니다.`);
+            setConfirmModalOpen(false);
+            setSuccessModalOpen(true);
+            return;
+        }
+
+        // 선택 삭제 모드 처리
+        if (selectedDocuments.size > 0 && !pendingAction) {
+            const count = selectedDocuments.size;
+            setDocuments(docs => docs.filter(doc => !selectedDocuments.has(doc.id)));
+            setSelectedDocuments(new Set());
+            setSuccessMessage(`${count}건의 서류가 삭제되었습니다.`);
+            setConfirmModalOpen(false);
+            setSuccessModalOpen(true);
+            return;
+        }
+
         if (!pendingAction) return;
 
         const { id, action } = pendingAction;
@@ -280,6 +305,45 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSelectDocument = (docId: number) => {
+        const newSelected = new Set(selectedDocuments);
+        if (newSelected.has(docId)) {
+            newSelected.delete(docId);
+        } else {
+            newSelected.add(docId);
+        }
+        setSelectedDocuments(newSelected);
+    };
+
+    const handleSelectAll = () => {
+        const paginatedDocs = getPaginatedDocuments();
+        const allCurrentPageSelected = paginatedDocs.every(doc => selectedDocuments.has(doc.id));
+
+        if (allCurrentPageSelected && paginatedDocs.length > 0) {
+            const newSelected = new Set(selectedDocuments);
+            paginatedDocs.forEach(doc => newSelected.delete(doc.id));
+            setSelectedDocuments(newSelected);
+        } else {
+            const newSelected = new Set(selectedDocuments);
+            paginatedDocs.forEach(doc => newSelected.add(doc.id));
+            setSelectedDocuments(newSelected);
+        }
+    };
+
+    const handleDeleteAll = () => {
+        setIsDeleteAllMode(true);
+        setConfirmMessage(`전체 서류(${getFilteredAndSortedDocuments().length}건)를 삭제하시겠습니까?`);
+        setConfirmModalOpen(true);
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedDocuments.size === 0) return;
+        setIsDeleteAllMode(false);
+        setPendingAction(null);
+        setConfirmMessage(`선택된 ${selectedDocuments.size}건의 서류를 삭제하시겠습니까?`);
+        setConfirmModalOpen(true);
     };
 
     const handleSort = (column: SortColumn) => {
@@ -624,9 +688,39 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                             <p className={styles.noDataText}>해당 데이터가 존재하지 않습니다.</p>
                         </div>
                     ) : (
-                        <table className={styles.documentTable}>
+                        <>
+                            <div className={styles.deleteButtonsContainer}>
+                                <button
+                                    className={styles.deleteAllButton}
+                                    onClick={handleDeleteAll}
+                                >
+                                    전체 삭제
+                                </button>
+
+                                <button
+                                    className={styles.deleteSelectedButton}
+                                    onClick={handleDeleteSelected}
+                                    disabled={selectedDocuments.size === 0}
+                                >
+                                    선택 삭제 ({selectedDocuments.size})
+                                </button>
+                            </div>
+
+                            <table className={styles.documentTable}>
                             <thead>
                                 <tr>
+                                    <th className={styles.checkboxHeader}>
+                                        <input
+                                            type="checkbox"
+                                            checked={
+                                                (() => {
+                                                    const paginatedDocs = getPaginatedDocuments();
+                                                    return paginatedDocs.length > 0 && paginatedDocs.every(doc => selectedDocuments.has(doc.id));
+                                                })()
+                                            }
+                                            onChange={handleSelectAll}
+                                        />
+                                    </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
                                         사용자 ID{getSortIcon('user_id')}
                                     </th>
@@ -650,6 +744,13 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                             <tbody>
                                 {getPaginatedDocuments().map((doc) => (
                                     <tr key={doc.id} className={styles.documentRow}>
+                                        <td className={styles.checkboxCell}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDocuments.has(doc.id)}
+                                                onChange={() => handleSelectDocument(doc.id)}
+                                            />
+                                        </td>
                                         <td className={styles.userId}>{doc.user_id}</td>
                                         <td className={styles.userName}>{doc.user_name}</td>
                                         <td className={styles.title}>{doc.title}</td>
@@ -768,6 +869,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                 ))}
                             </tbody>
                         </table>
+                        </>
                     )}
                 </div>
 
