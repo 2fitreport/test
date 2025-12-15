@@ -22,10 +22,24 @@ export default function Sidebar() {
     const router = useRouter();
     const [adminData, setAdminData] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [notificationCount, setNotificationCount] = useState(0);
 
     useEffect(() => {
         setAdminData(getAdminData());
+        fetchNotificationCount();
     }, []);
+
+    const fetchNotificationCount = async () => {
+        try {
+            const response = await fetch('/api/documents/notification-count');
+            if (response.ok) {
+                const data = await response.json();
+                setNotificationCount(data.count || 0);
+            }
+        } catch (error) {
+            console.error('알림 건수 조회 실패:', error);
+        }
+    };
 
     const handleMenuClick = (path: string) => {
         router.push(path);
@@ -69,7 +83,7 @@ export default function Sidebar() {
             <nav className={`${styles.nav} ${isMenuOpen ? styles.open : ''}`}>
                 <ul className={styles.menuList}>
                     {menuItems.map((item) => (
-                        <li key={item.path}>
+                        <li key={item.path} className={styles.menuItemWrapper}>
                             <button
                                 className={`${styles.menuItem} ${pathname === item.path ? styles.active : ''}`}
                                 onClick={() => handleMenuClick(item.path)}
@@ -80,6 +94,9 @@ export default function Sidebar() {
                                     <FiFile className={styles.menuIcon} />
                                 )}
                                 {item.label}
+                                {item.path === '/main/document_submission' && notificationCount > 0 && (
+                                    <span className={styles.notificationBadge}>{notificationCount}</span>
+                                )}
                             </button>
                         </li>
                     ))}
