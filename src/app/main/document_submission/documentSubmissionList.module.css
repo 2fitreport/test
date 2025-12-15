@@ -137,11 +137,11 @@
 }
 
 .statBox:nth-child(7) {
-    background-color: #ce93d8;
+    background-color: #81c784;
 }
 
 .statBox:nth-child(7):hover {
-    background-color: #6a1b9a;
+    background-color: #1b5e20;
 }
 
 .statBoxActive {
@@ -470,8 +470,8 @@
 }
 
 .submitted {
-    background-color: #f3e5f5;
-    color: #6a1b9a;
+    background-color: #e8f5e9;
+    color: #1b5e20;
 }
 
 .date {
