@@ -14,14 +14,16 @@ interface Document {
     user_name: string;
     document_type: string;
     title: string;
-    status: 'submitted' | 'pending' | 'rejected';
+    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
+    progress_start_date?: string;
+    progress_end_time?: string;
     reason?: string;
     reason_read: boolean;
 }
 
-type SortColumn = 'user_id' | 'user_name' | 'document_type' | 'title' | 'status' | 'submitted_date';
+type SortColumn = 'user_id' | 'user_name' | 'title' | 'status' | 'submitted_date';
 type SortOrder = 'asc' | 'desc';
 
 const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_, ref) {
@@ -32,12 +34,12 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [statusFilter, setStatusFilter] = useState<'all' | 'submitted' | 'pending' | 'rejected'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
-    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'submit' } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string } | null>(null);
 
@@ -48,6 +50,24 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const handleProgressStart = (id: number) => {
         setPendingAction({ id, action: 'start' });
         setConfirmMessage('서류 진행을 시작하시겠습니까?');
+        setConfirmModalOpen(true);
+    };
+
+    const handleApprove = (id: number) => {
+        setPendingAction({ id, action: 'approve' });
+        setConfirmMessage('서류를 승인하시겠습니까?');
+        setConfirmModalOpen(true);
+    };
+
+    const handleReject = (id: number) => {
+        setPendingAction({ id, action: 'reject' });
+        setConfirmMessage('서류를 반려하시겠습니까?');
+        setConfirmModalOpen(true);
+    };
+
+    const handleSubmit = (id: number) => {
+        setPendingAction({ id, action: 'submit' });
+        setConfirmMessage('서류를 제출하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
@@ -67,14 +87,81 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         if (!pendingAction) return;
 
         const { id, action } = pendingAction;
+        const now = new Date();
+        const timeString = now.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
 
         if (action === 'start') {
             setDocuments(docs =>
                 docs.map(doc =>
-                    doc.id === id ? { ...doc, progress_status: 'in_progress' as const } : doc
+                    doc.id === id ? {
+                        ...doc,
+                        status: 'in_progress' as const,
+                        progress_status: 'in_progress' as const,
+                        progress_start_date: now.toISOString()
+                    } : doc
                 )
             );
             setSuccessMessage('서류 진행이 시작되었습니다.');
+        } else if (action === 'approve') {
+            setDocuments(docs =>
+                docs.map(doc => {
+                    if (doc.id === id && doc.status === 'in_progress' && doc.progress_start_date) {
+                        const startTime = new Date(doc.progress_start_date);
+                        const endTime = new Date();
+                        const diffMs = endTime.getTime() - startTime.getTime();
+                        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+                        const timeDisplay = `${hours}시간${minutes}분 ${String(seconds).padStart(2, '0')}초`;
+
+                        return {
+                            ...doc,
+                            status: 'approved' as const,
+                            progress_status: 'stopped' as const,
+                            progress_end_time: timeDisplay
+                        };
+                    }
+                    return doc;
+                })
+            );
+            setSuccessMessage('서류가 승인되었습니다.');
+        } else if (action === 'reject') {
+            setDocuments(docs =>
+                docs.map(doc => {
+                    if (doc.id === id && doc.status === 'in_progress') {
+                        return {
+                            ...doc,
+                            status: 'rejected' as const,
+                            progress_status: 'not_started' as const
+                        };
+                    }
+                    return doc;
+                })
+            );
+            setSuccessMessage('서류가 반려되었습니다.');
+        } else if (action === 'submit') {
+            setDocuments(docs =>
+                docs.map(doc => {
+                    if (doc.id === id) {
+                        return {
+                            ...doc,
+                            status: 'submitted' as const,
+                            progress_status: 'not_started' as const
+                        };
+                    }
+                    return doc;
+                })
+            );
+            setSuccessMessage('서류가 제출되었습니다.');
         } else if (action === 'stop') {
             setDocuments(docs =>
                 docs.map(doc =>
@@ -95,6 +182,10 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const fetchDocuments = async () => {
         try {
             // 더미 데이터
+            const now = new Date();
+            const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+            const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000).toISOString();
+
             const dummyDocuments: Document[] = [
                 {
                     id: 1,
@@ -102,9 +193,10 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     user_name: '김철수',
                     document_type: '증명서',
                     title: '직원 경력 증명서',
-                    status: 'submitted',
+                    status: 'in_progress',
                     progress_status: 'in_progress',
                     submitted_date: '2025-12-10',
+                    progress_start_date: twoHoursAgo,
                     reason: '다음에는 조금 더 상세한 내용으로 작성해주세요.',
                     reason_read: false,
                 },
@@ -114,8 +206,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     user_name: '이영희',
                     document_type: '계약서',
                     title: '2025년 계약서',
-                    status: 'pending',
-                    progress_status: 'stopped',
+                    status: 'waiting',
+                    progress_status: 'not_started',
                     submitted_date: '2025-12-13',
                     reason_read: true,
                 },
@@ -137,9 +229,10 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     user_name: '김철수',
                     document_type: '이력서',
                     title: '최신 이력서 (2025)',
-                    status: 'submitted',
+                    status: 'in_progress',
                     progress_status: 'in_progress',
                     submitted_date: '2025-12-08',
+                    progress_start_date: oneHourAgo,
                     reason: '보안 정보를 더 강화해주시기 바랍니다.',
                     reason_read: false,
                 },
@@ -149,9 +242,22 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     user_name: '정수진',
                     document_type: '증명서',
                     title: '재직 및 급여 증명서',
-                    status: 'pending',
-                    progress_status: 'not_started',
+                    status: 'revision',
+                    progress_status: 'in_progress',
                     submitted_date: '2025-12-14',
+                    progress_start_date: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
+                    reason_read: true,
+                },
+                {
+                    id: 6,
+                    user_id: 'user005',
+                    user_name: '이수진',
+                    document_type: '신청서',
+                    title: '프로젝트 신청서',
+                    status: 'approved',
+                    progress_status: 'not_started',
+                    submitted_date: '2025-12-12',
+                    progress_end_time: '01:30:45',
                     reason_read: true,
                 },
             ];
@@ -180,8 +286,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             const query = searchQuery.toLowerCase();
             return (
                 doc.user_id.toLowerCase().includes(query) ||
-                doc.user_name.toLowerCase().includes(query) ||
-                doc.document_type.toLowerCase().includes(query)
+                doc.user_name.toLowerCase().includes(query)
             );
         });
 
@@ -209,6 +314,43 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         return filtered.slice(startIndex, endIndex);
     };
 
+    const getStatusCounts = () => {
+        const counts = {
+            all: documents.length,
+            waiting: 0,
+            in_progress: 0,
+            approved: 0,
+            revision: 0,
+            rejected: 0,
+            submitted: 0,
+        };
+
+        documents.forEach(doc => {
+            switch (doc.status) {
+                case 'waiting':
+                    counts.waiting++;
+                    break;
+                case 'in_progress':
+                    counts.in_progress++;
+                    break;
+                case 'approved':
+                    counts.approved++;
+                    break;
+                case 'revision':
+                    counts.revision++;
+                    break;
+                case 'rejected':
+                    counts.rejected++;
+                    break;
+                case 'submitted':
+                    counts.submitted++;
+                    break;
+            }
+        });
+
+        return counts;
+    };
+
     const getSortIcon = (column: SortColumn) => {
         const isActive = sortColumn === column;
         return (
@@ -221,12 +363,18 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const getStatusLabel = (status: string) => {
         switch (status) {
-            case 'submitted':
-                return '승인됨';
-            case 'pending':
-                return '대기중';
+            case 'approved':
+                return '승인';
+            case 'waiting':
+                return '대기';
             case 'rejected':
-                return '반려됨';
+                return '반려';
+            case 'revision':
+                return '보완';
+            case 'in_progress':
+                return '진행';
+            case 'submitted':
+                return '제출';
             default:
                 return status;
         }
@@ -234,12 +382,18 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const getStatusBadgeClass = (status: string) => {
         switch (status) {
-            case 'submitted':
-                return styles.submitted;
-            case 'pending':
-                return styles.pending;
+            case 'approved':
+                return styles.approved;
+            case 'waiting':
+                return styles.waiting;
             case 'rejected':
                 return styles.rejected;
+            case 'revision':
+                return styles.revision;
+            case 'in_progress':
+                return styles.started;
+            case 'submitted':
+                return styles.submitted;
             default:
                 return '';
         }
@@ -291,9 +445,12 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     }}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="submitted">승인됨</option>
-                                    <option value="pending">대기중</option>
-                                    <option value="rejected">반려됨</option>
+                                    <option value="approved">승인</option>
+                                    <option value="waiting">대기</option>
+                                    <option value="rejected">반려</option>
+                                    <option value="revision">보완</option>
+                                    <option value="in_progress">진행</option>
+                                    <option value="submitted">제출</option>
                                 </select>
                                 <Image
                                     src="/arrow.svg"
@@ -354,8 +511,6 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     <option value="user_id-desc">사용자 ID (Z-A)</option>
                                     <option value="user_name-asc">이름 (A-Z)</option>
                                     <option value="user_name-desc">이름 (Z-A)</option>
-                                    <option value="document_type-asc">서류 유형 (A-Z)</option>
-                                    <option value="document_type-desc">서류 유형 (Z-A)</option>
                                     <option value="status-asc">상태 (A-Z)</option>
                                     <option value="status-desc">상태 (Z-A)</option>
                                 </select>
@@ -369,6 +524,79 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div className={styles.statsContainer}>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'all' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('all');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>전체</span>
+                        <span className={styles.statCount}>{getStatusCounts().all}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'in_progress' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('in_progress');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>진행</span>
+                        <span className={styles.statCount}>{getStatusCounts().in_progress}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'approved' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('approved');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>승인</span>
+                        <span className={styles.statCount}>{getStatusCounts().approved}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'revision' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('revision');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>보완</span>
+                        <span className={styles.statCount}>{getStatusCounts().revision}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'rejected' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('rejected');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>반려</span>
+                        <span className={styles.statCount}>{getStatusCounts().rejected}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'waiting' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('waiting');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>대기</span>
+                        <span className={styles.statCount}>{getStatusCounts().waiting}</span>
+                    </button>
+                    <button
+                        className={`${styles.statBox} ${statusFilter === 'submitted' ? styles.statBoxActive : ''}`}
+                        onClick={() => {
+                            setStatusFilter('submitted');
+                            setCurrentPage(1);
+                        }}
+                    >
+                        <span className={styles.statLabel}>제출</span>
+                        <span className={styles.statCount}>{getStatusCounts().submitted}</span>
+                    </button>
                 </div>
 
                 <div className={styles.tableWrapper}>
@@ -395,9 +623,6 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     <th className={styles.sortableHeader} onClick={() => handleSort('title')}>
                                         제목{getSortIcon('title')}
                                     </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('document_type')}>
-                                        서류 유형{getSortIcon('document_type')}
-                                    </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
                                         상태{getSortIcon('status')}
                                     </th>
@@ -415,7 +640,6 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                         <td className={styles.userId}>{doc.user_id}</td>
                                         <td className={styles.userName}>{doc.user_name}</td>
                                         <td className={styles.title}>{doc.title}</td>
-                                        <td className={styles.documentType}>{doc.document_type}</td>
                                         <td className={styles.status}>
                                             <span className={`${styles.statusBadge} ${getStatusBadgeClass(doc.status)}`}>
                                                 {getStatusLabel(doc.status)}
@@ -435,7 +659,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                         );
                                                     }}
                                                 >
-                                                    사유 보기
+                                                    보기
                                                 </button>
                                             ) : (
                                                 <span className={styles.noReason}>없음</span>
@@ -443,10 +667,16 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                         </td>
                                         <td className={styles.date}>{doc.submitted_date}</td>
                                         <td className={styles.timeAgo}>
-                                            <TimeAgo dateString={doc.submitted_date} />
+                                            {(doc.status === 'in_progress' || doc.status === 'revision') && doc.progress_start_date ? (
+                                                <TimeAgo dateString={doc.progress_start_date} />
+                                            ) : doc.status === 'approved' && doc.progress_end_time ? (
+                                                <span>{doc.progress_end_time}</span>
+                                            ) : (
+                                                <span>-</span>
+                                            )}
                                         </td>
                                         <td className={styles.actions}>
-                                            {doc.progress_status === 'not_started' && (
+                                            {(doc.status === 'waiting' || doc.status === 'revision' || doc.status === 'rejected') && doc.progress_status === 'not_started' && (
                                                 <button
                                                     className={styles.startButton}
                                                     onClick={() => handleProgressStart(doc.id)}
@@ -454,21 +684,43 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                     진행
                                                 </button>
                                             )}
-                                            {doc.progress_status === 'in_progress' && (
-                                                <button
-                                                    className={styles.stopButton}
-                                                    onClick={() => handleProgressStop(doc.id)}
-                                                >
-                                                    중지
-                                                </button>
+                                            {doc.status === 'in_progress' && doc.progress_status === 'stopped' && (
+                                                <>
+                                                    <button
+                                                        className={styles.startButton}
+                                                        onClick={() => handleProgressStart(doc.id)}
+                                                    >
+                                                        재시작
+                                                    </button>
+                                                    <button
+                                                        className={styles.submitButton}
+                                                        onClick={() => handleSubmit(doc.id)}
+                                                    >
+                                                        제출
+                                                    </button>
+                                                </>
                                             )}
-                                            {doc.progress_status === 'stopped' && (
-                                                <button
-                                                    className={styles.startButton}
-                                                    onClick={() => handleProgressStart(doc.id)}
-                                                >
-                                                    재시작
-                                                </button>
+                                            {doc.status === 'in_progress' && doc.progress_status === 'in_progress' && (
+                                                <>
+                                                    <button
+                                                        className={styles.stopButton}
+                                                        onClick={() => handleProgressStop(doc.id)}
+                                                    >
+                                                        중지
+                                                    </button>
+                                                    <button
+                                                        className={styles.approveButton}
+                                                        onClick={() => handleApprove(doc.id)}
+                                                    >
+                                                        승인
+                                                    </button>
+                                                    <button
+                                                        className={styles.rejectActionButton}
+                                                        onClick={() => handleReject(doc.id)}
+                                                    >
+                                                        반려
+                                                    </button>
+                                                </>
                                             )}
                                             <button
                                                 className={styles.deleteButton}

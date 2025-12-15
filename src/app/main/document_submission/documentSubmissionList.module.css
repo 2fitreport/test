@@ -36,6 +36,138 @@
     flex-wrap: wrap;
 }
 
+.statsContainer {
+    display: flex;
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background-color: #ffffff;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.statBox {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 100px;
+    padding: 6px 12px;
+    text-align: center;
+    width: fit-content;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.statLabel {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 14px;
+    margin-bottom: 0;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.statCount {
+    font-weight: 700;
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.statBox:nth-child(1) {
+    background-color: #cccccc;
+}
+
+.statBox:nth-child(1):hover {
+    background-color: #999999;
+}
+
+.statBox:nth-child(2) {
+    background-color: #42a5f5;
+}
+
+.statBox:nth-child(2):hover {
+    background-color: #1565c0;
+}
+
+.statBox:nth-child(3) {
+    background-color: #66bb6a;
+}
+
+.statBox:nth-child(3):hover {
+    background-color: #0f661a;
+}
+
+.statBox:nth-child(4) {
+    background-color: #ab47bc;
+}
+
+.statBox:nth-child(4):hover {
+    background-color: #6a1b9a;
+}
+
+.statBox:nth-child(5) {
+    background-color: #ef5350;
+}
+
+.statBox:nth-child(5):hover {
+    background-color: #7a0f0f;
+}
+
+.statBox:nth-child(6) {
+    background-color: #fdd835;
+    color: #333;
+}
+
+.statBox:nth-child(6):hover {
+    background-color: #856404;
+}
+
+.statBox:nth-child(6) .statLabel,
+.statBox:nth-child(6) .statCount {
+    color: #333;
+}
+
+.statBox:nth-child(6):hover .statLabel,
+.statBox:nth-child(6):hover .statCount {
+    color: #ffffff;
+}
+
+.statBox:nth-child(7) {
+    background-color: #ce93d8;
+}
+
+.statBox:nth-child(7):hover {
+    background-color: #6a1b9a;
+}
+
+.statBoxActive {
+    opacity: 1 !important;
+}
+
+.statInProgress {
+    color: #ffffff;
+}
+
+.statApproved {
+    color: #ffffff;
+}
+
+.statRevision {
+    color: #ffffff;
+}
+
+.statRejected {
+    color: #ffffff;
+}
+
+.statWaiting {
+    color: #ffffff;
+}
+
 .searchContainer {
     display: flex;
     align-items: center;
@@ -312,12 +444,12 @@
     display: inline-block;
 }
 
-.submitted {
+.approved {
     background-color: #ecf9f0;
     color: #0f661a;
 }
 
-.pending {
+.waiting {
     background-color: #fff5cd;
     color: #856404;
 }
@@ -325,6 +457,21 @@
 .rejected {
     background-color: #fff5f5;
     color: #7a0f0f;
+}
+
+.revision {
+    background-color: #f3e5f5;
+    color: #6a1b9a;
+}
+
+.started {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.submitted {
+    background-color: #f3e5f5;
+    color: #6a1b9a;
 }
 
 .date {
@@ -399,6 +546,63 @@
 @media (min-width: 769px) {
     .stopButton:hover {
         background-color: #FF9800;
+        color: #ffffff;
+    }
+}
+
+.approveButton {
+    padding: 6px 12px;
+    border: 1px solid #2196F3;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+    color: #2196F3;
+}
+
+@media (min-width: 769px) {
+    .approveButton:hover {
+        background-color: #2196F3;
+        color: #ffffff;
+    }
+}
+
+.rejectActionButton {
+    padding: 6px 12px;
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+    color: #f44336;
+}
+
+@media (min-width: 769px) {
+    .rejectActionButton:hover {
+        background-color: #f44336;
+        color: #ffffff;
+    }
+}
+
+.submitButton {
+    padding: 6px 12px;
+    border: 1px solid #9c27b0;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #ffffff;
+    color: #9c27b0;
+}
+
+@media (min-width: 769px) {
+    .submitButton:hover {
+        background-color: #9c27b0;
         color: #ffffff;
     }
 }
