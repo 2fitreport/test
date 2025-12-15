@@ -268,8 +268,9 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     document_type: '신청서',
                     title: '휴가 신청서',
                     status: 'submitted',
-                    progress_status: 'not_started',
+                    progress_status: 'in_progress',
                     submitted_date: '2025-12-15',
+                    progress_start_date: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
                     reason_read: true,
                 },
             ];
@@ -679,7 +680,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                         </td>
                                         <td className={styles.date}>{doc.submitted_date}</td>
                                         <td className={styles.timeAgo}>
-                                            {(doc.status === 'in_progress' || doc.status === 'revision') && doc.progress_start_date ? (
+                                            {(doc.status === 'in_progress' || doc.status === 'revision' || doc.status === 'submitted') && doc.progress_start_date ? (
                                                 <TimeAgo dateString={doc.progress_start_date} />
                                             ) : doc.status === 'approved' && doc.progress_end_time ? (
                                                 <span>{doc.progress_end_time}</span>
@@ -713,6 +714,28 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                 </>
                                             )}
                                             {doc.status === 'in_progress' && doc.progress_status === 'in_progress' && (
+                                                <>
+                                                    <button
+                                                        className={styles.stopButton}
+                                                        onClick={() => handleProgressStop(doc.id)}
+                                                    >
+                                                        중지
+                                                    </button>
+                                                    <button
+                                                        className={styles.approveButton}
+                                                        onClick={() => handleApprove(doc.id)}
+                                                    >
+                                                        승인
+                                                    </button>
+                                                    <button
+                                                        className={styles.rejectActionButton}
+                                                        onClick={() => handleReject(doc.id)}
+                                                    >
+                                                        반려
+                                                    </button>
+                                                </>
+                                            )}
+                                            {doc.status === 'submitted' && (
                                                 <>
                                                     <button
                                                         className={styles.stopButton}
