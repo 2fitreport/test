@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import UserStats from './UserStats';
 import UserList from './UserList';
+import DocumentSubmission from './DocumentSubmission';
 import styles from './page.module.css';
 
 export default function UserManagementPage() {

@@ -1,0 +1,50 @@
+.container {
+    padding: 40px;
+    padding-bottom: 80px;
+    margin-left: 240px;
+    background-color: #f9fafb;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+.titleWrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 0 !important;
+}
+
+.contentWrapper {
+    width: 100%;
+}
+
+/* 반응형 */
+@media (max-width: 1080px) {
+    .container {
+        margin-left: 0;
+        padding: 40px;
+        padding-top: 120px;
+        padding-bottom: 80px;
+    }
+
+    .title {
+        font-size: 22px;
+        margin-bottom: 28px;
+    }
+}
+
+@media (max-width: 450px) {
+    .container {
+        padding: 12px;
+        padding-top: 120px;
+        padding-bottom: 80px;
+    }
+}

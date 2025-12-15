@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile } from 'react-icons/fi';
 import { clearAuthToken, getAdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -14,6 +14,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     { path: '/main/user_management', label: '사용자 관리' },
+    { path: '/main/document_submission', label: '서류 제출' },
 ];
 
 export default function Sidebar() {
@@ -73,7 +74,11 @@ export default function Sidebar() {
                                 className={`${styles.menuItem} ${pathname === item.path ? styles.active : ''}`}
                                 onClick={() => handleMenuClick(item.path)}
                             >
-                                <FiUsers className={styles.menuIcon} />
+                                {item.path === '/main/user_management' ? (
+                                    <FiUsers className={styles.menuIcon} />
+                                ) : (
+                                    <FiFile className={styles.menuIcon} />
+                                )}
                                 {item.label}
                             </button>
                         </li>
