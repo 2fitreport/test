@@ -246,6 +246,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     progress_status: 'in_progress',
                     submitted_date: '2025-12-14',
                     progress_start_date: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
+                    reason: '직인이 불분명합니다. 더 명확한 인장으로 다시 제출해주세요.',
                     reason_read: true,
                 },
                 {
@@ -258,6 +259,17 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     progress_status: 'not_started',
                     submitted_date: '2025-12-12',
                     progress_end_time: '01:30:45',
+                    reason_read: true,
+                },
+                {
+                    id: 7,
+                    user_id: 'user006',
+                    user_name: '홍길동',
+                    document_type: '신청서',
+                    title: '휴가 신청서',
+                    status: 'submitted',
+                    progress_status: 'not_started',
+                    submitted_date: '2025-12-15',
                     reason_read: true,
                 },
             ];
