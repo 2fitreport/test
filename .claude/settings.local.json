@@ -43,7 +43,11 @@
       "Bash(npm run build:*)",
       "Bash(git config:*)",
       "Bash(git push:*)",
-      "Bash(npm update:*)"
+      "Bash(npm update:*)",
+      "Bash(git credential:*)",
+      "Bash(host=github.com)",
+      "Bash(protocol=https)",
+      "Bash(powershell -Command \"\n$cred = New-Object System.Management.Automation.PSCredential -ArgumentList @(''2fitweb@gmail.com'', (ConvertTo-SecureString ''기본인증패스워드없음'' -AsPlainText -Force))\ngit config --global credential.username ''2fitweb@gmail.com''\n\")"
     ],
     "deny": [],
     "ask": []

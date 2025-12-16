@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, forwardRef } from 'react';
+import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import Image from 'next/image';
 import Pagination from '@/app/components/Pagination/Pagination';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
@@ -53,6 +53,10 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     useEffect(() => {
         fetchDocuments();
     }, []);
+
+    useImperativeHandle(ref, () => ({
+        refreshDocuments: fetchDocuments,
+    }));
 
     const handleProgressStart = (id: number) => {
         setPendingAction({ id, action: 'start' });
