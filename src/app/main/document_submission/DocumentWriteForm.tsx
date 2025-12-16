@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getAdminData } from '@/lib/auth';
 import styles from './documentWriteForm.module.css';
 
 interface DocumentWriteFormProps {
@@ -17,6 +18,17 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        const adminData = getAdminData();
+        if (adminData) {
+            setFormData(prev => ({
+                ...prev,
+                user_id: adminData.user_id || '',
+                user_name: adminData.name || '',
+            }));
+        }
+    }, []);
 
     const documentTypes = [
         '증명서',
