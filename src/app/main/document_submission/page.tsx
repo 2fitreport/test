@@ -12,12 +12,12 @@ export default function DocumentSubmissionPage() {
     return (
         <div className={styles.container}>
             <div className={styles.titleWrapper}>
-                <h1 className={styles.title}>서류 제출</h1>
+                <h1 className={styles.title}>기업관리</h1>
                 <button
                     className={styles.createButton}
                     onClick={() => setShowWriteForm(true)}
                 >
-                    + 서류 작성
+                    + 기업 생성
                 </button>
             </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import Image from 'next/image';
 import Pagination from '@/app/components/Pagination/Pagination';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
+import ActionModal from '@/app/components/Modal/ActionModal';
 import TimeAgo from './TimeAgo';
 import styles from './documentSubmissionList.module.css';
 import modalStyles from '@/app/components/Modal/Modal.module.css';
@@ -14,6 +15,10 @@ interface Document {
     user_name: string;
     document_type: string;
     title: string;
+    company_name?: string;
+    representative_name?: string;
+    manager_name?: string;
+    progress_details?: string;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
@@ -25,7 +30,7 @@ interface Document {
     reason_read: boolean;
 }
 
-type SortColumn = 'user_id' | 'user_name' | 'title' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date';
+type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date';
 type SortOrder = 'asc' | 'desc';
 
 const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_, ref) {
@@ -49,6 +54,11 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const [reasonInputModalOpen, setReasonInputModalOpen] = useState(false);
     const [reasonInput, setReasonInput] = useState('');
     const [pendingReasonAction, setPendingReasonAction] = useState<{ id: number; action: 'reject' | 'revision' } | null>(null);
+    const [actionModalOpen, setActionModalOpen] = useState(false);
+    const [selectedDocumentForAction, setSelectedDocumentForAction] = useState<Document | null>(null);
+    const [managerSelectModalOpen, setManagerSelectModalOpen] = useState(false);
+    const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
+    const [selectedManager, setSelectedManager] = useState<string>('');
 
     useEffect(() => {
         fetchDocuments();
@@ -65,9 +75,17 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     };
 
     const handleApprove = (id: number) => {
-        setPendingAction({ id, action: 'approve' });
-        setConfirmMessage('서류를 승인하시겠습니까?');
-        setConfirmModalOpen(true);
+        const doc = documents.find(d => d.id === id);
+        if (doc && doc.progress_details === '대표실무자') {
+            // 담당실무자 선택 모달 띄우기
+            setSelectedManagerId(id);
+            setManagerSelectModalOpen(true);
+        } else {
+            // 일반 승인 진행
+            setPendingAction({ id, action: 'approve' });
+            setConfirmMessage('서류를 승인하시겠습니까?');
+            setConfirmModalOpen(true);
+        }
     };
 
     const handleReject = (id: number) => {
@@ -98,6 +116,11 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         setPendingAction({ id, action: 'delete' });
         setConfirmMessage('이 서류를 삭제하시겠습니까?');
         setConfirmModalOpen(true);
+    };
+
+    const handleOpenActionModal = (doc: Document) => {
+        setSelectedDocumentForAction(doc);
+        setActionModalOpen(true);
     };
 
     const handleConfirmAction = async () => {
@@ -154,27 +177,42 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             setDocuments(docs =>
                 docs.map(doc => {
                     if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted') && doc.progress_start_date) {
-                        const startTime = new Date(doc.progress_start_date);
-                        const endTime = new Date();
-                        const diffMs = endTime.getTime() - startTime.getTime();
-                        const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                        const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+                        // 진행상황에 따라 다르게 처리
+                        if (doc.progress_details === '검수자') {
+                            // 검수자 → 대표실무자로 변경
+                            return {
+                                ...doc,
+                                progress_details: '대표실무자'
+                            };
+                        } else {
+                            // 최종 승인
+                            const startTime = new Date(doc.progress_start_date);
+                            const endTime = new Date();
+                            const diffMs = endTime.getTime() - startTime.getTime();
+                            const hours = Math.floor(diffMs / (1000 * 60 * 60));
+                            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
 
-                        const timeDisplay = `${hours}시간${minutes}분 ${String(seconds).padStart(2, '0')}초`;
+                            const timeDisplay = `${hours}시간${minutes}분 ${String(seconds).padStart(2, '0')}초`;
 
-                        return {
-                            ...doc,
-                            status: 'approved' as const,
-                            progress_status: 'stopped' as const,
-                            progress_end_time: timeDisplay,
-                            completed_date: new Date().toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3')
-                        };
+                            const now = new Date();
+                            const completedHours = String(now.getHours()).padStart(2, '0');
+                            const completedMinutes = String(now.getMinutes()).padStart(2, '0');
+                            const dateStr = now.toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3');
+
+                            return {
+                                ...doc,
+                                status: 'approved' as const,
+                                progress_status: 'stopped' as const,
+                                progress_end_time: timeDisplay,
+                                completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
+                            };
+                        }
                     }
                     return doc;
                 })
             );
-            setSuccessMessage('서류가 승인되었습니다.');
+            setSuccessMessage(documents.find(d => d.id === id)?.progress_details === '검수자' ? '대표실무자로 진행합니다.' : '서류가 승인되었습니다.');
         } else if (action === 'reject') {
             setDocuments(docs =>
                 docs.map(doc => {
@@ -501,7 +539,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         <>
             <div className={styles.documentListContainer}>
                 <div className={styles.header}>
-                    <h2>서류 목록</h2>
+                    <h2>기업 목록</h2>
                     <span className={styles.count}>총 {getFilteredAndSortedDocuments().length}건</span>
                 </div>
 
@@ -749,13 +787,22 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                         />
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
-                                        사용자 ID{getSortIcon('user_id')}
+                                        작성자 ID{getSortIcon('user_id')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
-                                        이름{getSortIcon('user_name')}
+                                        작성자{getSortIcon('user_name')}
                                     </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('title')}>
-                                        제목{getSortIcon('title')}
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
+                                        기업명{getSortIcon('company_name')}
+                                    </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('representative_name')}>
+                                        대표자명{getSortIcon('representative_name')}
+                                    </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
+                                        담당실무자{getSortIcon('manager_name')}
+                                    </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('progress_details')}>
+                                        진행상황{getSortIcon('progress_details')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
                                         상태{getSortIcon('status')}
@@ -772,9 +819,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     <th className={styles.sortableHeader} onClick={() => handleSort('progress_start_date')}>
                                         시간 경과{getSortIcon('progress_start_date')}
                                     </th>
-                                    <th>정보</th>
-                                    <th>수정</th>
-                                    <th>관리</th>
+                                    <th>작업</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -789,7 +834,16 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                         </td>
                                         <td className={styles.userId}>{doc.user_id}</td>
                                         <td className={styles.userName}>{doc.user_name}</td>
-                                        <td className={styles.title}>{doc.title}</td>
+                                        <td className={styles.companyName}>{doc.company_name || '-'}</td>
+                                        <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
+                                        <td className={styles.managerName}>{doc.manager_name || '-'}</td>
+                                        <td className={styles.progressDetails}>
+                                            {doc.status === 'in_progress' ? (
+                                                <span className={styles.badge}>{doc.progress_details}</span>
+                                            ) : (
+                                                '-'
+                                            )}
+                                        </td>
                                         <td className={styles.status}>
                                             <span className={`${styles.statusBadge} ${getStatusBadgeClass(doc.status)}`}>
                                                 {getStatusLabel(doc.status)}
@@ -833,78 +887,12 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                 <span>-</span>
                                             )}
                                         </td>
-                                        <td className={styles.infoCell}>
+                                        <td className={styles.actionsCell}>
                                             <button
-                                                className={styles.infoButton}
-                                                onClick={() => {
-                                                    // 정보 보기 로직
-                                                }}
-                                                title="정보 보기"
+                                                className={styles.actionButton}
+                                                onClick={() => handleOpenActionModal(doc)}
                                             >
-                                                📋
-                                            </button>
-                                        </td>
-                                        <td className={styles.editCell}>
-                                            <button
-                                                className={styles.editButton}
-                                                onClick={() => {
-                                                    // 수정 로직
-                                                }}
-                                            >
-                                                수정
-                                            </button>
-                                        </td>
-                                        <td className={styles.actions}>
-                                            <button
-                                                className={styles.startButton}
-                                                onClick={() => handleProgressStart(doc.id)}
-                                            >
-                                                진행
-                                            </button>
-                                            {doc.status === 'stopped' ? (
-                                                <button
-                                                    className={styles.restartButton}
-                                                    onClick={() => handleProgressStart(doc.id)}
-                                                >
-                                                    재시작
-                                                </button>
-                                            ) : (
-                                                <button
-                                                    className={styles.stopButton}
-                                                    onClick={() => handleProgressStop(doc.id)}
-                                                >
-                                                    중지
-                                                </button>
-                                            )}
-                                            <button
-                                                className={styles.approveButton}
-                                                onClick={() => handleApprove(doc.id)}
-                                            >
-                                                승인
-                                            </button>
-                                            <button
-                                                className={styles.rejectActionButton}
-                                                onClick={() => handleReject(doc.id)}
-                                            >
-                                                반려
-                                            </button>
-                                            <button
-                                                className={styles.revisionButton}
-                                                onClick={() => handleRevision(doc.id)}
-                                            >
-                                                보완
-                                            </button>
-                                            <button
-                                                className={styles.submitButton}
-                                                onClick={() => handleSubmit(doc.id)}
-                                            >
-                                                제출
-                                            </button>
-                                            <button
-                                                className={styles.deleteButton}
-                                                onClick={() => handleProgressDelete(doc.id)}
-                                            >
-                                                삭제
+                                                작업
                                             </button>
                                         </td>
                                     </tr>
@@ -1058,6 +1046,118 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     onClick={() => {
                                         setSuccessModalOpen(false);
                                         setSuccessMessage('');
+                                    }}
+                                >
+                                    확인
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <ActionModal
+                    isOpen={actionModalOpen}
+                    document={selectedDocumentForAction}
+                    onClose={() => {
+                        setActionModalOpen(false);
+                        setSelectedDocumentForAction(null);
+                    }}
+                    onEdit={(id) => {
+                        // 수정 기능 구현 예정
+                        console.log('수정:', id);
+                    }}
+                    onProgressStart={handleProgressStart}
+                    onProgressStop={handleProgressStop}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    onRevision={handleRevision}
+                    onSubmit={handleSubmit}
+                    onDelete={handleProgressDelete}
+                />
+
+                {managerSelectModalOpen && selectedManagerId && (
+                    <div className={modalStyles.overlay} onClick={() => {
+                        setManagerSelectModalOpen(false);
+                        setSelectedManagerId(null);
+                        setSelectedManager('');
+                    }}>
+                        <div className={`${modalStyles.modal}`} onClick={(e) => e.stopPropagation()}>
+                            <div className={modalStyles.header}>
+                                <h3 className={modalStyles.title}>담당실무자 배정</h3>
+                            </div>
+                            <div className={modalStyles.content}>
+                                <p style={{ marginBottom: '16px', fontSize: '14px', color: '#666' }}>
+                                    담당실무자를 선택하세요
+                                </p>
+                                <select
+                                    value={selectedManager}
+                                    onChange={(e) => setSelectedManager(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        border: '1px solid #e0e0e0',
+                                        borderRadius: '6px',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    <option value="">선택하세요</option>
+                                    {documents
+                                        .filter(doc => doc.status === 'approved')
+                                        .map(doc => (
+                                            <option key={doc.id} value={doc.manager_name || ''}>
+                                                {doc.manager_name}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                            <div className={modalStyles.footer}>
+                                <button
+                                    className={modalStyles.cancelButton}
+                                    onClick={() => {
+                                        setManagerSelectModalOpen(false);
+                                        setSelectedManagerId(null);
+                                        setSelectedManager('');
+                                    }}
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    className={modalStyles.confirmButton}
+                                    onClick={() => {
+                                        if (selectedManager && selectedManagerId) {
+                                            setDocuments(docs =>
+                                                docs.map(doc => {
+                                                    if (doc.id === selectedManagerId) {
+                                                        return {
+                                                            ...doc,
+                                                            progress_details: '담당실무자',
+                                                            status: 'approved' as const,
+                                                            progress_status: 'stopped' as const,
+                                                            progress_end_time: '배정 완료'
+                                                        };
+                                                    }
+                                                    return doc;
+                                                })
+                                            );
+                                            setSuccessMessage('담당실무자가 배정되었습니다.');
+                                            setSuccessModalOpen(true);
+                                            setManagerSelectModalOpen(false);
+                                            setSelectedManagerId(null);
+                                            setSelectedManager('');
+
+                                            // 데이터베이스에 저장
+                                            const updatedDoc = documents.find(d => d.id === selectedManagerId);
+                                            if (updatedDoc) {
+                                                saveDocumentToDatabase({
+                                                    ...updatedDoc,
+                                                    progress_details: '담당실무자',
+                                                    status: 'approved',
+                                                    progress_end_time: '배정 완료'
+                                                });
+                                            }
+                                        }
                                     }}
                                 >
                                     확인

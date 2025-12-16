@@ -5,7 +5,7 @@ export const getAuthToken = () => {
 };
 
 // 로컬스토리지에 로그인 정보 저장 (무한 유지)
-export const setAuthToken = (token: string, adminData: { name: string; position: string }) => {
+export const setAuthToken = (token: string, adminData: { name: string; position: string; company_name?: string }) => {
   if (typeof window === 'undefined') return;
   localStorage.setItem('auth_token', token);
   localStorage.setItem('admin_data', JSON.stringify(adminData));

@@ -14,7 +14,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     { path: '/main/user_management', label: '사용자 관리' },
-    { path: '/main/document_submission', label: '서류 제출' },
+    { path: '/main/document_submission', label: '기업관리' },
 ];
 
 export default function Sidebar() {

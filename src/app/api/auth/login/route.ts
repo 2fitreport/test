@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
           phone: user.phone,
           address: user.address,
           status: user.status,
+          company_name: user.company_name,
         },
       },
       { status: 200 }

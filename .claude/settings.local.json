@@ -47,7 +47,10 @@
       "Bash(git credential:*)",
       "Bash(host=github.com)",
       "Bash(protocol=https)",
-      "Bash(powershell -Command \"\n$cred = New-Object System.Management.Automation.PSCredential -ArgumentList @(''2fitweb@gmail.com'', (ConvertTo-SecureString ''기본인증패스워드없음'' -AsPlainText -Force))\ngit config --global credential.username ''2fitweb@gmail.com''\n\")"
+      "Bash(powershell -Command \"\n$cred = New-Object System.Management.Automation.PSCredential -ArgumentList @(''2fitweb@gmail.com'', (ConvertTo-SecureString ''기본인증패스워드없음'' -AsPlainText -Force))\ngit config --global credential.username ''2fitweb@gmail.com''\n\")",
+      "mcp__supabase__list_extensions",
+      "mcp__supabase__deploy_edge_function",
+      "mcp__playwright__playwright_post"
     ],
     "deny": [],
     "ask": []

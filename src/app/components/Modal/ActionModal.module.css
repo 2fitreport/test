@@ -1,0 +1,230 @@
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    width: 90%;
+    border: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px 20px 16px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+}
+
+.title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--black-color);
+    text-align: center;
+}
+
+.closeButton {
+    position: absolute;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+    color: #333;
+}
+
+.content {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+}
+
+.documentInfo {
+    padding: 0;
+    border-radius: 0;
+    background-color: transparent;
+    border-left: none;
+    width: 100%;
+}
+
+.documentInfo p {
+    margin: 6px 0;
+    font-size: 14px;
+    color: var(--black-color);
+}
+
+.documentInfo strong {
+    color: var(--black-color);
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.actionsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    width: 100%;
+}
+
+.actionButton {
+    padding: 10px 16px;
+    border: 1px solid;
+    border-radius: 4px;
+    background-color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+/* 액션별 색상 */
+.action-start {
+    color: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.action-start:hover {
+    background-color: #4CAF50;
+    color: #ffffff;
+}
+
+.action-stop {
+    color: #FF9800;
+    border-color: #FF9800;
+}
+
+.action-stop:hover {
+    background-color: #FF9800;
+    color: #ffffff;
+}
+
+.action-approve {
+    color: #2196F3;
+    border-color: #2196F3;
+}
+
+.action-approve:hover {
+    background-color: #2196F3;
+    color: #ffffff;
+}
+
+.action-reject {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+.action-reject:hover {
+    background-color: #f44336;
+    color: #ffffff;
+}
+
+.action-revision {
+    color: #9c27b0;
+    border-color: #9c27b0;
+}
+
+.action-revision:hover {
+    background-color: #9c27b0;
+    color: #ffffff;
+}
+
+.action-submit {
+    color: #673ab7;
+    border-color: #673ab7;
+}
+
+.action-submit:hover {
+    background-color: #673ab7;
+    color: #ffffff;
+}
+
+.action-delete {
+    color: #d32f2f;
+    border-color: #d32f2f;
+}
+
+.action-delete:hover {
+    background-color: #d32f2f;
+    color: #ffffff;
+}
+
+.noActions {
+    text-align: center;
+    color: #999;
+    padding: 16px;
+    font-size: 13px;
+}
+
+.footer {
+    padding: 16px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.editActionButton {
+    padding: 10px 24px;
+    background-color: var(--main-color);
+    border: 1px solid var(--main-color);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.editActionButton:hover {
+    opacity: 0.9;
+}
+
+.closeActionButton {
+    padding: 10px 24px;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--black-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.closeActionButton:hover {
+    background-color: #f5f5f5;
+    border-color: #999;
+}
