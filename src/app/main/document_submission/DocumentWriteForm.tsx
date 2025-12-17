@@ -326,14 +326,14 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
             <ConfirmModal
                 isOpen={confirmModalOpen}
                 message="기업을 생성하시겠습니까?"
-                onClose={() => setConfirmModalOpen(false)}
+                onCancel={() => setConfirmModalOpen(false)}
                 onConfirm={() => {
                     setConfirmModalOpen(false);
                     handleConfirmSubmit();
                 }}
                 type="warning"
-                confirmText="생성"
-                cancelText="취소"
+                confirmButtonText="생성"
+                cancelButtonText="취소"
             />
 
             {showSuccessModal && (

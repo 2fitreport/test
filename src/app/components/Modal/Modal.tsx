@@ -33,6 +33,7 @@ export default function Modal({
   const getIconSrc = () => {
     if (type === 'success') return '/check.svg';
     if (type === 'error' || type === 'warning') return '/error.svg';
+    if (type === 'info') return '/question.svg';
     return null;
   };
 

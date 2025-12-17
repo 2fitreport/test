@@ -906,7 +906,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                         ? `전체 사용자(${users.filter(u => u.position?.level !== 1).length}명)의 사용자를 삭제하시겠습니까?`
                         : `선택된 ${selectedUsers.size}명의 사용자를 삭제하시겠습니까?`
                 }
-                onClose={() => {
+                onCancel={() => {
                     setIsModalOpen(false);
                     setPendingStatusChange(null);
                     setIsDeleteAllMode(false);
@@ -925,14 +925,14 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                         : handleConfirmDeleteSelected
                 }
                 type="warning"
-                confirmText="확인"
-                cancelText="취소"
+                confirmButtonText="확인"
+                cancelButtonText="취소"
             />
 
             <ConfirmModal
                 isOpen={errorModalOpen}
                 message={errorMessage}
-                onClose={() => {
+                onCancel={() => {
                     setErrorModalOpen(false);
                     setErrorMessage('');
                 }}
@@ -940,7 +940,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                     setErrorModalOpen(false);
                     setErrorMessage('');
                 }}
-                confirmText="확인"
+                confirmButtonText="확인"
                 type="error"
             />
 

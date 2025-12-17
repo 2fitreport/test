@@ -1,35 +1,23 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
+import Link from 'next/link';
 import DocumentSubmissionList from './DocumentSubmissionList';
-import DocumentWriteForm from './DocumentWriteForm';
 import styles from './page.module.css';
 
 export default function DocumentSubmissionPage() {
     const documentListRef = useRef<any>(null);
-    const [showWriteForm, setShowWriteForm] = useState(false);
 
     return (
         <div className={styles.container}>
             <div className={styles.titleWrapper}>
                 <h1 className={styles.title}>기업관리</h1>
-                <button
-                    className={styles.createButton}
-                    onClick={() => setShowWriteForm(true)}
-                >
-                    + 기업 생성
-                </button>
+                <Link href="/main/company_create">
+                    <button className={styles.createButton}>
+                        + 기업 생성
+                    </button>
+                </Link>
             </div>
-
-            {showWriteForm && (
-                <DocumentWriteForm
-                    onClose={() => setShowWriteForm(false)}
-                    onSuccess={() => {
-                        setShowWriteForm(false);
-                        documentListRef.current?.refreshDocuments();
-                    }}
-                />
-            )}
 
             <div className={styles.contentWrapper}>
                 <DocumentSubmissionList ref={documentListRef} />

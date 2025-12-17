@@ -196,6 +196,22 @@
     gap: 12px;
 }
 
+.resetActionButton {
+    padding: 10px 24px;
+    background-color: #ff9500;
+    border: 1px solid #ff9500;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.resetActionButton:hover {
+    opacity: 0.9;
+}
+
 .editActionButton {
     padding: 10px 24px;
     background-color: var(--main-color);

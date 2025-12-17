@@ -1,25 +1,30 @@
 'use client';
 
+import Image from 'next/image';
 import styles from './Modal.module.css';
 
 interface ConfirmModalProps {
   isOpen: boolean;
+  title?: string;
   message: string;
-  onClose: () => void;
   onConfirm: () => void;
+  onCancel?: () => void;
   type?: 'success' | 'error' | 'warning' | 'info';
-  confirmText?: string;
-  cancelText?: string;
+  confirmButtonText?: string;
+  cancelButtonText?: string;
+  hideCancel?: boolean;
 }
 
 export default function ConfirmModal({
   isOpen,
+  title,
   message,
-  onClose,
   onConfirm,
+  onCancel,
   type = 'info',
-  confirmText = '확인',
-  cancelText = '취소',
+  confirmButtonText = '확인',
+  cancelButtonText = '취소',
+  hideCancel = false,
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -31,24 +36,27 @@ export default function ConfirmModal({
   };
 
   const iconSrc = getIconSrc();
+  const handleCancel = onCancel || onConfirm;
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={handleCancel}>
       <div className={`${styles.modal} ${styles[type]}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.content}>
           {iconSrc && (
             <div className={styles.iconWrapper}>
-              <img src={iconSrc} alt={type} className={styles.icon} />
+              <Image src={iconSrc} alt={type} width={48} height={48} className={styles.icon} />
             </div>
           )}
           <p className={styles.message}>{message}</p>
         </div>
         <div className={styles.footer}>
-          <button className={styles.cancelButton} onClick={onClose}>
-            {cancelText}
-          </button>
+          {!hideCancel && (
+            <button className={styles.cancelButton} onClick={handleCancel}>
+              {cancelButtonText}
+            </button>
+          )}
           <button className={styles.confirmButton} onClick={onConfirm}>
-            {confirmText}
+            {confirmButtonText}
           </button>
         </div>
       </div>

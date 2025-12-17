@@ -19,7 +19,7 @@ interface Document {
     representative_name?: string;
     manager_name?: string;
     progress_details?: string;
-    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped';
+    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
@@ -41,12 +41,12 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
-    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string } | null>(null);
     const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
@@ -123,14 +123,26 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         setActionModalOpen(true);
     };
 
+    const handleReset = (id: number) => {
+        setPendingAction({ id, action: 'reset' });
+        setConfirmMessage('서류를 초기화하시겠습니까? (대기 상태로 돌아갑니다)');
+        setConfirmModalOpen(true);
+    };
+
     const handleConfirmAction = async () => {
         // 전체 삭제 모드 처리
         if (isDeleteAllMode) {
             const allDocs = getFilteredAndSortedDocuments();
+
+            // 데이터베이스에서 모두 삭제
+            for (const doc of allDocs) {
+                await deleteDocumentFromDatabase(doc.id);
+            }
+
             setDocuments(docs => docs.filter(doc => !allDocs.some(d => d.id === doc.id)));
             setSelectedDocuments(new Set());
             setIsDeleteAllMode(false);
-            setSuccessMessage(`${allDocs.length}건의 서류가 삭제되었습니다.`);
+            setSuccessMessage(`${allDocs.length}건의 기업이 삭제되었습니다.`);
             setConfirmModalOpen(false);
             setSuccessModalOpen(true);
             return;
@@ -139,9 +151,16 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         // 선택 삭제 모드 처리
         if (selectedDocuments.size > 0 && !pendingAction) {
             const count = selectedDocuments.size;
+            const docIds = Array.from(selectedDocuments);
+
+            // 데이터베이스에서 선택된 문서 삭제
+            for (const docId of docIds) {
+                await deleteDocumentFromDatabase(docId);
+            }
+
             setDocuments(docs => docs.filter(doc => !selectedDocuments.has(doc.id)));
             setSelectedDocuments(new Set());
-            setSuccessMessage(`${count}건의 서류가 삭제되었습니다.`);
+            setSuccessMessage(`${count}건의 기업이 삭제되었습니다.`);
             setConfirmModalOpen(false);
             setSuccessModalOpen(true);
             return;
@@ -176,16 +195,23 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         } else if (action === 'approve') {
             setDocuments(docs =>
                 docs.map(doc => {
-                    if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted') && doc.progress_start_date) {
+                    if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted' || doc.status === 'waiting') && doc.progress_start_date) {
                         // 진행상황에 따라 다르게 처리
                         if (doc.progress_details === '검수자') {
-                            // 검수자 → 대표실무자로 변경
+                            // 검수자 → 대표실무자로 변경 (status는 waiting 유지)
                             return {
                                 ...doc,
                                 progress_details: '대표실무자'
                             };
+                        } else if (doc.progress_details === '대표실무자') {
+                            // 담당실무자로 배정
+                            return {
+                                ...doc,
+                                status: 'assigned' as const,
+                                progress_details: '담당실무자'
+                            };
                         } else {
-                            // 최종 승인
+                            // 최종 승인 (담당실무자 완료)
                             const startTime = new Date(doc.progress_start_date);
                             const endTime = new Date();
                             const diffMs = endTime.getTime() - startTime.getTime();
@@ -212,7 +238,14 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     return doc;
                 })
             );
-            setSuccessMessage(documents.find(d => d.id === id)?.progress_details === '검수자' ? '대표실무자로 진행합니다.' : '서류가 승인되었습니다.');
+            const docProgressDetails = documents.find(d => d.id === id)?.progress_details;
+            if (docProgressDetails === '검수자') {
+                setSuccessMessage('대표실무자로 진행합니다.');
+            } else if (docProgressDetails === '대표실무자') {
+                setSuccessMessage('담당실무자로 배정되었습니다.');
+            } else {
+                setSuccessMessage('서류가 승인되었습니다.');
+            }
         } else if (action === 'reject') {
             setDocuments(docs =>
                 docs.map(doc => {
@@ -246,18 +279,26 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             );
             setSuccessMessage('서류 보완이 요청되었습니다.');
         } else if (action === 'submit') {
+            let submittedDoc: Document | undefined;
             setDocuments(docs =>
                 docs.map(doc => {
                     if (doc.id === id) {
-                        return {
+                        submittedDoc = {
                             ...doc,
                             status: 'submitted' as const,
                             progress_status: 'not_started' as const
                         };
+                        return submittedDoc;
                     }
                     return doc;
                 })
             );
+
+            // 데이터베이스에 저장
+            if (submittedDoc) {
+                await saveDocumentToDatabase(submittedDoc);
+            }
+
             setSuccessMessage('서류가 제출되었습니다.');
         } else if (action === 'stop') {
             setDocuments(docs =>
@@ -290,6 +331,24 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         } else if (action === 'delete') {
             setDocuments(docs => docs.filter(doc => doc.id !== id));
             setSuccessMessage('서류가 삭제되었습니다.');
+        } else if (action === 'reset') {
+            setDocuments(docs =>
+                docs.map(doc => {
+                    if (doc.id === id) {
+                        return {
+                            ...doc,
+                            status: 'waiting' as const,
+                            progress_status: 'not_started' as const,
+                            progress_details: '검수자',
+                            progress_start_date: undefined,
+                            progress_end_time: undefined,
+                            stopped_time: undefined
+                        };
+                    }
+                    return doc;
+                })
+            );
+            setSuccessMessage('서류가 초기화되었습니다.');
         }
 
         setConfirmModalOpen(false);
@@ -341,7 +400,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const fetchDocuments = async () => {
         try {
-            const response = await fetch('/api/documents');
+            const response = await fetch('/api/companies');
             if (!response.ok) {
                 throw new Error('서류 목록 조회 실패');
             }
@@ -381,7 +440,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const handleDeleteAll = () => {
         setIsDeleteAllMode(true);
-        setConfirmMessage(`전체 서류(${getFilteredAndSortedDocuments().length}건)를 삭제하시겠습니까?`);
+        setConfirmMessage(`전체 기업(${getFilteredAndSortedDocuments().length}건)을 삭제하시겠습니까?`);
         setConfirmModalOpen(true);
     };
 
@@ -389,7 +448,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         if (selectedDocuments.size === 0) return;
         setIsDeleteAllMode(false);
         setPendingAction(null);
-        setConfirmMessage(`선택된 ${selectedDocuments.size}건의 서류를 삭제하시겠습니까?`);
+        setConfirmMessage(`선택된 ${selectedDocuments.size}건의 기업을 삭제하시겠습니까?`);
         setConfirmModalOpen(true);
     };
 
@@ -448,6 +507,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             rejected: 0,
             submitted: 0,
             stopped: 0,
+            assigned: 0,
         };
 
         documents.forEach(doc => {
@@ -472,6 +532,9 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     break;
                 case 'stopped':
                     counts.stopped++;
+                    break;
+                case 'assigned':
+                    counts.assigned++;
                     break;
             }
         });
@@ -505,6 +568,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                 return '제출';
             case 'stopped':
                 return '중지';
+            case 'assigned':
+                return '배정';
             default:
                 return status;
         }
@@ -526,6 +591,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                 return styles.submitted;
             case 'stopped':
                 return styles.stopped;
+            case 'assigned':
+                return styles.assigned;
             default:
                 return '';
         }
@@ -583,6 +650,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     <option value="revision">보완</option>
                                     <option value="in_progress">진행</option>
                                     <option value="submitted">제출</option>
+                                    <option value="assigned">배정</option>
                                 </select>
                                 <Image
                                     src="/arrow.svg"
@@ -913,7 +981,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                 <ConfirmModal
                     isOpen={confirmModalOpen}
                     message={confirmMessage}
-                    onClose={() => {
+                    onCancel={() => {
                         setConfirmModalOpen(false);
                         // Cancel 버튼을 눌렀을 때만 상태 초기화
                         // Confirm 버튼을 눌렀을 때는 handleConfirmAction에서 처리
@@ -923,8 +991,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                         setConfirmModalOpen(false);
                     }}
                     type="warning"
-                    confirmText="확인"
-                    cancelText="취소"
+                    confirmButtonText="확인"
+                    cancelButtonText="취소"
                 />
 
                 {reasonInputModalOpen && pendingReasonAction && (
@@ -1066,6 +1134,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                         // 수정 기능 구현 예정
                         console.log('수정:', id);
                     }}
+                    onReset={handleReset}
                     onProgressStart={handleProgressStart}
                     onProgressStop={handleProgressStop}
                     onApprove={handleApprove}

@@ -12,7 +12,7 @@ interface Document {
     representative_name?: string;
     manager_name?: string;
     progress_details?: string;
-    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped';
+    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
@@ -28,6 +28,7 @@ interface ActionModalProps {
     document: Document | null;
     onClose: () => void;
     onEdit?: (id: number) => void;
+    onReset?: (id: number) => void;
     onProgressStart: (id: number) => void;
     onProgressStop: (id: number) => void;
     onApprove: (id: number) => void;
@@ -42,6 +43,7 @@ export default function ActionModal({
     document,
     onClose,
     onEdit,
+    onReset,
     onProgressStart,
     onProgressStop,
     onApprove,
@@ -130,6 +132,14 @@ export default function ActionModal({
                 </div>
 
                 <div className={styles.footer}>
+                    <button className={styles.resetActionButton} onClick={() => {
+                        if (onReset) {
+                            onReset(document.id);
+                            onClose();
+                        }
+                    }}>
+                        초기화
+                    </button>
                     <button className={styles.editActionButton} onClick={() => {
                         if (onEdit) {
                             onEdit(document.id);
@@ -163,6 +173,8 @@ function getStatusLabel(status: string) {
             return '제출';
         case 'stopped':
             return '중지';
+        case 'assigned':
+            return '배정';
         default:
             return status;
     }

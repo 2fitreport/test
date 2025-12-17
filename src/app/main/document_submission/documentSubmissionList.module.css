@@ -510,6 +510,11 @@
     color: #5d4037;
 }
 
+.assigned {
+    background-color: #e8eaf6;
+    color: #283593;
+}
+
 .date {
     color: #666;
     font-size: 14px;
