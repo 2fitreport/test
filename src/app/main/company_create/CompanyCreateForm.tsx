@@ -707,9 +707,9 @@ export default function CompanyCreateForm() {
                 type="error"
                 onClose={() => {
                     setErrorModalOpen(false);
-                    // 권한 거부 에러인 경우 뒤로 이동
+                    // 권한 거부 에러인 경우 문서 목록으로 이동
                     if (error === '접근 권한이 없습니다.') {
-                        router.back();
+                        router.push('/main/document_submission');
                     }
                 }}
                 confirmText="확인"
