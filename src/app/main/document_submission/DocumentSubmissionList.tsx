@@ -76,9 +76,11 @@ export default function DocumentSubmissionList() {
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [isUserSalesManager, setIsUserSalesManager] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string>('');
+    const [userRoleLevel, setUserRoleLevel] = useState<number | undefined>();
 
     useEffect(() => {
         const adminData = getAdminData();
+        setUserRoleLevel(adminData?.position?.level);
         // level이 4(영업자)인지 확인
         if (adminData?.position?.level === 4) {
             setIsUserSalesManager(true);
@@ -423,9 +425,10 @@ export default function DocumentSubmissionList() {
                             progress_details: '검수자',
                             manager_name: null,
                             manager_id: null,
-                            progress_start_date: undefined,
-                            progress_end_time: undefined,
-                            stopped_time: undefined
+                            progress_start_date: null,
+                            progress_end_time: null,
+                            stopped_time: null,
+                            completed_date: null
                         };
                     }
                     return doc;
@@ -551,6 +554,10 @@ export default function DocumentSubmissionList() {
             if (isUserSalesManager && doc.user_id !== currentUserId) {
                 return false;
             }
+            // 검수자는 progress_details가 '검수자'인 문서만 보기
+            if (userRoleLevel === 6 && doc.progress_details !== '검수자') {
+                return false;
+            }
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
                 return false;
             }
@@ -587,9 +594,13 @@ export default function DocumentSubmissionList() {
 
     const getStatusCounts = () => {
         // 영업자인 경우 자신의 문서만 카운트
-        const docsToCount = isUserSalesManager
-            ? documents.filter(doc => doc.user_id === currentUserId)
-            : documents;
+        // 검수자인 경우 progress_details가 '검수자'인 문서만 카운트
+        let docsToCount = documents;
+        if (isUserSalesManager) {
+            docsToCount = documents.filter(doc => doc.user_id === currentUserId);
+        } else if (userRoleLevel === 6) {
+            docsToCount = documents.filter(doc => doc.progress_details === '검수자');
+        }
 
         const counts = {
             all: docsToCount.length,
@@ -960,7 +971,7 @@ export default function DocumentSubmissionList() {
                         </div>
                     ) : (
                         <>
-                            {!isUserSalesManager && (
+                            {!isUserSalesManager && userRoleLevel !== 6 && (
                                 <div className={styles.deleteButtonsContainer}>
                                     <button
                                         className={styles.deleteAllButton}
@@ -982,7 +993,7 @@ export default function DocumentSubmissionList() {
                             <table className={styles.documentTable}>
                             <thead>
                                 <tr>
-                                    {!isUserSalesManager && (
+                                    {!isUserSalesManager && userRoleLevel !== 6 && (
                                         <th className={styles.checkboxHeader}>
                                             <input
                                                 type="checkbox"
@@ -1012,12 +1023,12 @@ export default function DocumentSubmissionList() {
                                     <th className={styles.sortableHeader} onClick={() => handleSort('representative_name')}>
                                         대표자명{getSortIcon('representative_name')}
                                     </th>
-                                    {!isUserSalesManager && (
+                                    {!isUserSalesManager && userRoleLevel !== 6 && (
                                         <th className={styles.sortableHeader}>
                                             실무자 ID
                                         </th>
                                     )}
-                                    {!isUserSalesManager && (
+                                    {!isUserSalesManager && userRoleLevel !== 6 && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
                                             실무자{getSortIcon('manager_name')}
                                         </th>
@@ -1046,7 +1057,7 @@ export default function DocumentSubmissionList() {
                             <tbody>
                                 {getPaginatedDocuments().map((doc) => (
                                     <tr key={doc.id} className={styles.documentRow}>
-                                        {!isUserSalesManager && (
+                                        {!isUserSalesManager && userRoleLevel !== 6 && (
                                             <td className={styles.checkboxCell}>
                                                 <input
                                                     type="checkbox"
@@ -1063,10 +1074,10 @@ export default function DocumentSubmissionList() {
                                         )}
                                         <td className={styles.companyName}>{doc.company_name || '-'}</td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
-                                        {!isUserSalesManager && (
+                                        {!isUserSalesManager && userRoleLevel !== 6 && (
                                             <td className={styles.managerId}>{doc.manager_id || '-'}</td>
                                         )}
-                                        {!isUserSalesManager && (
+                                        {!isUserSalesManager && userRoleLevel !== 6 && (
                                             <td className={styles.managerName}>{doc.manager_name || '-'}</td>
                                         )}
                                         <td className={styles.progressDetails}>
@@ -1317,6 +1328,10 @@ export default function DocumentSubmissionList() {
                     onSubmit={handleSubmit}
                     onDelete={handleProgressDelete}
                     isUserSalesManager={isUserSalesManager}
+                    userRoleLevel={userRoleLevel}
+                    onViewDetail={(id) => {
+                        // TODO: DetailModal 또는 detail page로 이동
+                    }}
                 />
 
                 {managerSelectModalOpen && selectedManagerId && (

@@ -10,8 +10,8 @@ interface Document {
     title: string;
     company_name?: string;
     representative_name?: string;
-    manager_id?: number;
-    manager_name?: string;
+    manager_id?: string | null;
+    manager_name?: string | null;
     progress_details?: string;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
@@ -38,6 +38,8 @@ interface ActionModalProps {
     onSubmit: (id: number) => void;
     onDelete: (id: number) => void;
     isUserSalesManager?: boolean;
+    userRoleLevel?: number;
+    onViewDetail?: (id: number) => void;
 }
 
 export default function ActionModal({
@@ -54,8 +56,36 @@ export default function ActionModal({
     onSubmit,
     onDelete,
     isUserSalesManager = false,
+    userRoleLevel,
+    onViewDetail,
 }: ActionModalProps) {
+    const [statusAlertOpen, setStatusAlertOpen] = React.useState(false);
+    const [statusAlertMessage, setStatusAlertMessage] = React.useState('');
+
+    const getDisabledMessage = (action: string): string | null => {
+        if (action === 'stop' && document.status !== 'in_progress') {
+            return '진행 중인 상태에서만 중지할 수 있습니다.';
+        }
+        if (action === 'submit' && document.status !== 'rejected' && document.status !== 'revision') {
+            return '반려 또는 보완 상태에서만 제출할 수 있습니다.';
+        }
+        return null;
+    };
+
+    const handleButtonClick = (action: string) => {
+        const message = getDisabledMessage(action);
+        if (message) {
+            setStatusAlertMessage(message);
+            setStatusAlertOpen(true);
+            return;
+        }
+        handleActionClick(action);
+    };
+
     if (!isOpen || !document) return null;
+
+    // 검수자 판별 (level=6)
+    const isInspector = userRoleLevel === 6;
 
     const getAllActions = () => {
         const allActions = [
@@ -71,6 +101,11 @@ export default function ActionModal({
         // 영업자는 진행, 중지, 승인, 반려, 보완, 삭제 숨김 (제출만 보임)
         if (isUserSalesManager) {
             return allActions.filter(action => action.action === 'submit');
+        }
+
+        // 검수자는 승인, 보완만 보임
+        if (isInspector) {
+            return allActions.filter(action => ['approve', 'revision'].includes(action.action));
         }
 
         return allActions;
@@ -138,8 +173,11 @@ export default function ActionModal({
                             <button
                                 key={action.action}
                                 className={`${styles.actionButton} ${styles[`action-${action.action}`]}`}
-                                onClick={() => handleActionClick(action.action)}
-                                disabled={isUserSalesManager && action.action === 'submit' && !canSubmitAsSalesManager}
+                                onClick={() => handleButtonClick(action.action)}
+                                disabled={
+                                    (action.action === 'submit' && document.status !== 'rejected' && document.status !== 'revision') ||
+                                    (action.action === 'stop' && document.status !== 'in_progress')
+                                }
                             >
                                 {action.label}
                             </button>
@@ -148,7 +186,7 @@ export default function ActionModal({
                 </div>
 
                 <div className={styles.footer}>
-                    {!isUserSalesManager && (
+                    {!isUserSalesManager && !isInspector && (
                         <button className={styles.resetActionButton} onClick={() => {
                             if (onReset) {
                                 onReset(document.id);
@@ -158,19 +196,52 @@ export default function ActionModal({
                             초기화
                         </button>
                     )}
-                    <button className={styles.editActionButton} onClick={() => {
-                        if (onEdit) {
-                            onEdit(document.id);
-                            onClose();
-                        }
-                    }}>
-                        수정
-                    </button>
+                    {isInspector ? (
+                        <button className={styles.editActionButton} onClick={() => {
+                            if (onViewDetail) {
+                                onViewDetail(document.id);
+                                onClose();
+                            }
+                        }}>
+                            보기
+                        </button>
+                    ) : (
+                        <button className={styles.editActionButton} onClick={() => {
+                            if (onEdit) {
+                                onEdit(document.id);
+                                onClose();
+                            }
+                        }}>
+                            수정
+                        </button>
+                    )}
                     <button className={styles.closeActionButton} onClick={onClose}>
                         닫기
                     </button>
                 </div>
             </div>
+
+            {/* 상태안내 모달 */}
+            {statusAlertOpen && (
+                <div className={styles.overlay} onClick={() => setStatusAlertOpen(false)}>
+                    <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.header}>
+                            <h3 className={styles.title}>작업 불가</h3>
+                        </div>
+                        <div className={styles.content}>
+                            <p className={styles.message}>{statusAlertMessage}</p>
+                        </div>
+                        <div className={styles.footer}>
+                            <button
+                                className={styles.confirmButton}
+                                onClick={() => setStatusAlertOpen(false)}
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
