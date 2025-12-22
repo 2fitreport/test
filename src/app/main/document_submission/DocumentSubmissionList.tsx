@@ -19,8 +19,8 @@ interface Document {
     title: string;
     company_name?: string;
     representative_name?: string;
-    manager_id?: string;
-    manager_name?: string;
+    manager_id?: string | null;
+    manager_name?: string | null;
     business_number?: string;
     phone?: string;
     progress_details?: string;
@@ -287,8 +287,8 @@ export default function DocumentSubmissionList() {
                     status: 'rejected' as const,
                     progress_status: 'not_started' as const,
                     progress_details: '영업자',
-                    manager_name: undefined,
-                    manager_id: undefined,
+                    manager_name: null,
+                    manager_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -326,8 +326,8 @@ export default function DocumentSubmissionList() {
                     status: 'revision' as const,
                     progress_status: 'not_started' as const,
                     progress_details: '영업자',
-                    manager_name: undefined,
-                    manager_id: undefined,
+                    manager_name: null,
+                    manager_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -421,8 +421,8 @@ export default function DocumentSubmissionList() {
                             status: 'waiting' as const,
                             progress_status: 'not_started' as const,
                             progress_details: '검수자',
-                            manager_name: undefined,
-                            manager_id: undefined,
+                            manager_name: null,
+                            manager_id: null,
                             progress_start_date: undefined,
                             progress_end_time: undefined,
                             stopped_time: undefined
