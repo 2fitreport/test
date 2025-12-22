@@ -40,7 +40,6 @@ interface ActionModalProps {
     onDelete: (id: number) => void;
     isUserSalesManager?: boolean;
     userRoleLevel?: number;
-    onViewDetail?: (id: number) => void;
 }
 
 export default function ActionModal({
@@ -58,7 +57,6 @@ export default function ActionModal({
     onDelete,
     isUserSalesManager = false,
     userRoleLevel,
-    onViewDetail,
 }: ActionModalProps) {
     const [statusAlertOpen, setStatusAlertOpen] = React.useState(false);
     const [statusAlertMessage, setStatusAlertMessage] = React.useState('');
@@ -197,25 +195,14 @@ export default function ActionModal({
                             초기화
                         </button>
                     )}
-                    {isInspector ? (
-                        <button className={styles.editActionButton} onClick={() => {
-                            if (onViewDetail) {
-                                onViewDetail(document.id);
-                                onClose();
-                            }
-                        }}>
-                            보기
-                        </button>
-                    ) : (
-                        <button className={styles.editActionButton} onClick={() => {
-                            if (onEdit) {
-                                onEdit(document.id);
-                                onClose();
-                            }
-                        }}>
-                            수정
-                        </button>
-                    )}
+                    <button className={styles.editActionButton} onClick={() => {
+                        if (onEdit) {
+                            onEdit(document.id);
+                            onClose();
+                        }
+                    }}>
+                        보기
+                    </button>
                     <button className={styles.closeActionButton} onClick={onClose}>
                         닫기
                     </button>

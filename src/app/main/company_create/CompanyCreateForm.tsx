@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
+import { canEditDocument } from '@/lib/permissions';
 import Modal from '@/app/components/Modal/Modal';
 import styles from './companyCreate.module.css';
 
@@ -17,7 +18,8 @@ interface CompanyFormData {
 export default function CompanyCreateForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const editId = searchParams.get('edit');
+    const viewId = searchParams.get('view');
+    const editParam = searchParams.get('edit');
 
     const [formData, setFormData] = useState<CompanyFormData>({
         businessType: 'individual',
@@ -36,15 +38,19 @@ export default function CompanyCreateForm() {
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
+    const [isViewMode, setIsViewMode] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [canEdit, setCanEdit] = useState(false);
+    const [documentData, setDocumentData] = useState<any>(null);
 
-    // 수정 모드일 때 문서 정보 로드
+    // 보기/수정 모드일 때 문서 정보 로드
     useEffect(() => {
-        if (editId) {
-            setIsEditMode(true);
-            fetchDocumentData(parseInt(editId));
+        if (viewId) {
+            setIsViewMode(true);
+            setIsEditMode(editParam === 'true');
+            fetchDocumentData(parseInt(viewId));
         }
-    }, [editId]);
+    }, [viewId, editParam]);
 
     const fetchDocumentData = async (docId: number) => {
         try {
@@ -53,6 +59,10 @@ export default function CompanyCreateForm() {
                 throw new Error('문서 조회 실패');
             }
             const data = await response.json();
+
+            // 전체 문서 데이터 저장
+            setDocumentData(data);
+
             setFormData({
                 businessType: data.type || 'individual',
                 representative_name: data.representative_name || '',
@@ -65,6 +75,15 @@ export default function CompanyCreateForm() {
             if (data.files && Array.isArray(data.files)) {
                 setExistingFiles(data.files);
             }
+
+            // 권한 확인
+            const adminData = getAdminData();
+            const hasEditPermission = canEditDocument(
+                adminData?.position?.level,
+                adminData?.user_id,
+                data.user_id
+            );
+            setCanEdit(hasEditPermission);
         } catch (err) {
             console.error('문서 데이터 로드 실패:', err);
             setError('문서 정보를 불러오지 못했습니다.');
@@ -158,7 +177,7 @@ export default function CompanyCreateForm() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    documentId: editId,
+                    documentId: viewId || documentData?.id,
                     files: existingFiles,
                 }),
             });
@@ -174,7 +193,7 @@ export default function CompanyCreateForm() {
             link.href = url;
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-            link.download = `document_${editId}_${dateStr}.zip`;
+            link.download = `document_${viewId || documentData?.id}_${dateStr}.zip`;
             globalThis.document.body.appendChild(link);
             link.click();
             window.URL.revokeObjectURL(url);
@@ -213,17 +232,23 @@ export default function CompanyCreateForm() {
             return false;
         }
 
-        // 파일 검증
+        // 파일 검증 (보기 모드에서는 스킵)
         // 생성 모드: 새 파일 필수
         // 수정 모드: 기존 파일 또는 새 파일 중 최소 1개 필수
-        if (!isEditMode && selectedFiles.length === 0) {
+        if (!isViewMode && !isEditMode && selectedFiles.length === 0) {
             setError('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
         }
 
-        if (isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
+        if (!isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
             setError('파일을 최소 1개 이상 업로드해주세요.');
+            setErrorModalOpen(true);
+            return false;
+        }
+
+        if (isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
+            setError('파일을 최소 1개 이상 보유해야 합니다.');
             setErrorModalOpen(true);
             return false;
         }
@@ -315,14 +340,14 @@ export default function CompanyCreateForm() {
                 type: formData.businessType,
             };
 
-            if (isEditMode) {
-                // 수정 모드: PUT 요청
+            if (isViewMode && isEditMode) {
+                // 수정 모드: PUT 요청 (보기 모드에서 수정)
                 const editBody = {
                     ...requestBody,
                     files: uploadedFiles,
                 };
 
-                const response = await fetch(`/api/documents/${editId}`, {
+                const response = await fetch(`/api/documents/${viewId}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -376,16 +401,34 @@ export default function CompanyCreateForm() {
         router.push('/main/document_submission');
     };
 
+    const handleEnterEditMode = () => {
+        router.push(`/main/company_create?view=${viewId}&edit=true`);
+    };
+
+    const handleCancel = () => {
+        if (isViewMode && isEditMode) {
+            // 수정 취소: 보기 모드로 복귀
+            router.push(`/main/company_create?view=${viewId}`);
+        } else {
+            // 등록 취소: 뒤로가기
+            router.back();
+        }
+    };
+
     const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자' : '법인사업자';
 
     return (
         <div className={styles.formContainer}>
             <div className={styles.formHeader}>
                 <h2 className={styles.formTitle}>
-                    {isEditMode ? '기업 정보 수정' : '기업 정보 입력'}
+                    {!isViewMode ? '기업 정보 입력' :
+                     isEditMode ? '기업 정보 수정' :
+                     '기업 정보 조회'}
                 </h2>
                 <p className={styles.formSubtitle}>
-                    {isEditMode ? '기업 정보를 수정해주세요.' : '새로운 기업 정보를 등록해주세요.'}
+                    {!isViewMode ? '새로운 기업 정보를 등록해주세요.' :
+                     isEditMode ? '기업 정보를 수정해주세요.' :
+                     '기업 정보를 확인하세요.'}
                 </p>
             </div>
 
@@ -402,6 +445,7 @@ export default function CompanyCreateForm() {
                                 checked={formData.businessType === 'individual'}
                                 onChange={() => handleBusinessTypeChange('individual')}
                                 className={styles.radioInput}
+                                disabled={isViewMode && !isEditMode}
                             />
                             <label htmlFor="individual" className={styles.radioLabel}>
                                 개인사업자
@@ -416,6 +460,7 @@ export default function CompanyCreateForm() {
                                 checked={formData.businessType === 'business'}
                                 onChange={() => handleBusinessTypeChange('business')}
                                 className={styles.radioInput}
+                                disabled={isViewMode && !isEditMode}
                             />
                             <label htmlFor="business" className={styles.radioLabel}>
                                 법인사업자
@@ -438,6 +483,7 @@ export default function CompanyCreateForm() {
                             onChange={handleChange}
                             placeholder="대표자 이름을 입력해주세요"
                             className={styles.input}
+                            disabled={isViewMode && !isEditMode}
                         />
                     </div>
 
@@ -453,6 +499,7 @@ export default function CompanyCreateForm() {
                             onChange={handleChange}
                             placeholder="회사 이름을 입력해주세요"
                             className={styles.input}
+                            disabled={isViewMode && !isEditMode}
                         />
                     </div>
 
@@ -469,6 +516,7 @@ export default function CompanyCreateForm() {
                             placeholder="사업자등록번호를 입력해주세요"
                             maxLength={13}
                             className={styles.input}
+                            disabled={isViewMode && !isEditMode}
                         />
                     </div>
 
@@ -485,17 +533,19 @@ export default function CompanyCreateForm() {
                             placeholder="연락처를 입력해주세요"
                             maxLength={13}
                             className={styles.input}
+                            disabled={isViewMode && !isEditMode}
                         />
                     </div>
                 </div>
 
-                {/* 파일 업로드 */}
+                {/* 파일 업로드 - 보기 전용 모드에서 숨김 */}
+                {(!isViewMode || isEditMode) && (
                 <div className={styles.fileUploadSection}>
                     <label className={styles.sectionTitle}>
                         파일 업로드 ({fileTypeLabel})
                     </label>
                     <div className={styles.uploadArea}>
-                        <label htmlFor="fileInput" className={styles.uploadLabel}>
+                        <label htmlFor="fileInput" className={styles.uploadLabel} style={isViewMode && !isEditMode ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
                             <div className={styles.uploadIcon}>📎</div>
                             <div className={styles.uploadText}>
                                 <p className={styles.uploadMain}>파일을 선택하거나 드래그하여 업로드</p>
@@ -509,6 +559,7 @@ export default function CompanyCreateForm() {
                             multiple
                             className={styles.fileInput}
                             accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.jpg,.jpeg,.png"
+                            disabled={isViewMode && !isEditMode}
                         />
                     </div>
 
@@ -522,6 +573,7 @@ export default function CompanyCreateForm() {
                                         <span className={styles.fileSize}>
                                             ({(file.size / 1024 / 1024).toFixed(2)}MB)
                                         </span>
+                                        {(!isViewMode || isEditMode) && (
                                         <button
                                             type="button"
                                             onClick={() => handleRemoveFile(index)}
@@ -529,15 +581,17 @@ export default function CompanyCreateForm() {
                                         >
                                             ✕
                                         </button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
                         </div>
                     )}
                 </div>
+                )}
 
-                {/* 기존 파일 목록 (수정 모드) */}
-                {isEditMode && existingFiles.length > 0 && (
+                {/* 기존 파일 목록 (보기/수정 모드) */}
+                {isViewMode && existingFiles.length > 0 && (
                 <div className={styles.fileUploadSection}>
                     <label className={styles.sectionTitle}>
                         등록된 파일
@@ -551,6 +605,7 @@ export default function CompanyCreateForm() {
                                     <span className={styles.fileSize}>
                                         ({(file.size / 1024 / 1024).toFixed(2)}MB)
                                     </span>
+                                    {isEditMode && (
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveExistingFile(index)}
@@ -558,6 +613,7 @@ export default function CompanyCreateForm() {
                                     >
                                         ✕
                                     </button>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -584,21 +640,46 @@ export default function CompanyCreateForm() {
 
                 {/* 버튼 */}
                 <div className={styles.formButtons}>
-                    <button
-                        type="button"
-                        onClick={() => router.back()}
-                        className={styles.cancelButton}
-                        disabled={loading}
-                    >
-                        취소
-                    </button>
-                    <button
-                        type="submit"
-                        className={styles.submitButton}
-                        disabled={loading}
-                    >
-                        {loading ? '처리 중...' : '등록'}
-                    </button>
+                    {isViewMode && !isEditMode ? (
+                        // 보기 모드: 수정 버튼(권한 있으면) + 닫기 버튼
+                        <>
+                            {canEdit && (
+                            <button
+                                type="button"
+                                onClick={handleEnterEditMode}
+                                className={styles.submitButton}
+                            >
+                                수정
+                            </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => router.back()}
+                                className={styles.cancelButton}
+                            >
+                                닫기
+                            </button>
+                        </>
+                    ) : (
+                        // 등록/수정 모드: 취소 + 등록/저장
+                        <>
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                className={styles.cancelButton}
+                                disabled={loading}
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="submit"
+                                className={styles.submitButton}
+                                disabled={loading}
+                            >
+                                {loading ? '처리 중...' : (isViewMode && isEditMode ? '저장' : '등록')}
+                            </button>
+                        </>
+                    )}
                 </div>
             </form>
 

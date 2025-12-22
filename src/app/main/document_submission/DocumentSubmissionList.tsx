@@ -1317,7 +1317,7 @@ export default function DocumentSubmissionList() {
                         setSelectedDocumentForAction(null);
                     }}
                     onEdit={(id) => {
-                        router.push(`/main/company_create?edit=${id}`);
+                        router.push(`/main/company_create?view=${id}`);
                     }}
                     onReset={handleReset}
                     onProgressStart={handleProgressStart}
@@ -1329,9 +1329,6 @@ export default function DocumentSubmissionList() {
                     onDelete={handleProgressDelete}
                     isUserSalesManager={isUserSalesManager}
                     userRoleLevel={userRoleLevel}
-                    onViewDetail={(id) => {
-                        // TODO: DetailModal 또는 detail page로 이동
-                    }}
                 />
 
                 {managerSelectModalOpen && selectedManagerId && (
