@@ -19,7 +19,7 @@ interface Document {
     title: string;
     company_name?: string;
     representative_name?: string;
-    manager_id?: number;
+    manager_id?: string;
     manager_name?: string;
     business_number?: string;
     phone?: string;
@@ -1338,7 +1338,7 @@ export default function DocumentSubmissionList() {
                                     >
                                         <option value="">실무자를 선택하세요</option>
                                         {workers.map(worker => (
-                                            <option key={worker.id} value={String(worker.id)}>
+                                            <option key={worker.id} value={worker.user_id}>
                                                 {worker.name}({worker.user_id})
                                             </option>
                                         ))}
@@ -1368,11 +1368,11 @@ export default function DocumentSubmissionList() {
                                     onClick={async () => {
                                         if (selectedManager && selectedManagerId) {
                                             const updatedDoc = documents.find(d => d.id === selectedManagerId);
-                                            const selectedWorker = workers.find(w => w.id === parseInt(selectedManager));
+                                            const selectedWorker = workers.find(w => w.user_id === selectedManager);
                                             if (updatedDoc && selectedWorker) {
                                                 const newDoc = {
                                                     ...updatedDoc,
-                                                    manager_id: selectedWorker.id,
+                                                    manager_id: selectedWorker.user_id,
                                                     manager_name: selectedWorker.name,
                                                     progress_details: '실무자',
                                                     status: 'assigned' as const,
