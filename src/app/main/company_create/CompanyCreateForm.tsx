@@ -47,7 +47,8 @@ export default function CompanyCreateForm() {
     useEffect(() => {
         if (viewId) {
             setIsViewMode(true);
-            setIsEditMode(editParam === 'true');
+            // 수정 모드는 일단 false로 설정, 권한 확인 후에 결정
+            setIsEditMode(false);
             fetchDocumentData(parseInt(viewId));
         }
     }, [viewId, editParam]);
@@ -84,6 +85,11 @@ export default function CompanyCreateForm() {
                 data.user_id
             );
             setCanEdit(hasEditPermission);
+
+            // 권한이 있을 때만 URL의 edit 파라미터를 반영
+            if (hasEditPermission && editParam === 'true') {
+                setIsEditMode(true);
+            }
         } catch (err) {
             console.error('문서 데이터 로드 실패:', err);
             setError('문서 정보를 불러오지 못했습니다.');

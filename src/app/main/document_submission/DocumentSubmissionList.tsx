@@ -80,14 +80,25 @@ export default function DocumentSubmissionList() {
 
     useEffect(() => {
         const adminData = getAdminData();
-        setUserRoleLevel(adminData?.position?.level);
+        const userLevel = adminData?.position?.level;
+        const userId = adminData?.user_id;
+
+        setUserRoleLevel(userLevel);
+
         // level이 4(영업자)인지 확인
-        if (adminData?.position?.level === 4) {
+        if (userLevel === 4) {
             setIsUserSalesManager(true);
-            setCurrentUserId(adminData?.user_id || '');
+            setCurrentUserId(userId || '');
+            // 영업자인 경우, 현재 userId로 필터링된 문서를 가져올 수 있도록
+            // 하지만 여기서는 바로 fetchDocuments를 호출해도 필터링 함수에서 처리됨
         }
-        fetchDocuments();
+
         fetchWorkers();
+    }, []);
+
+    // documents 로드는 별도로 처리
+    useEffect(() => {
+        fetchDocuments();
     }, []);
 
     const fetchWorkers = async () => {
@@ -549,13 +560,17 @@ export default function DocumentSubmissionList() {
     };
 
     const getFilteredAndSortedDocuments = () => {
+        const adminData = getAdminData();
+        const userLevel = adminData?.position?.level;
+        const userId = adminData?.user_id;
+
         const filtered = documents.filter(doc => {
-            // 영업자는 자신이 올린 문서만 보기
-            if (isUserSalesManager && doc.user_id !== currentUserId) {
+            // 영업자(level=4)는 자신이 올린 문서만 보기
+            if (userLevel === 4 && doc.user_id !== userId) {
                 return false;
             }
             // 검수자는 progress_details가 '검수자'인 문서만 보기
-            if (userRoleLevel === 6 && doc.progress_details !== '검수자') {
+            if (userLevel === 6 && doc.progress_details !== '검수자') {
                 return false;
             }
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
@@ -593,12 +608,16 @@ export default function DocumentSubmissionList() {
     };
 
     const getStatusCounts = () => {
+        const adminData = getAdminData();
+        const userLevel = adminData?.position?.level;
+        const userId = adminData?.user_id;
+
         // 영업자인 경우 자신의 문서만 카운트
         // 검수자인 경우 progress_details가 '검수자'인 문서만 카운트
         let docsToCount = documents;
-        if (isUserSalesManager) {
-            docsToCount = documents.filter(doc => doc.user_id === currentUserId);
-        } else if (userRoleLevel === 6) {
+        if (userLevel === 4) {
+            docsToCount = documents.filter(doc => doc.user_id === userId);
+        } else if (userLevel === 6) {
             docsToCount = documents.filter(doc => doc.progress_details === '검수자');
         }
 

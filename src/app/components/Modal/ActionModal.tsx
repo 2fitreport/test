@@ -173,10 +173,6 @@ export default function ActionModal({
                                 key={action.action}
                                 className={`${styles.actionButton} ${styles[`action-${action.action}`]}`}
                                 onClick={() => handleButtonClick(action.action)}
-                                disabled={
-                                    (action.action === 'submit' && document.status !== 'rejected' && document.status !== 'revision') ||
-                                    (action.action === 'stop' && document.status !== 'in_progress')
-                                }
                             >
                                 {action.label}
                             </button>
