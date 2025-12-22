@@ -61,7 +61,19 @@ export default function CompanyCreateForm() {
             }
             const data = await response.json();
 
-            // 전체 문서 데이터 저장
+            // 권한 확인 (데이터 표시 전에)
+            const adminData = getAdminData();
+            const userLevel = adminData?.position?.level;
+            const userId = adminData?.user_id;
+
+            // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
+            if (userLevel === 4 && userId !== data.user_id) {
+                setError('접근 권한이 없습니다.');
+                setErrorModalOpen(true);
+                return;
+            }
+
+            // 권한이 확인되었으면 데이터 표시
             setDocumentData(data);
 
             setFormData({
@@ -77,11 +89,10 @@ export default function CompanyCreateForm() {
                 setExistingFiles(data.files);
             }
 
-            // 권한 확인
-            const adminData = getAdminData();
+            // 수정 권한 확인
             const hasEditPermission = canEditDocument(
-                adminData?.position?.level,
-                adminData?.user_id,
+                userLevel,
+                userId,
                 data.user_id
             );
             setCanEdit(hasEditPermission);
@@ -694,7 +705,13 @@ export default function CompanyCreateForm() {
                 isOpen={errorModalOpen}
                 message={error}
                 type="error"
-                onClose={() => setErrorModalOpen(false)}
+                onClose={() => {
+                    setErrorModalOpen(false);
+                    // 권한 거부 에러인 경우 뒤로 이동
+                    if (error === '접근 권한이 없습니다.') {
+                        router.back();
+                    }
+                }}
                 confirmText="확인"
                 showConfirmButton={false}
             />
