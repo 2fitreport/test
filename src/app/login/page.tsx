@@ -25,10 +25,10 @@ export default function LoginPage() {
     });
 
     useEffect(() => {
-        // 이미 로그인된 상태면 메인 페이지로 리다이렉트
+        // 이미 로그인된 상태면 문서 제출 페이지로 리다이렉트
         const authToken = getAuthToken();
         if (authToken) {
-            router.push('/main/user_management');
+            router.push('/main/document_submission');
         }
     }, [router]);
 
@@ -56,8 +56,8 @@ export default function LoginPage() {
                 document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 365}`;
                 // 로컬스토리지에도 저장 (클라이언트에서 사용)
                 setAuthToken(data.token, data.admin);
-                // 바로 사용자 관리 페이지로 이동
-                router.push('/main/user_management');
+                // 문서 제출 페이지로 이동
+                router.push('/main/document_submission');
             } else {
                 setModal({
                     isOpen: true,

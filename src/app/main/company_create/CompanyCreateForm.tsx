@@ -97,6 +97,13 @@ export default function CompanyCreateForm() {
             );
             setCanEdit(hasEditPermission);
 
+            // 검수자가 URL로 수정 모드 진입 시도 → 차단
+            if (userLevel === 6 && editParam === 'true') {
+                setError('검수자는 수정할 수 없습니다.');
+                setErrorModalOpen(true);
+                return;
+            }
+
             // 권한이 있을 때만 URL의 edit 파라미터를 반영
             if (hasEditPermission && editParam === 'true') {
                 setIsEditMode(true);
