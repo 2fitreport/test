@@ -460,7 +460,8 @@ export default function DocumentSubmissionList() {
             });
 
             if (!response.ok) {
-                console.error('데이터베이스 저장 실패');
+                const errorData = await response.json();
+                console.error('데이터베이스 저장 실패:', response.status, errorData);
             }
         } catch (error) {
             console.error('데이터베이스 저장 오류:', error);
@@ -1337,7 +1338,7 @@ export default function DocumentSubmissionList() {
                                     >
                                         <option value="">실무자를 선택하세요</option>
                                         {workers.map(worker => (
-                                            <option key={worker.id} value={worker.user_id}>
+                                            <option key={worker.id} value={String(worker.id)}>
                                                 {worker.name}({worker.user_id})
                                             </option>
                                         ))}
@@ -1367,11 +1368,11 @@ export default function DocumentSubmissionList() {
                                     onClick={async () => {
                                         if (selectedManager && selectedManagerId) {
                                             const updatedDoc = documents.find(d => d.id === selectedManagerId);
-                                            const selectedWorker = workers.find(w => w.user_id === selectedManager);
+                                            const selectedWorker = workers.find(w => w.id === parseInt(selectedManager));
                                             if (updatedDoc && selectedWorker) {
                                                 const newDoc = {
                                                     ...updatedDoc,
-                                                    manager_id: parseInt(selectedWorker.user_id),
+                                                    manager_id: selectedWorker.id,
                                                     manager_name: selectedWorker.name,
                                                     progress_details: '실무자',
                                                     status: 'assigned' as const,
