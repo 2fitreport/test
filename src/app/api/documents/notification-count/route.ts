@@ -8,17 +8,31 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function GET(request: NextRequest) {
     try {
+        const userId = request.nextUrl.searchParams.get('user_id');
+
         // 보완 건수
-        const { count: revisionCount, error: revisionError } = await supabase
+        let revisionQuery = supabase
             .from('documents')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'revision');
 
+        if (userId) {
+            revisionQuery = revisionQuery.eq('user_id', userId);
+        }
+
+        const { count: revisionCount, error: revisionError } = await revisionQuery;
+
         // 반려 건수
-        const { count: rejectionCount, error: rejectionError } = await supabase
+        let rejectionQuery = supabase
             .from('documents')
             .select('*', { count: 'exact', head: true })
             .eq('status', 'rejected');
+
+        if (userId) {
+            rejectionQuery = rejectionQuery.eq('user_id', userId);
+        }
+
+        const { count: rejectionCount, error: rejectionError } = await rejectionQuery;
 
         if (revisionError || rejectionError) {
             throw revisionError || rejectionError;

@@ -59,7 +59,7 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
         }
 
         if (!formData.manager_name) {
-            setError('담당실무자를 입력해주세요.');
+            setError('실무자를 입력해주세요.');
             return;
         }
 
@@ -228,14 +228,14 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
                     </div>
 
                     <div className={styles.formGroup}>
-                        <label htmlFor="manager_name">담당실무자</label>
+                        <label htmlFor="manager_name">실무자</label>
                         <input
                             type="text"
                             id="manager_name"
                             name="manager_name"
                             value={formData.manager_name ?? ''}
                             onChange={handleChange}
-                            placeholder="담당실무자명을 입력하세요"
+                            placeholder="실무자명을 입력하세요"
                         />
                     </div>
 
@@ -253,7 +253,7 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
                         >
                             <option value="검수자">검수자</option>
                             <option value="대표실무자">대표실무자</option>
-                            <option value="담당실무자">담당실무자</option>
+                            <option value="실무자">실무자</option>
                         </select>
                     </div>
 
@@ -317,7 +317,7 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
                             className={styles.submitButton}
                             disabled={loading}
                         >
-                            {loading ? '작성 중...' : '서류 작성'}
+                            {loading ? '작성 중...' : '기업 작성'}
                         </button>
                     </div>
                 </form>

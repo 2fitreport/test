@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { getAdminData } from '@/lib/auth';
 import Pagination from '@/app/components/Pagination/Pagination';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import ActionModal from '@/app/components/Modal/ActionModal';
@@ -17,7 +19,10 @@ interface Document {
     title: string;
     company_name?: string;
     representative_name?: string;
+    manager_id?: number;
     manager_name?: string;
+    business_number?: string;
+    phone?: string;
     progress_details?: string;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
@@ -30,10 +35,19 @@ interface Document {
     reason_read: boolean;
 }
 
+interface Worker {
+    id: number;
+    user_id: string;
+    name: string;
+    position_id: number;
+    company_name?: string;
+}
+
 type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date';
 type SortOrder = 'asc' | 'desc';
 
-const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_, ref) {
+export default function DocumentSubmissionList() {
+    const router = useRouter();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const [sortColumn, setSortColumn] = useState<SortColumn>('submitted_date');
@@ -59,31 +73,52 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     const [managerSelectModalOpen, setManagerSelectModalOpen] = useState(false);
     const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
     const [selectedManager, setSelectedManager] = useState<string>('');
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [isUserSalesManager, setIsUserSalesManager] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string>('');
 
     useEffect(() => {
+        const adminData = getAdminData();
+        // level이 4(영업자)인지 확인
+        if (adminData?.position?.level === 4) {
+            setIsUserSalesManager(true);
+            setCurrentUserId(adminData?.user_id || '');
+        }
         fetchDocuments();
+        fetchWorkers();
     }, []);
 
-    useImperativeHandle(ref, () => ({
-        refreshDocuments: fetchDocuments,
-    }));
+    const fetchWorkers = async () => {
+        try {
+            const response = await fetch('/api/users');
+            if (!response.ok) {
+                throw new Error('실무자 목록 조회 실패');
+            }
+            const data = await response.json();
+            // position_id가 3인 실무자만 필터링
+            const workerList = data.filter((user: Worker) => user.position_id === 3);
+            setWorkers(workerList);
+        } catch (error) {
+            console.error('실무자 목록 조회 실패:', error);
+        }
+    };
 
     const handleProgressStart = (id: number) => {
         setPendingAction({ id, action: 'start' });
-        setConfirmMessage('서류 진행을 시작하시겠습니까?');
+        setConfirmMessage('기업 진행을 시작하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
     const handleApprove = (id: number) => {
         const doc = documents.find(d => d.id === id);
         if (doc && doc.progress_details === '대표실무자') {
-            // 담당실무자 선택 모달 띄우기
+            // 실무자 선택 모달 띄우기
             setSelectedManagerId(id);
             setManagerSelectModalOpen(true);
         } else {
             // 일반 승인 진행
             setPendingAction({ id, action: 'approve' });
-            setConfirmMessage('서류를 승인하시겠습니까?');
+            setConfirmMessage('기업을 승인하시겠습니까?');
             setConfirmModalOpen(true);
         }
     };
@@ -102,19 +137,19 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const handleSubmit = (id: number) => {
         setPendingAction({ id, action: 'submit' });
-        setConfirmMessage('서류를 제출하시겠습니까?');
+        setConfirmMessage('기업을 제출하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
     const handleProgressStop = (id: number) => {
         setPendingAction({ id, action: 'stop' });
-        setConfirmMessage('서류 진행을 중지하시겠습니까?');
+        setConfirmMessage('기업 진행을 중지하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
     const handleProgressDelete = (id: number) => {
         setPendingAction({ id, action: 'delete' });
-        setConfirmMessage('이 서류를 삭제하시겠습니까?');
+        setConfirmMessage('이 기업을 삭제하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
@@ -125,7 +160,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const handleReset = (id: number) => {
         setPendingAction({ id, action: 'reset' });
-        setConfirmMessage('서류를 초기화하시겠습니까? (대기 상태로 돌아갑니다)');
+        setConfirmMessage('기업을 초기화하시겠습니까? (대기 상태로 돌아갑니다)');
         setConfirmModalOpen(true);
     };
 
@@ -191,115 +226,157 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     } : doc
                 )
             );
-            setSuccessMessage('서류 진행이 시작되었습니다.');
+            setSuccessMessage('기업 진행이 시작되었습니다.');
         } else if (action === 'approve') {
-            setDocuments(docs =>
-                docs.map(doc => {
-                    if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted' || doc.status === 'waiting') && doc.progress_start_date) {
-                        // 진행상황에 따라 다르게 처리
-                        if (doc.progress_details === '검수자') {
-                            // 검수자 → 대표실무자로 변경 (status는 waiting 유지)
-                            return {
-                                ...doc,
-                                progress_details: '대표실무자'
-                            };
-                        } else if (doc.progress_details === '대표실무자') {
-                            // 담당실무자로 배정
-                            return {
-                                ...doc,
-                                status: 'assigned' as const,
-                                progress_details: '담당실무자'
-                            };
-                        } else {
-                            // 최종 승인 (담당실무자 완료)
-                            const startTime = new Date(doc.progress_start_date);
-                            const endTime = new Date();
-                            const diffMs = endTime.getTime() - startTime.getTime();
-                            const hours = Math.floor(diffMs / (1000 * 60 * 60));
-                            const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                            const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+            const doc = documents.find(d => d.id === id);
+            if (!doc) return;
 
-                            const timeDisplay = `${hours}시간${minutes}분 ${String(seconds).padStart(2, '0')}초`;
+            let updatedDoc: Document;
+            let message = '';
 
-                            const now = new Date();
-                            const completedHours = String(now.getHours()).padStart(2, '0');
-                            const completedMinutes = String(now.getMinutes()).padStart(2, '0');
-                            const dateStr = now.toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3');
-
-                            return {
-                                ...doc,
-                                status: 'approved' as const,
-                                progress_status: 'stopped' as const,
-                                progress_end_time: timeDisplay,
-                                completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
-                            };
-                        }
-                    }
-                    return doc;
-                })
-            );
-            const docProgressDetails = documents.find(d => d.id === id)?.progress_details;
-            if (docProgressDetails === '검수자') {
-                setSuccessMessage('대표실무자로 진행합니다.');
-            } else if (docProgressDetails === '대표실무자') {
-                setSuccessMessage('담당실무자로 배정되었습니다.');
+            if (doc.progress_details === '검수자') {
+                // 검수자 → 대표실무자로 변경
+                updatedDoc = { ...doc, progress_details: '대표실무자' };
+                message = '대표실무자로 진행합니다.';
+            } else if (doc.progress_details === '대표실무자') {
+                // 대표실무자 → 실무자로 변경
+                updatedDoc = { ...doc, status: 'assigned' as const, progress_details: '실무자' };
+                message = '실무자로 배정되었습니다.';
             } else {
-                setSuccessMessage('서류가 승인되었습니다.');
+                // 최종 승인
+                const now = new Date();
+                const completedHours = String(now.getHours()).padStart(2, '0');
+                const completedMinutes = String(now.getMinutes()).padStart(2, '0');
+                const dateStr = now.toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3');
+
+                updatedDoc = {
+                    ...doc,
+                    status: 'approved' as const,
+                    progress_status: 'stopped' as const,
+                    completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
+                };
+                message = '기업이 승인되었습니다.';
             }
+
+            // DB에 저장
+            await saveDocumentToDatabase(updatedDoc);
+
+            // UI 상태 업데이트
+            setDocuments(docs => docs.map(d => d.id === id ? updatedDoc : d));
+            setSuccessMessage(message);
         } else if (action === 'reject') {
-            setDocuments(docs =>
-                docs.map(doc => {
-                    if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted' || doc.status === 'stopped')) {
-                        return {
-                            ...doc,
-                            status: 'rejected' as const,
-                            progress_status: 'not_started' as const,
-                            reason: reasonInput || '사유 없음',
-                            reason_read: false
-                        };
-                    }
-                    return doc;
-                })
-            );
-            setSuccessMessage('서류가 반려되었습니다.');
-        } else if (action === 'revision') {
-            setDocuments(docs =>
-                docs.map(doc => {
-                    if (doc.id === id && (doc.status === 'in_progress' || doc.status === 'submitted' || doc.status === 'stopped')) {
-                        return {
-                            ...doc,
-                            status: 'revision' as const,
-                            progress_status: 'not_started' as const,
-                            reason: reasonInput || '사유 없음',
-                            reason_read: false
-                        };
-                    }
-                    return doc;
-                })
-            );
-            setSuccessMessage('서류 보완이 요청되었습니다.');
-        } else if (action === 'submit') {
-            let submittedDoc: Document | undefined;
-            setDocuments(docs =>
-                docs.map(doc => {
-                    if (doc.id === id) {
-                        submittedDoc = {
-                            ...doc,
-                            status: 'submitted' as const,
-                            progress_status: 'not_started' as const
-                        };
-                        return submittedDoc;
-                    }
-                    return doc;
-                })
-            );
+            const doc = documents.find(d => d.id === id);
+            if (doc) {
+                const now = new Date();
+                const timeStr = now.toLocaleString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
 
-            // 데이터베이스에 저장
-            if (submittedDoc) {
-                await saveDocumentToDatabase(submittedDoc);
+                // 기존 사유가 있으면 새로운 사유 추가, 없으면 새로 생성
+                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const combinedReason = doc.reason ? `${doc.reason}\n${newReason}` : newReason;
+
+                const rejectedDoc = {
+                    ...doc,
+                    status: 'rejected' as const,
+                    progress_status: 'not_started' as const,
+                    progress_details: '영업자',
+                    manager_name: undefined,
+                    manager_id: undefined,
+                    reason: combinedReason,
+                    reason_read: false
+                };
+
+                // DB에 저장
+                await saveDocumentToDatabase(rejectedDoc);
+
+                // UI 상태 업데이트
+                setDocuments(docs => docs.map(d => d.id === id ? rejectedDoc : d));
+                setSuccessMessage('기업이 반려되었습니다.');
+
+                // 사이드바 알림 숫자 업데이트 이벤트 발생
+                window.dispatchEvent(new CustomEvent('notificationUpdate', { detail: { type: 'reject' } }));
             }
+        } else if (action === 'revision') {
+            const doc = documents.find(d => d.id === id);
+            if (doc) {
+                const now = new Date();
+                const timeStr = now.toLocaleString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
 
-            setSuccessMessage('서류가 제출되었습니다.');
+                // 기존 사유가 있으면 새로운 사유 추가, 없으면 새로 생성
+                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const combinedReason = doc.reason ? `${doc.reason}\n${newReason}` : newReason;
+
+                const revisionDoc = {
+                    ...doc,
+                    status: 'revision' as const,
+                    progress_status: 'not_started' as const,
+                    progress_details: '영업자',
+                    manager_name: undefined,
+                    manager_id: undefined,
+                    reason: combinedReason,
+                    reason_read: false
+                };
+
+                // DB에 저장
+                await saveDocumentToDatabase(revisionDoc);
+
+                // UI 상태 업데이트
+                setDocuments(docs => docs.map(d => d.id === id ? revisionDoc : d));
+                setSuccessMessage('기업 보완이 요청되었습니다.');
+
+                // 사이드바 알림 숫자 업데이트 이벤트 발생
+                window.dispatchEvent(new CustomEvent('notificationUpdate', { detail: { type: 'revision' } }));
+            }
+        } else if (action === 'submit') {
+            const doc = documents.find(d => d.id === id);
+            if (doc) {
+                let submittedDoc: Document;
+
+                // 반려되거나 보완이 요청된 상태에서 제출하면 대기 상태로 돌아감
+                if (doc.status === 'rejected' || doc.status === 'revision') {
+                    submittedDoc = {
+                        ...doc,
+                        status: 'waiting' as const,
+                        progress_status: 'not_started' as const,
+                        progress_details: '검수자',
+                        reason_read: true
+                    };
+                } else {
+                    // 기타 상태에서는 제출 상태로 변경
+                    submittedDoc = {
+                        ...doc,
+                        status: 'submitted' as const,
+                        progress_status: 'not_started' as const
+                    };
+                }
+
+                // DB에 저장
+                await saveDocumentToDatabase(submittedDoc);
+
+                // UI 상태 업데이트
+                setDocuments(docs => docs.map(d => d.id === id ? submittedDoc : d));
+
+                if (doc.status === 'rejected' || doc.status === 'revision') {
+                    setSuccessMessage('기업이 재제출되었습니다.');
+                } else {
+                    setSuccessMessage('기업이 제출되었습니다.');
+                }
+            }
         } else if (action === 'stop') {
             setDocuments(docs =>
                 docs.map(doc => {
@@ -327,10 +404,14 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     return doc;
                 })
             );
-            setSuccessMessage('서류 진행이 중지되었습니다.');
+            setSuccessMessage('기업 진행이 중지되었습니다.');
         } else if (action === 'delete') {
+            // DB에서 삭제
+            deleteDocumentFromDatabase(id);
+
+            // UI에서 삭제
             setDocuments(docs => docs.filter(doc => doc.id !== id));
-            setSuccessMessage('서류가 삭제되었습니다.');
+            setSuccessMessage('기업이 삭제되었습니다.');
         } else if (action === 'reset') {
             setDocuments(docs =>
                 docs.map(doc => {
@@ -340,6 +421,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                             status: 'waiting' as const,
                             progress_status: 'not_started' as const,
                             progress_details: '검수자',
+                            manager_name: undefined,
+                            manager_id: undefined,
                             progress_start_date: undefined,
                             progress_end_time: undefined,
                             stopped_time: undefined
@@ -348,7 +431,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     return doc;
                 })
             );
-            setSuccessMessage('서류가 초기화되었습니다.');
+            setSuccessMessage('기업이 초기화되었습니다.');
         }
 
         setConfirmModalOpen(false);
@@ -357,12 +440,12 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         setPendingReasonAction(null);
         setSuccessModalOpen(true);
 
-        // 데이터베이스에 저장
-        const updatedDoc = documents.find(doc => doc.id === id);
-        if (updatedDoc && action !== 'delete') {
-            await saveDocumentToDatabase(updatedDoc);
-        } else if (action === 'delete') {
-            await deleteDocumentFromDatabase(id);
+        // 데이터베이스에 저장 (이미 처리된 액션: approve, delete, reject, revision, submit)
+        if (action === 'start' || action === 'stop' || action === 'reset') {
+            const updatedDoc = documents.find(doc => doc.id === id);
+            if (updatedDoc) {
+                await saveDocumentToDatabase(updatedDoc);
+            }
         }
     };
 
@@ -400,14 +483,14 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
 
     const fetchDocuments = async () => {
         try {
-            const response = await fetch('/api/companies');
+            const response = await fetch('/api/documents');
             if (!response.ok) {
-                throw new Error('서류 목록 조회 실패');
+                throw new Error('기업 목록 조회 실패');
             }
             const data = await response.json();
             setDocuments(data);
         } catch (error) {
-            console.error('서류 목록 조회 실패:', error);
+            console.error('기업 목록 조회 실패:', error);
         } finally {
             setLoading(false);
         }
@@ -462,20 +545,24 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     };
 
     const getFilteredAndSortedDocuments = () => {
-        let filtered = documents.filter(doc => {
+        const filtered = documents.filter(doc => {
+            // 영업자는 자신이 올린 문서만 보기
+            if (isUserSalesManager && doc.user_id !== currentUserId) {
+                return false;
+            }
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
                 return false;
             }
             const query = searchQuery.toLowerCase();
             return (
-                doc.user_id.toLowerCase().includes(query) ||
-                doc.user_name.toLowerCase().includes(query)
+                (doc.user_id || '').toLowerCase().includes(query) ||
+                (doc.user_name || '').toLowerCase().includes(query)
             );
         });
 
         const sorted = [...filtered].sort((a, b) => {
-            let aValue: any = a[sortColumn];
-            let bValue: any = b[sortColumn];
+            let aValue: Document[SortColumn] = a[sortColumn];
+            let bValue: Document[SortColumn] = b[sortColumn];
 
             if (typeof aValue === 'string' && typeof bValue === 'string') {
                 aValue = aValue.toLowerCase();
@@ -498,8 +585,13 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
     };
 
     const getStatusCounts = () => {
+        // 영업자인 경우 자신의 문서만 카운트
+        const docsToCount = isUserSalesManager
+            ? documents.filter(doc => doc.user_id === currentUserId)
+            : documents;
+
         const counts = {
-            all: documents.length,
+            all: docsToCount.length,
             waiting: 0,
             in_progress: 0,
             approved: 0,
@@ -510,7 +602,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             assigned: 0,
         };
 
-        documents.forEach(doc => {
+        docsToCount.forEach(doc => {
             switch (doc.status) {
                 case 'waiting':
                     counts.waiting++;
@@ -598,6 +690,51 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
         }
     };
 
+    const formatSubmittedDate = (dateString: string) => {
+        if (!dateString) return '-';
+        try {
+            // 기존 저장된 형식 파싱: "YYYY. MM. DD. 오전/오후 H:M:S"
+            const match = dateString.match(/(\d+)\.\s+(\d+)\.\s+(\d+)\.\s+(오전|오후)\s+(\d+):(\d+):(\d+)/);
+            if (match) {
+                let year = match[1];
+                const month = match[2];
+                const day = match[3];
+                const period = match[4];
+                let hours = parseInt(match[5]);
+                const minutes = match[6];
+
+                // 오후인 경우 12시간 더하기
+                if (period === '오후' && hours !== 12) {
+                    hours += 12;
+                } else if (period === '오전' && hours === 12) {
+                    hours = 0;
+                }
+
+                // 연도는 마지막 2자리만 사용
+                year = year.slice(-2);
+                const formattedHours = String(hours).padStart(2, '0');
+                const formattedMinutes = String(minutes).padStart(2, '0');
+
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${formattedHours}:${formattedMinutes}`;
+            }
+
+            // 표준 ISO 형식 시도
+            const date = new Date(dateString);
+            if (!isNaN(date.getTime())) {
+                const year = String(date.getFullYear()).slice(-2);
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}`;
+            }
+
+            return dateString;
+        } catch {
+            return dateString;
+        }
+    };
+
     if (loading) {
         return <div className={styles.loading}>로딩 중...</div>;
     }
@@ -639,7 +776,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     className={styles.itemsSelect}
                                     value={statusFilter}
                                     onChange={(e) => {
-                                        setStatusFilter(e.target.value as any);
+                                        setStatusFilter(e.target.value as 'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned');
                                         setCurrentPage(1);
                                     }}
                                 >
@@ -822,53 +959,68 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                         </div>
                     ) : (
                         <>
-                            <div className={styles.deleteButtonsContainer}>
-                                <button
-                                    className={styles.deleteAllButton}
-                                    onClick={handleDeleteAll}
-                                >
-                                    전체 삭제
-                                </button>
+                            {!isUserSalesManager && (
+                                <div className={styles.deleteButtonsContainer}>
+                                    <button
+                                        className={styles.deleteAllButton}
+                                        onClick={handleDeleteAll}
+                                    >
+                                        전체 삭제
+                                    </button>
 
-                                <button
-                                    className={styles.deleteSelectedButton}
-                                    onClick={handleDeleteSelected}
-                                    disabled={selectedDocuments.size === 0}
-                                >
-                                    선택 삭제 ({selectedDocuments.size})
-                                </button>
-                            </div>
+                                    <button
+                                        className={styles.deleteSelectedButton}
+                                        onClick={handleDeleteSelected}
+                                        disabled={selectedDocuments.size === 0}
+                                    >
+                                        선택 삭제 ({selectedDocuments.size})
+                                    </button>
+                                </div>
+                            )}
 
                             <table className={styles.documentTable}>
                             <thead>
                                 <tr>
-                                    <th className={styles.checkboxHeader}>
-                                        <input
-                                            type="checkbox"
-                                            checked={
-                                                (() => {
-                                                    const paginatedDocs = getPaginatedDocuments();
-                                                    return paginatedDocs.length > 0 && paginatedDocs.every(doc => selectedDocuments.has(doc.id));
-                                                })()
-                                            }
-                                            onChange={handleSelectAll}
-                                        />
-                                    </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
-                                        작성자 ID{getSortIcon('user_id')}
-                                    </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
-                                        작성자{getSortIcon('user_name')}
-                                    </th>
+                                    {!isUserSalesManager && (
+                                        <th className={styles.checkboxHeader}>
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    (() => {
+                                                        const paginatedDocs = getPaginatedDocuments();
+                                                        return paginatedDocs.length > 0 && paginatedDocs.every(doc => selectedDocuments.has(doc.id));
+                                                    })()
+                                                }
+                                                onChange={handleSelectAll}
+                                            />
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
+                                            작성자 ID{getSortIcon('user_id')}
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
+                                            작성자{getSortIcon('user_name')}
+                                        </th>
+                                    )}
                                     <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
                                         기업명{getSortIcon('company_name')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('representative_name')}>
                                         대표자명{getSortIcon('representative_name')}
                                     </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
-                                        담당실무자{getSortIcon('manager_name')}
-                                    </th>
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader}>
+                                            실무자 ID
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
+                                            실무자{getSortIcon('manager_name')}
+                                        </th>
+                                    )}
                                     <th className={styles.sortableHeader} onClick={() => handleSort('progress_details')}>
                                         진행상황{getSortIcon('progress_details')}
                                     </th>
@@ -893,20 +1045,31 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                             <tbody>
                                 {getPaginatedDocuments().map((doc) => (
                                     <tr key={doc.id} className={styles.documentRow}>
-                                        <td className={styles.checkboxCell}>
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDocuments.has(doc.id)}
-                                                onChange={() => handleSelectDocument(doc.id)}
-                                            />
-                                        </td>
-                                        <td className={styles.userId}>{doc.user_id}</td>
-                                        <td className={styles.userName}>{doc.user_name}</td>
+                                        {!isUserSalesManager && (
+                                            <td className={styles.checkboxCell}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedDocuments.has(doc.id)}
+                                                    onChange={() => handleSelectDocument(doc.id)}
+                                                />
+                                            </td>
+                                        )}
+                                        {!isUserSalesManager && (
+                                            <td className={styles.userId}>{doc.user_id}</td>
+                                        )}
+                                        {!isUserSalesManager && (
+                                            <td className={styles.userName}>{doc.user_name}</td>
+                                        )}
                                         <td className={styles.companyName}>{doc.company_name || '-'}</td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
-                                        <td className={styles.managerName}>{doc.manager_name || '-'}</td>
+                                        {!isUserSalesManager && (
+                                            <td className={styles.managerId}>{doc.manager_id || '-'}</td>
+                                        )}
+                                        {!isUserSalesManager && (
+                                            <td className={styles.managerName}>{doc.manager_name || '-'}</td>
+                                        )}
                                         <td className={styles.progressDetails}>
-                                            {doc.status === 'in_progress' ? (
+                                            {doc.progress_details ? (
                                                 <span className={styles.badge}>{doc.progress_details}</span>
                                             ) : (
                                                 '-'
@@ -922,6 +1085,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                 <button
                                                     className={`${styles.reasonButton} ${!doc.reason_read ? styles.unreadButton : ''}`}
                                                     onClick={async () => {
+                                                        const wasUnread = !doc.reason_read;
+
                                                         setSelectedReason({ id: doc.id, reason: doc.reason! });
                                                         setReasonModalOpen(true);
                                                         setDocuments(docs =>
@@ -934,16 +1099,25 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                                             ...doc,
                                                             reason_read: true
                                                         });
+
+                                                        // 읽지 않은 상태에서 읽음 상태로 변경될 때만 알림 업데이트
+                                                        if (wasUnread) {
+                                                            window.dispatchEvent(new CustomEvent('notificationUpdate', { detail: { type: 'read' } }));
+                                                        }
                                                     }}
                                                 >
                                                     보기
+                                                    {(() => {
+                                                        const reasonCount = doc.reason.split('\n').length;
+                                                        return reasonCount >= 2 ? <span className={styles.reasonCount}>{reasonCount}</span> : null;
+                                                    })()}
                                                 </button>
                                             ) : (
                                                 <span className={styles.noReason}>없음</span>
                                             )}
                                         </td>
-                                        <td className={styles.date}>{doc.submitted_date}</td>
-                                        <td className={styles.completedDate}>{doc.completed_date || '-'}</td>
+                                        <td className={styles.date}>{formatSubmittedDate(doc.submitted_date)}</td>
+                                        <td className={styles.completedDate}>{formatSubmittedDate(doc.completed_date || '')}</td>
                                         <td className={styles.timeAgo}>
                                             {doc.status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
@@ -1044,8 +1218,8 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                             setPendingAction({ id: pendingReasonAction.id, action: pendingReasonAction.action });
                                             setConfirmMessage(
                                                 pendingReasonAction.action === 'reject'
-                                                    ? '서류를 반려하시겠습니까?'
-                                                    : '서류 보완을 요청하시겠습니까?'
+                                                    ? '기업을 반려하시겠습니까?'
+                                                    : '기업 보완을 요청하시겠습니까?'
                                             );
                                             setConfirmModalOpen(true);
                                             setReasonInputModalOpen(false);
@@ -1131,8 +1305,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                         setSelectedDocumentForAction(null);
                     }}
                     onEdit={(id) => {
-                        // 수정 기능 구현 예정
-                        console.log('수정:', id);
+                        router.push(`/main/company_create?edit=${id}`);
                     }}
                     onReset={handleReset}
                     onProgressStart={handleProgressStart}
@@ -1142,6 +1315,7 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                     onRevision={handleRevision}
                     onSubmit={handleSubmit}
                     onDelete={handleProgressDelete}
+                    isUserSalesManager={isUserSalesManager}
                 />
 
                 {managerSelectModalOpen && selectedManagerId && (
@@ -1150,36 +1324,32 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                         setSelectedManagerId(null);
                         setSelectedManager('');
                     }}>
-                        <div className={`${modalStyles.modal}`} onClick={(e) => e.stopPropagation()}>
+                        <div className={`${modalStyles.modal} ${styles.managerModal}`} onClick={(e) => e.stopPropagation()}>
                             <div className={modalStyles.header}>
-                                <h3 className={modalStyles.title}>담당실무자 배정</h3>
+                                <h3 className={modalStyles.title}>실무자 배정</h3>
                             </div>
-                            <div className={modalStyles.content}>
-                                <p style={{ marginBottom: '16px', fontSize: '14px', color: '#666' }}>
-                                    담당실무자를 선택하세요
-                                </p>
-                                <select
-                                    value={selectedManager}
-                                    onChange={(e) => setSelectedManager(e.target.value)}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 12px',
-                                        border: '1px solid #e0e0e0',
-                                        borderRadius: '6px',
-                                        fontSize: '14px',
-                                        fontWeight: 500,
-                                    }}
-                                >
-                                    <option value="">선택하세요</option>
-                                    {documents
-                                        .filter(doc => doc.status === 'approved')
-                                        .map(doc => (
-                                            <option key={doc.id} value={doc.manager_name || ''}>
-                                                {doc.manager_name}
+                            <div className={`${modalStyles.content} ${styles.managerContent}`}>
+                                <div className={styles.managerSelectWrapper}>
+                                    <select
+                                        value={selectedManager}
+                                        onChange={(e) => setSelectedManager(e.target.value)}
+                                        className={styles.managerSelect}
+                                    >
+                                        <option value="">실무자를 선택하세요</option>
+                                        {workers.map(worker => (
+                                            <option key={worker.id} value={worker.user_id}>
+                                                {worker.name}({worker.user_id})
                                             </option>
-                                        ))
-                                    }
-                                </select>
+                                        ))}
+                                    </select>
+                                    <Image
+                                        src="/arrow.svg"
+                                        alt="드롭다운"
+                                        width={16}
+                                        height={16}
+                                        className={styles.managerSelectArrow}
+                                    />
+                                </div>
                             </div>
                             <div className={modalStyles.footer}>
                                 <button
@@ -1193,41 +1363,37 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
                                     취소
                                 </button>
                                 <button
-                                    className={modalStyles.confirmButton}
-                                    onClick={() => {
+                                    className={`${modalStyles.confirmButton} ${!selectedManager ? styles.disabledButton : ''}`}
+                                    onClick={async () => {
                                         if (selectedManager && selectedManagerId) {
-                                            setDocuments(docs =>
-                                                docs.map(doc => {
-                                                    if (doc.id === selectedManagerId) {
-                                                        return {
-                                                            ...doc,
-                                                            progress_details: '담당실무자',
-                                                            status: 'approved' as const,
-                                                            progress_status: 'stopped' as const,
-                                                            progress_end_time: '배정 완료'
-                                                        };
-                                                    }
-                                                    return doc;
-                                                })
-                                            );
-                                            setSuccessMessage('담당실무자가 배정되었습니다.');
+                                            const updatedDoc = documents.find(d => d.id === selectedManagerId);
+                                            const selectedWorker = workers.find(w => w.user_id === selectedManager);
+                                            if (updatedDoc && selectedWorker) {
+                                                const newDoc = {
+                                                    ...updatedDoc,
+                                                    manager_id: parseInt(selectedWorker.user_id),
+                                                    manager_name: selectedWorker.name,
+                                                    progress_details: '실무자',
+                                                    status: 'assigned' as const,
+                                                };
+
+                                                // 데이터베이스에 먼저 저장
+                                                await saveDocumentToDatabase(newDoc);
+
+                                                // UI 상태 업데이트
+                                                setDocuments(docs =>
+                                                    docs.map(doc => doc.id === selectedManagerId ? newDoc : doc)
+                                                );
+                                            }
+
+                                            setSuccessMessage(`${selectedWorker?.name} 실무자가 배정되었습니다.`);
                                             setSuccessModalOpen(true);
                                             setManagerSelectModalOpen(false);
                                             setSelectedManagerId(null);
                                             setSelectedManager('');
-
-                                            // 데이터베이스에 저장
-                                            const updatedDoc = documents.find(d => d.id === selectedManagerId);
-                                            if (updatedDoc) {
-                                                saveDocumentToDatabase({
-                                                    ...updatedDoc,
-                                                    progress_details: '담당실무자',
-                                                    status: 'approved',
-                                                    progress_end_time: '배정 완료'
-                                                });
-                                            }
                                         }
                                     }}
+                                    disabled={!selectedManager}
                                 >
                                     확인
                                 </button>
@@ -1238,6 +1404,4 @@ const DocumentSubmissionList = forwardRef<any>(function DocumentSubmissionList(_
             </div>
         </>
     );
-});
-
-export default DocumentSubmissionList;
+}

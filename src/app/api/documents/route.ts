@@ -30,9 +30,9 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(documents);
     } catch (error) {
-        console.error('서류 목록 조회 실패:', error);
+        console.error('기업 목록 조회 실패:', error);
         return NextResponse.json(
-            { error: '서류 목록 조회 실패' },
+            { error: '기업 목록 조회 실패' },
             { status: 500 }
         );
     }
@@ -62,10 +62,20 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json(data[0], { status: 201 });
-    } catch (error) {
-        console.error('서류 생성 실패:', error);
+    } catch (error: unknown) {
+        console.error('기업 생성 실패:', error);
+        let errorMessage = '알 수 없는 오류';
+        if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+            errorMessage = String((error as { message: unknown }).message);
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        } else {
+            errorMessage = JSON.stringify(error);
+        }
         return NextResponse.json(
-            { error: '서류 생성 실패' },
+            { error: `기업 생성 실패: ${errorMessage}` },
             { status: 500 }
         );
     }

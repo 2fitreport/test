@@ -10,6 +10,7 @@ interface Document {
     title: string;
     company_name?: string;
     representative_name?: string;
+    manager_id?: number;
     manager_name?: string;
     progress_details?: string;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
@@ -36,6 +37,7 @@ interface ActionModalProps {
     onRevision: (id: number) => void;
     onSubmit: (id: number) => void;
     onDelete: (id: number) => void;
+    isUserSalesManager?: boolean;
 }
 
 export default function ActionModal({
@@ -51,11 +53,12 @@ export default function ActionModal({
     onRevision,
     onSubmit,
     onDelete,
+    isUserSalesManager = false,
 }: ActionModalProps) {
     if (!isOpen || !document) return null;
 
     const getAllActions = () => {
-        return [
+        const allActions = [
             { label: '진행', action: 'start' },
             { label: '중지', action: 'stop' },
             { label: '승인', action: 'approve' },
@@ -64,6 +67,13 @@ export default function ActionModal({
             { label: '제출', action: 'submit' },
             { label: '삭제', action: 'delete' }
         ];
+
+        // 영업자는 진행, 중지, 승인, 반려, 보완, 삭제 숨김 (제출만 보임)
+        if (isUserSalesManager) {
+            return allActions.filter(action => action.action === 'submit');
+        }
+
+        return allActions;
     };
 
     const handleActionClick = (action: string) => {
@@ -95,6 +105,11 @@ export default function ActionModal({
 
     const allActions = getAllActions();
 
+    // 영업자가 제출 버튼을 클릭할 수 있는 조건
+    const canSubmitAsSalesManager = isUserSalesManager &&
+        document.progress_details === '영업자' &&
+        (document.status === 'rejected' || document.status === 'revision');
+
     return (
         <div className={styles.overlay} onClick={onClose}>
             <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
@@ -113,7 +128,7 @@ export default function ActionModal({
                             <>
                                 <p><strong>검수자:</strong> {document.progress_details || '-'}</p>
                                 <p><strong>대표실무자:</strong> {document.representative_name || '-'}</p>
-                                <p><strong>담당실무자:</strong> {document.manager_name || '-'}</p>
+                                <p><strong>실무자:</strong> {document.manager_name || '-'}</p>
                             </>
                         )}
                     </div>
@@ -124,6 +139,7 @@ export default function ActionModal({
                                 key={action.action}
                                 className={`${styles.actionButton} ${styles[`action-${action.action}`]}`}
                                 onClick={() => handleActionClick(action.action)}
+                                disabled={isUserSalesManager && action.action === 'submit' && !canSubmitAsSalesManager}
                             >
                                 {action.label}
                             </button>
@@ -132,14 +148,16 @@ export default function ActionModal({
                 </div>
 
                 <div className={styles.footer}>
-                    <button className={styles.resetActionButton} onClick={() => {
-                        if (onReset) {
-                            onReset(document.id);
-                            onClose();
-                        }
-                    }}>
-                        초기화
-                    </button>
+                    {!isUserSalesManager && (
+                        <button className={styles.resetActionButton} onClick={() => {
+                            if (onReset) {
+                                onReset(document.id);
+                                onClose();
+                            }
+                        }}>
+                            초기화
+                        </button>
+                    )}
                     <button className={styles.editActionButton} onClick={() => {
                         if (onEdit) {
                             onEdit(document.id);

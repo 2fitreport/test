@@ -1,17 +1,67 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getAdminData } from '@/lib/auth';
+import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import UserStats from './UserStats';
 import UserList from './UserList';
 import styles from './page.module.css';
 
 export default function UserManagementPage() {
     const [activeTab, setActiveTab] = useState<'stats' | 'users'>('stats');
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [showAccessDeniedModal, setShowAccessDeniedModal] = useState(false);
     const userListRef = useRef<any>(null);
+    const router = useRouter();
+
+    useEffect(() => {
+        const adminData = getAdminData();
+        // level이 1(대표자)인지 확인
+        if (adminData?.position?.level === 1) {
+            setIsAuthorized(true);
+        } else {
+            setIsAuthorized(false);
+            setShowAccessDeniedModal(true);
+        }
+        setLoading(false);
+    }, []);
 
     const handleCreateUser = () => {
         userListRef.current?.openCreateModal();
     };
+
+    const handleAccessDeniedConfirm = () => {
+        setShowAccessDeniedModal(false);
+        router.push('/main/document_submission');
+    };
+
+    if (loading) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.loadingContainer}>
+                    <div className={styles.spinner}></div>
+                    <p className={styles.loadingText}>로딩 중...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isAuthorized) {
+        return (
+            <>
+                <ConfirmModal
+                    isOpen={showAccessDeniedModal}
+                    message="사용자 관리는 대표자만 접근할 수 있습니다."
+                    type="error"
+                    onConfirm={handleAccessDeniedConfirm}
+                    confirmButtonText="확인"
+                    hideCancel={true}
+                />
+            </>
+        );
+    }
 
     return (
         <div className={styles.container}>

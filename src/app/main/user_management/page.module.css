@@ -136,3 +136,114 @@
 
 }
 
+/* 접근 거부 화면 */
+.accessDeniedContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+}
+
+.accessDeniedContent {
+    text-align: center;
+    padding: 80px 50px;
+    background: #ffffff;
+    border: 2px solid #f0f0f0;
+    border-radius: 12px;
+    max-width: 520px;
+}
+
+.iconBox {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 32px;
+    background: linear-gradient(135deg, var(--main-color), var(--main-color));
+    border-radius: 12px;
+    position: relative;
+}
+
+.iconBox::before {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 32px;
+    background: #ffffff;
+    border-radius: 4px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -35%);
+}
+
+.iconBox::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #ffffff;
+    border-radius: 50%;
+    top: 65%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.accessDeniedTitle {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 0 0 20px 0;
+}
+
+.accessDeniedMessage {
+    font-size: 16px;
+    color: #555;
+    margin: 0 0 16px 0;
+    line-height: 1.7;
+}
+
+.highlight {
+    color: var(--main-color);
+    font-weight: 700;
+}
+
+.accessDeniedSubMessage {
+    font-size: 14px;
+    color: #888;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* 로딩 화면 */
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 20px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #e8e8e8;
+    border-top: 2px solid var(--main-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.loadingText {
+    font-size: 14px;
+    color: #888;
+    margin: 0;
+    font-weight: 500;
+}
+

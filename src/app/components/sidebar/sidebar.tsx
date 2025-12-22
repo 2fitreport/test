@@ -27,11 +27,28 @@ export default function Sidebar() {
     useEffect(() => {
         setAdminData(getAdminData());
         fetchNotificationCount();
+
+        // 알림 업데이트 이벤트 리스닝
+        const handleNotificationUpdate = () => {
+            fetchNotificationCount();
+        };
+
+        window.addEventListener('notificationUpdate', handleNotificationUpdate);
+        return () => window.removeEventListener('notificationUpdate', handleNotificationUpdate);
     }, []);
 
     const fetchNotificationCount = async () => {
         try {
-            const response = await fetch('/api/documents/notification-count');
+            const adminData = getAdminData();
+            const isSalesManager = adminData?.position?.level === 4;
+            const userId = adminData?.user_id;
+
+            // 영업자는 자신의 반려/보완만, 다른 직급은 전체 반려/보완 조회
+            const url = isSalesManager && userId
+                ? `/api/documents/notification-count?user_id=${userId}`
+                : '/api/documents/notification-count';
+
+            const response = await fetch(url);
             if (response.ok) {
                 const data = await response.json();
                 setNotificationCount(data.count || 0);
@@ -50,10 +67,14 @@ export default function Sidebar() {
         if (!adminData?.name) return '';
 
         const positionLevel = adminData.position?.level;
+        const positionName = adminData.position?.name;
         const isRepresentative = positionLevel === 1;
-        const suffix = isRepresentative ? ' 대표님' : '님';
 
-        return `${adminData.name}${suffix}`;
+        if (isRepresentative) {
+            return `${adminData.name} 대표님`;
+        } else {
+            return `${adminData.name}(${positionName})님`;
+        }
     };
 
     const handleLogout = () => {
@@ -82,24 +103,34 @@ export default function Sidebar() {
             </div>
             <nav className={`${styles.nav} ${isMenuOpen ? styles.open : ''}`}>
                 <ul className={styles.menuList}>
-                    {menuItems.map((item) => (
-                        <li key={item.path} className={styles.menuItemWrapper}>
-                            <button
-                                className={`${styles.menuItem} ${pathname === item.path ? styles.active : ''}`}
-                                onClick={() => handleMenuClick(item.path)}
-                            >
-                                {item.path === '/main/user_management' ? (
-                                    <FiUsers className={styles.menuIcon} />
-                                ) : (
-                                    <FiFile className={styles.menuIcon} />
-                                )}
-                                {item.label}
-                                {item.path === '/main/document_submission' && notificationCount > 0 && (
-                                    <span className={styles.notificationBadge}>{notificationCount}</span>
-                                )}
-                            </button>
-                        </li>
-                    ))}
+                    {menuItems.map((item) => {
+                        // 사용자 관리는 대표자(level=1)만 접근 가능
+                        if (item.path === '/main/user_management' && adminData?.position?.level !== 1) {
+                            return null;
+                        }
+
+                        const isActive = pathname === item.path ||
+                            (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create'));
+
+                        return (
+                            <li key={item.path} className={styles.menuItemWrapper}>
+                                <button
+                                    className={`${styles.menuItem} ${isActive ? styles.active : ''}`}
+                                    onClick={() => handleMenuClick(item.path)}
+                                >
+                                    {item.path === '/main/user_management' ? (
+                                        <FiUsers className={styles.menuIcon} />
+                                    ) : (
+                                        <FiFile className={styles.menuIcon} />
+                                    )}
+                                    {item.label}
+                                    {item.path === '/main/document_submission' && notificationCount > 0 && (
+                                        <span className={styles.notificationBadge}>{notificationCount}</span>
+                                    )}
+                                </button>
+                            </li>
+                        );
+                    })}
                     <li className={styles.logoutMenuItem}>
                         <button
                             className={styles.menuItem}

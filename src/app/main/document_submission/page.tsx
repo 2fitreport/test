@@ -1,13 +1,10 @@
 'use client';
 
-import { useRef } from 'react';
 import Link from 'next/link';
 import DocumentSubmissionList from './DocumentSubmissionList';
 import styles from './page.module.css';
 
 export default function DocumentSubmissionPage() {
-    const documentListRef = useRef<any>(null);
-
     return (
         <div className={styles.container}>
             <div className={styles.titleWrapper}>
@@ -20,7 +17,7 @@ export default function DocumentSubmissionPage() {
             </div>
 
             <div className={styles.contentWrapper}>
-                <DocumentSubmissionList ref={documentListRef} />
+                <DocumentSubmissionList />
             </div>
         </div>
     );

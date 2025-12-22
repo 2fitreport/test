@@ -53,3 +53,39 @@ export async function POST(request: NextRequest) {
         );
     }
 }
+
+export async function DELETE(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const path = searchParams.get('path');
+
+        if (!path) {
+            return NextResponse.json(
+                { error: '파일 경로가 필요합니다.' },
+                { status: 400 }
+            );
+        }
+
+        // Supabase Storage에서 삭제
+        const { error } = await supabase.storage
+            .from('documents')
+            .remove([path]);
+
+        if (error) {
+            return NextResponse.json(
+                { error: `삭제 실패: ${error.message}` },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: '파일이 삭제되었습니다.',
+        });
+    } catch (error) {
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : '서버 오류' },
+            { status: 500 }
+        );
+    }
+}

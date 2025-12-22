@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import Modal from '@/app/components/Modal/Modal';
 import styles from './companyCreate.module.css';
@@ -16,6 +16,9 @@ interface CompanyFormData {
 
 export default function CompanyCreateForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const editId = searchParams.get('edit');
+
     const [formData, setFormData] = useState<CompanyFormData>({
         businessType: 'individual',
         representative_name: '',
@@ -25,18 +28,60 @@ export default function CompanyCreateForm() {
     });
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
     const [loading, setLoading] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadError, setDownloadError] = useState('');
     const [error, setError] = useState('');
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+
+    // 수정 모드일 때 문서 정보 로드
+    useEffect(() => {
+        if (editId) {
+            setIsEditMode(true);
+            fetchDocumentData(parseInt(editId));
+        }
+    }, [editId]);
+
+    const fetchDocumentData = async (docId: number) => {
+        try {
+            const response = await fetch(`/api/documents/${docId}`);
+            if (!response.ok) {
+                throw new Error('문서 조회 실패');
+            }
+            const data = await response.json();
+            setFormData({
+                businessType: data.type || 'individual',
+                representative_name: data.representative_name || '',
+                company_name: data.company_name || '',
+                business_number: data.business_number || '',
+                phone: data.phone || '',
+            });
+
+            // 파일 정보 로드
+            if (data.files && Array.isArray(data.files)) {
+                setExistingFiles(data.files);
+            }
+        } catch (err) {
+            console.error('문서 데이터 로드 실패:', err);
+            setError('문서 정보를 불러오지 못했습니다.');
+            setErrorModalOpen(true);
+        }
+    };
 
     const handleBusinessTypeChange = (type: 'individual' | 'business') => {
-        setFormData(prev => ({
-            ...prev,
+        setFormData({
             businessType: type,
-        }));
+            representative_name: '',
+            company_name: '',
+            business_number: '',
+            phone: '',
+        });
         setSelectedFiles([]);
+        setExistingFiles([]);
     };
 
     const formatBusinessNumber = (value: string) => {
@@ -79,6 +124,70 @@ export default function CompanyCreateForm() {
         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleRemoveExistingFile = async (index: number) => {
+        const fileToRemove = existingFiles[index];
+
+        try {
+            // 스토리지에서 파일 삭제
+            await fetch(`/api/upload?path=${encodeURIComponent(fileToRemove.path)}`, {
+                method: 'DELETE',
+            });
+
+            // UI에서 파일 제거
+            setExistingFiles(prev => prev.filter((_, i) => i !== index));
+        } catch (err) {
+            console.error('파일 삭제 중 오류:', err);
+            setError('파일 삭제 중 오류가 발생했습니다.');
+            setErrorModalOpen(true);
+        }
+    };
+
+    const handleDownloadZip = async () => {
+        if (!existingFiles || existingFiles.length === 0) {
+            setDownloadError('다운로드할 파일이 없습니다.');
+            return;
+        }
+
+        setIsDownloading(true);
+        setDownloadError('');
+
+        try {
+            const response = await fetch('/api/download/zip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    documentId: editId,
+                    files: existingFiles,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '다운로드 실패');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = globalThis.document.createElement('a');
+            link.href = url;
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            link.download = `document_${editId}_${dateStr}.zip`;
+            globalThis.document.body.appendChild(link);
+            link.click();
+            window.URL.revokeObjectURL(url);
+            globalThis.document.body.removeChild(link);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '파일 다운로드 중 오류가 발생했습니다.';
+            setDownloadError(errorMessage);
+            console.error('ZIP 다운로드 오류:', error);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     const validateForm = () => {
         if (!formData.representative_name.trim()) {
             setError('대표자명을 입력해주세요.');
@@ -104,7 +213,16 @@ export default function CompanyCreateForm() {
             return false;
         }
 
-        if (selectedFiles.length === 0) {
+        // 파일 검증
+        // 생성 모드: 새 파일 필수
+        // 수정 모드: 기존 파일 또는 새 파일 중 최소 1개 필수
+        if (!isEditMode && selectedFiles.length === 0) {
+            setError('파일을 최소 1개 이상 업로드해주세요.');
+            setErrorModalOpen(true);
+            return false;
+        }
+
+        if (isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
             setError('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
@@ -136,79 +254,112 @@ export default function CompanyCreateForm() {
                 return;
             }
 
-            // 파일 업로드 (Supabase Storage)
-            const uploadedFiles: Array<{ name: string; path: string; size: number }> = [];
+            let uploadedFiles: Array<{ name: string; path: string; size: number }> = [];
 
-            for (const file of selectedFiles) {
-                try {
-                    // 파일 크기 확인 (50MB 제한)
-                    if (file.size > 50 * 1024 * 1024) {
-                        throw new Error(`${file.name}은(는) 50MB 이상으로 업로드할 수 없습니다.`);
+            // 새로운 파일 업로드 (생성 모드 또는 수정 모드에서 새 파일 추가)
+            if (selectedFiles.length > 0) {
+                for (const file of selectedFiles) {
+                    try {
+                        // 파일 크기 확인 (50MB 제한)
+                        if (file.size > 50 * 1024 * 1024) {
+                            throw new Error(`${file.name}은(는) 50MB 이상으로 업로드할 수 없습니다.`);
+                        }
+
+                        const fileExt = file.name.split('.').pop();
+                        const timestamp = Date.now();
+                        const date = new Date(timestamp);
+                        const timeStr = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
+                        const randomStr = Math.random().toString(36).substring(2, 9);
+                        const fileName = `${timeStr}-${randomStr}.${fileExt}`;
+                        const businessTypeFolder = formData.businessType === 'individual' ? 'individual' : 'business';
+                        const filePath = `companies/${businessTypeFolder}/${fileName}`;
+
+                        const uploadFormData = new FormData();
+                        uploadFormData.append('file', file);
+                        uploadFormData.append('path', filePath);
+
+                        const uploadResponse = await fetch('/api/upload', {
+                            method: 'POST',
+                            body: uploadFormData,
+                        });
+
+                        if (!uploadResponse.ok) {
+                            const errorData = await uploadResponse.json();
+                            throw new Error(errorData.error || `파일 업로드 실패: ${file.name}`);
+                        }
+
+                        const uploadData = await uploadResponse.json();
+                        uploadedFiles.push({
+                            name: file.name,
+                            path: uploadData.path,
+                            size: file.size,
+                        });
+                    } catch (err) {
+                        throw new Error(`파일 업로드 중 오류 발생: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
                     }
-
-                    const fileExt = file.name.split('.').pop();
-                    const timestamp = Date.now();
-                    const date = new Date(timestamp);
-                    const timeStr = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
-                    const randomStr = Math.random().toString(36).substring(2, 9);
-                    const fileName = `${timeStr}-${randomStr}.${fileExt}`;
-                    const businessTypeFolder = formData.businessType === 'individual' ? 'individual' : 'business';
-                    const filePath = `companies/${businessTypeFolder}/${fileName}`;
-
-                    const uploadFormData = new FormData();
-                    uploadFormData.append('file', file);
-                    uploadFormData.append('path', filePath);
-
-                    const uploadResponse = await fetch('/api/upload', {
-                        method: 'POST',
-                        body: uploadFormData,
-                    });
-
-                    if (!uploadResponse.ok) {
-                        const errorData = await uploadResponse.json();
-                        throw new Error(errorData.error || `파일 업로드 실패: ${file.name}`);
-                    }
-
-                    const uploadData = await uploadResponse.json();
-                    uploadedFiles.push({
-                        name: file.name,
-                        path: uploadData.path,
-                        size: file.size,
-                    });
-                } catch (err) {
-                    throw new Error(`파일 업로드 중 오류 발생: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
                 }
             }
 
-            // 기업 정보 저장 (documents 테이블)
+            // 수정 모드: 기존 파일과 새 파일 합치기
+            if (isEditMode) {
+                uploadedFiles = [...existingFiles, ...uploadedFiles];
+            }
+
+            // 기업 정보 저장/수정
             const now = new Date();
-            const response = await fetch('/api/documents', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
+            const requestBody: any = {
+                company_name: formData.company_name,
+                representative_name: formData.representative_name,
+                business_number: formData.business_number,
+                phone: formData.phone,
+                type: formData.businessType,
+            };
+
+            if (isEditMode) {
+                // 수정 모드: PUT 요청
+                const editBody = {
+                    ...requestBody,
+                    files: uploadedFiles,
+                };
+
+                const response = await fetch(`/api/documents/${editId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(editBody),
+                });
+
+                if (!response.ok) {
+                    throw new Error('기업 정보 수정 실패');
+                }
+            } else {
+                // 생성 모드: POST 요청
+                const createBody = {
+                    ...requestBody,
                     user_id: adminData.user_id,
                     user_name: adminData.name || adminData.user_id,
                     document_type: '기업등록',
                     title: formData.company_name,
-                    company_name: formData.company_name,
-                    representative_name: formData.representative_name,
-                    manager_name: formData.representative_name,
-                    business_number: formData.business_number,
-                    phone: formData.phone,
-                    type: formData.businessType,
+                    manager_name: '',
                     progress_details: '검수자',
                     status: 'waiting',
                     progress_status: 'not_started',
                     submitted_date: now.toLocaleString('ko-KR'),
                     files: uploadedFiles,
-                    created_at: now.toISOString(),
-                }),
-            });
+                };
 
-            if (!response.ok) {
-                throw new Error('기업 정보 저장 실패');
+                const response = await fetch('/api/documents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(createBody),
+                });
+
+                if (!response.ok) {
+                    throw new Error('기업 정보 저장 실패');
+                }
             }
 
             setSuccessModalOpen(true);
@@ -225,13 +376,17 @@ export default function CompanyCreateForm() {
         router.push('/main/document_submission');
     };
 
-    const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자 서류' : '법인사업자 서류';
+    const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자' : '법인사업자';
 
     return (
         <div className={styles.formContainer}>
             <div className={styles.formHeader}>
-                <h2 className={styles.formTitle}>기업 정보 입력</h2>
-                <p className={styles.formSubtitle}>새로운 기업 정보를 등록해주세요.</p>
+                <h2 className={styles.formTitle}>
+                    {isEditMode ? '기업 정보 수정' : '기업 정보 입력'}
+                </h2>
+                <p className={styles.formSubtitle}>
+                    {isEditMode ? '기업 정보를 수정해주세요.' : '새로운 기업 정보를 등록해주세요.'}
+                </p>
             </div>
 
             <form onSubmit={handleSubmit} className={styles.form}>
@@ -337,7 +492,7 @@ export default function CompanyCreateForm() {
                 {/* 파일 업로드 */}
                 <div className={styles.fileUploadSection}>
                     <label className={styles.sectionTitle}>
-                        서류 업로드 ({fileTypeLabel})
+                        파일 업로드 ({fileTypeLabel})
                     </label>
                     <div className={styles.uploadArea}>
                         <label htmlFor="fileInput" className={styles.uploadLabel}>
@@ -380,6 +535,52 @@ export default function CompanyCreateForm() {
                         </div>
                     )}
                 </div>
+
+                {/* 기존 파일 목록 (수정 모드) */}
+                {isEditMode && existingFiles.length > 0 && (
+                <div className={styles.fileUploadSection}>
+                    <label className={styles.sectionTitle}>
+                        등록된 파일
+                    </label>
+                    <div className={styles.fileList}>
+                        <p className={styles.fileListTitle}>파일 ({existingFiles.length}개)</p>
+                        <ul className={styles.files}>
+                            {existingFiles.map((file, index) => (
+                                <li key={index} className={styles.fileItem}>
+                                    <span className={styles.fileName}>{file.name}</span>
+                                    <span className={styles.fileSize}>
+                                        ({(file.size / 1024 / 1024).toFixed(2)}MB)
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveExistingFile(index)}
+                                        className={styles.removeButton}
+                                    >
+                                        ✕
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {downloadError && (
+                        <div className={styles.errorMessage}>
+                            {downloadError}
+                        </div>
+                    )}
+
+                    <div className={styles.downloadButtonContainer}>
+                        <button
+                            type="button"
+                            className={styles.downloadButton}
+                            onClick={handleDownloadZip}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
+                        </button>
+                    </div>
+                </div>
+                )}
 
                 {/* 버튼 */}
                 <div className={styles.formButtons}>

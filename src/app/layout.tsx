@@ -5,7 +5,7 @@ import './globals.css';
 export const metadata: Metadata = {
     title: '2FitReport',
     description: 'User management dashboard',
-    viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
+    viewport: 'width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover',
 };
 
 export default function RootLayout({

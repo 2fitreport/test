@@ -324,3 +324,41 @@
         width: 100%;
     }
 }
+
+/* Download button styles */
+.downloadButtonContainer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.downloadButton {
+    padding: 10px 24px;
+    background-color: #2196F3;
+    border: 1px solid #2196F3;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.downloadButton:hover {
+    opacity: 0.9;
+}
+
+.downloadButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.errorMessage {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 12px;
+    color: #856404;
+    font-size: 13px;
+}
