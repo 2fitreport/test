@@ -160,7 +160,7 @@ export default function DocumentSubmissionList() {
 
     const handleReset = (id: number) => {
         setPendingAction({ id, action: 'reset' });
-        setConfirmMessage('기업을 초기화하시겠습니까? (대기 상태로 돌아갑니다)');
+        setConfirmMessage('기업을 초기화하시겠습니까?\n(대기 상태로 돌아갑니다)');
         setConfirmModalOpen(true);
     };
 
