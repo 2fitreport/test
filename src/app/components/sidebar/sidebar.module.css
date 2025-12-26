@@ -137,6 +137,17 @@ text-align: center;
 letter-spacing: -0.3px;
 }
 
+.supervisorInfo {
+margin: 0;
+padding: 8px 0;
+font-size: 13px;
+font-weight: 500;
+color: #666;
+text-align: center;
+line-height: 1.4;
+border-top: 1px solid rgba(15, 26, 77, 0.1);
+}
+
 .logoutButton {
 width: 100%;
 padding: 10px 16px;

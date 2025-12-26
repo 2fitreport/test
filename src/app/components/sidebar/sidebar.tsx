@@ -23,10 +23,17 @@ export default function Sidebar() {
     const [adminData, setAdminData] = useState(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [notificationCount, setNotificationCount] = useState(0);
+    const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
     useEffect(() => {
-        setAdminData(getAdminData());
+        const data = getAdminData();
+        setAdminData(data);
         fetchNotificationCount();
+
+        // 영업자(Level 4)인 경우 담당검수자 정보 조회
+        if (data?.position?.level === 4 && data?.supervisor_id) {
+            fetchSupervisorInfo(data.supervisor_id);
+        }
 
         // 알림 업데이트 이벤트 리스닝
         const handleNotificationUpdate = () => {
@@ -55,6 +62,24 @@ export default function Sidebar() {
             }
         } catch (error) {
             console.error('알림 건수 조회 실패:', error);
+        }
+    };
+
+    const fetchSupervisorInfo = async (supervisorId: number) => {
+        try {
+            const response = await fetch('/api/users');
+            if (response.ok) {
+                const users = await response.json();
+                const supervisor = users.find((user: any) => user.id === supervisorId);
+                if (supervisor) {
+                    setSupervisorInfo({
+                        name: supervisor.name,
+                        user_id: supervisor.user_id
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('검수자 정보 조회 실패:', error);
         }
     };
 
@@ -147,6 +172,11 @@ export default function Sidebar() {
             </nav>
             <div className={styles.userInfo}>
                 <p className={styles.userName}>{getNameDisplay()}</p>
+                {adminData?.position?.level === 4 && supervisorInfo && (
+                    <p className={styles.supervisorInfo}>
+                        담당검수자: {supervisorInfo.name} ({supervisorInfo.user_id})
+                    </p>
+                )}
                 <button className={styles.logoutButton} onClick={handleLogout}>
                     로그아웃
                 </button>

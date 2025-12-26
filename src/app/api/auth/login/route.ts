@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
           address: user.address,
           status: user.status,
           company_name: user.company_name,
+          supervisor_id: user.supervisor_id,
         },
       },
       { status: 200 }
