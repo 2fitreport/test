@@ -10,7 +10,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { documentId, files } = body;
+        const { documentId, files, companyName } = body;
+
+        console.log('[ZIP 다운로드] 요청 데이터:', { documentId, companyName, filesCount: files?.length });
 
         // 인증 확인 (쿠키에서 토큰 가져오기)
         const authToken = request.cookies.get('auth_token')?.value;
@@ -24,7 +26,7 @@ export async function POST(request: NextRequest) {
         // 문서 존재 및 접근 권한 확인
         const { data: document, error: docError } = await supabase
             .from('documents')
-            .select('id, user_id')
+            .select('id, user_id, company_name')
             .eq('id', documentId)
             .single();
 
@@ -34,6 +36,9 @@ export async function POST(request: NextRequest) {
                 { status: 404 }
             );
         }
+
+        // companyName이 없으면 데이터베이스에서 가져오기
+        const finalCompanyName = companyName || document.company_name || `document_${documentId}`;
 
         if (!documentId || !files || !Array.isArray(files)) {
             return NextResponse.json(
@@ -97,16 +102,22 @@ export async function POST(request: NextRequest) {
         // ZIP 파일 생성 (Node.js 환경용)
         const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
 
-        // 파일명 생성
+        // 파일명 생성 (회사명 또는 문서ID 사용)
         const now = new Date();
         const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-        const filename = `document_${documentId}_${dateStr}.zip`;
+        const sanitizedCompanyName = finalCompanyName.replace(/[/\\:*?"<>|]/g, '');
+        const filename = `${sanitizedCompanyName}_${dateStr}.zip`;
+
+        console.log('[ZIP 파일명] 생성됨:', { finalCompanyName, sanitizedCompanyName, filename });
+
+        // 한글 파일명 지원 (RFC 5987 인코딩)
+        const contentDisposition = `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`;
 
         return new NextResponse(new Uint8Array(zipBuffer), {
             status: 200,
             headers: {
                 'Content-Type': 'application/zip',
-                'Content-Disposition': `attachment; filename="${filename}"`,
+                'Content-Disposition': contentDisposition,
             },
         });
     } catch (error) {

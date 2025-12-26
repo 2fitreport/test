@@ -8,6 +8,47 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function GET(request: NextRequest) {
     try {
+        // 인증 확인
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (!authToken) {
+            return NextResponse.json(
+                { error: '인증이 필요합니다.' },
+                { status: 401 }
+            );
+        }
+
+        // 토큰 디코딩
+        let tokenData;
+        try {
+            const decodedToken = Buffer.from(authToken, 'base64').toString('utf-8');
+            tokenData = JSON.parse(decodedToken);
+        } catch (err) {
+            return NextResponse.json(
+                { error: '유효하지 않은 토큰입니다.' },
+                { status: 401 }
+            );
+        }
+
+        const userId = tokenData.user_id;
+
+        // 현재 사용자 정보 조회 (역할 레벨 확인용)
+        const { data: currentUser, error: userError } = await supabase
+            .from('users')
+            .select('*, position(level)')
+            .eq('user_id', userId)
+            .single();
+
+        if (userError || !currentUser) {
+            return NextResponse.json(
+                { error: '사용자 정보를 찾을 수 없습니다.' },
+                { status: 404 }
+            );
+        }
+
+        const userLevel = currentUser.position?.level;
+        const userIdNumber = currentUser.id;
+
+        // 모든 문서 조회
         const { data, error } = await supabase
             .from('documents')
             .select('*')
@@ -17,16 +58,36 @@ export async function GET(request: NextRequest) {
             throw error;
         }
 
+        let filteredDocuments = data;
+
+        // 역할별 필터링
+        // Level 4 (영업자): 자신의 문서만
+        if (userLevel === 4) {
+            filteredDocuments = data.filter((doc: any) => doc.user_id === userId);
+        }
+        // Level 6 (검수자): progress_details가 '검수자'인 자신의 담당 영업자 문서 또는 과거에 승인했던 문서 (영업자 상태는 제외)
+        else if (userLevel === 6) {
+            const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('user_id')
+                .eq('supervisor_id', userIdNumber);
+
+            if (!usersError && usersData) {
+                const assignedUserIds = usersData.map((u: any) => u.user_id);
+                // 자신이 담당하고 진행상태가 '검수자'인 문서 OR 과거에 승인했던 문서 (하지만 '영업자' 상태로 돌아간 것은 제외)
+                filteredDocuments = data.filter((doc: any) =>
+                    (assignedUserIds.includes(doc.user_id) && doc.progress_details === '검수자') ||
+                    (doc.inspector_id === userId && doc.progress_details !== '영업자')
+                );
+            }
+        }
+        // Level 1, 2: 필터링 없음 (모든 문서)
+
         // 데이터 변환 (timestamp를 ISO 문자열로 변환)
-        const documents = data.map((doc: any) => ({
+        const documents = filteredDocuments.map((doc: any) => ({
             ...doc,
             progress_start_date: doc.progress_start_date ? new Date(doc.progress_start_date).toISOString() : undefined,
         }));
-
-        console.log('GET 응답 데이터:', {
-            submitted_date: documents[0]?.submitted_date,
-            completed_date: documents[0]?.completed_date
-        });
 
         return NextResponse.json(documents);
     } catch (error) {

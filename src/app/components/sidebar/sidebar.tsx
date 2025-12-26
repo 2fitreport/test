@@ -116,7 +116,14 @@ export default function Sidebar() {
                 </div>
                 <div className={styles.headerUserName}>
                     <FiUser className={styles.headerUserIcon} />
-                    <p className={styles.headerUserText}>{getNameDisplay()}</p>
+                    <div className={styles.headerUserInfo}>
+                        <p className={styles.headerUserText}>{getNameDisplay()}</p>
+                        {adminData?.position?.level === 4 && supervisorInfo && (
+                            <p className={styles.headerSupervisorText}>
+                                검수자: {supervisorInfo.name} ({supervisorInfo.user_id})
+                            </p>
+                        )}
+                    </div>
                 </div>
                 <button
                     className={`${styles.hamburger} ${isMenuOpen ? styles.active : ''}`}
@@ -174,7 +181,7 @@ export default function Sidebar() {
                 <p className={styles.userName}>{getNameDisplay()}</p>
                 {adminData?.position?.level === 4 && supervisorInfo && (
                     <p className={styles.supervisorInfo}>
-                        담당검수자: {supervisorInfo.name} ({supervisorInfo.user_id})
+                        검수자: {supervisorInfo.name} ({supervisorInfo.user_id})
                     </p>
                 )}
                 <button className={styles.logoutButton} onClick={handleLogout}>

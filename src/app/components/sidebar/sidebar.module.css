@@ -226,11 +226,25 @@ box-shadow: 0 2px 4px rgba(15, 26, 77, 0.2);
         flex-shrink: 0;
     }
 
+    .headerUserInfo {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
     .headerUserText {
         margin: 0;
         font-size: 16px;
         font-weight: 700;
         color: var(--main-color);
+        white-space: nowrap;
+    }
+
+    .headerSupervisorText {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 500;
+        color: #666;
         white-space: nowrap;
     }
 

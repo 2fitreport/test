@@ -36,6 +36,7 @@ interface Document {
     business_number?: string;
     phone?: string;
     progress_details?: string;
+    inspector_id?: string | null;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
@@ -99,6 +100,7 @@ export default function CompanyCreateForm() {
     const [fileViewerOpen, setFileViewerOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<{ name: string; path: string; size: number } | null>(null);
     const [fileViewUrl, setFileViewUrl] = useState('');
+    const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
     // 초기화: 실무자 목록 로드 및 현재 사용자 정보 설정
     useEffect(() => {
@@ -142,6 +144,7 @@ export default function CompanyCreateForm() {
             const adminData = getAdminData();
             const userLevel = adminData?.position?.level;
             const userId = adminData?.user_id;
+            const userIdNumber = adminData?.id;
 
             // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
             if (userLevel === 4 && userId !== data.user_id) {
@@ -150,8 +153,51 @@ export default function CompanyCreateForm() {
                 return;
             }
 
+            // 검수자(level=6)는 자신이 담당하는 영업자의 문서 또는 과거에 담당했던 문서를 볼 수 있음
+            let assignedSalesManagerIds: string[] = [];
+            if (userLevel === 6 && userIdNumber) {
+                try {
+                    const usersResponse = await fetch('/api/users');
+                    if (usersResponse.ok) {
+                        const usersData = await usersResponse.json();
+                        assignedSalesManagerIds = usersData
+                            .filter((user: any) => user.supervisor_id === userIdNumber)
+                            .map((user: any) => user.user_id);
+
+                        // 자신의 담당 영업자의 문서이거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
+                        const isAssignedDocument = assignedSalesManagerIds.includes(data.user_id);
+                        const isPastInspector = data.inspector_id === userId;
+
+                        if (!isAssignedDocument && !isPastInspector) {
+                            setError('접근 권한이 없습니다.');
+                            setErrorModalOpen(true);
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('사용자 정보 조회 실패:', error);
+                }
+            }
+
             // 권한이 확인되었으면 데이터 표시
             setDocumentData(data);
+
+            // 담당검수자 정보 조회
+            try {
+                const usersResponse = await fetch('/api/users');
+                if (usersResponse.ok) {
+                    const usersData = await usersResponse.json();
+                    const documentOwner = usersData.find((user: any) => user.user_id === data.user_id);
+                    if (documentOwner && documentOwner.supervisor_id) {
+                        const supervisor = usersData.find((user: any) => user.id === documentOwner.supervisor_id);
+                        if (supervisor) {
+                            setSupervisorInfo({ name: supervisor.name, user_id: supervisor.user_id });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('담당검수자 정보 조회 실패:', error);
+            }
 
             setFormData({
                 businessType: data.type || 'individual',
@@ -170,14 +216,17 @@ export default function CompanyCreateForm() {
             const hasEditPermission = canEditDocument(
                 userLevel,
                 userId,
-                data.user_id
+                data.user_id,
+                undefined,
+                assignedSalesManagerIds.length > 0 ? assignedSalesManagerIds : undefined,
+                data.inspector_id,
+                data.manager_id
             );
             setCanEdit(hasEditPermission);
 
-            // 검수자가 URL로 수정 모드 진입 시도 → 차단
-            if (userLevel === 6 && editParam === 'true') {
-                setError('검수자는 수정할 수 없습니다.');
-                setErrorModalOpen(true);
+            // edit 파라미터가 있지만 권한이 없으면 뷰 페이지로 리다이렉트
+            if (editParam === 'true' && !hasEditPermission) {
+                router.replace(`/main/company_create?view=${viewId}`);
                 return;
             }
 
@@ -272,6 +321,13 @@ export default function CompanyCreateForm() {
         setDownloadError('');
 
         try {
+            const companyNameToSend = documentData?.company_name || '기업';
+            console.log('[ZIP 다운로드] 프론트엔드 데이터:', {
+                documentId: viewId || documentData?.id,
+                companyName: companyNameToSend,
+                documentDataKeys: Object.keys(documentData || {})
+            });
+
             const response = await fetch('/api/download/zip', {
                 method: 'POST',
                 headers: {
@@ -280,12 +336,14 @@ export default function CompanyCreateForm() {
                 body: JSON.stringify({
                     documentId: viewId || documentData?.id,
                     files: existingFiles,
+                    companyName: companyNameToSend,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || '다운로드 실패');
+                const errorMsg = errorData.message ? `${errorData.error} - ${errorData.message}` : (errorData.error || '다운로드 실패');
+                throw new Error(errorMsg);
             }
 
             const blob = await response.blob();
@@ -294,7 +352,7 @@ export default function CompanyCreateForm() {
             link.href = url;
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-            link.download = `document_${viewId || documentData?.id}_${dateStr}.zip`;
+            link.download = `${companyNameToSend}_${dateStr}.zip`;
             globalThis.document.body.appendChild(link);
             link.click();
             window.URL.revokeObjectURL(url);
@@ -521,7 +579,7 @@ export default function CompanyCreateForm() {
 
     const fetchWorkers = async () => {
         try {
-            const response = await fetch('/api/workers');
+            const response = await fetch('/api/users');
             if (response.ok) {
                 const data = await response.json();
                 setWorkers(data);
@@ -560,16 +618,37 @@ export default function CompanyCreateForm() {
         };
 
         const updatedMemos = [...(documentData.memos || []), newMemo];
-        const updated = {
+
+        // 로컬 상태만 먼저 업데이트 (UI 즉시 반영)
+        setDocumentData({
             ...documentData,
             memos: updatedMemos
-        };
-
-        await saveDocumentToDatabase(updated);
-        setDocumentData(updated);
+        });
         setMemoInput('');
-        setSuccessMessage('메모가 추가되었습니다.');
-        setSuccessModalOpen(true);
+
+        // 데이터베이스에 저장 (백그라운드)
+        await saveDocumentToDatabase({
+            ...documentData,
+            memos: updatedMemos
+        });
+    };
+
+    const handleDeleteMemo = async (memoIndex: number) => {
+        if (!documentData) return;
+
+        const updatedMemos = documentData.memos?.filter((_, index) => index !== memoIndex) || [];
+
+        // 로컬 상태만 먼저 업데이트 (UI 즉시 반영)
+        setDocumentData({
+            ...documentData,
+            memos: updatedMemos
+        });
+
+        // 데이터베이스에 저장 (백그라운드)
+        await saveDocumentToDatabase({
+            ...documentData,
+            memos: updatedMemos
+        });
     };
 
     const handleViewFile = async (file: { name: string; path: string; size: number }) => {
@@ -722,9 +801,16 @@ export default function CompanyCreateForm() {
             } else if (action === 'approve') {
                 let updated: Document;
                 let message = '';
+                const adminData = getAdminData();
+                const currentUserId = adminData?.user_id;
 
                 if (documentData.progress_details === '검수자') {
-                    updated = { ...documentData, progress_details: '대표실무자' };
+                    // 검수자가 승인할 때 inspector_id 저장
+                    updated = {
+                        ...documentData,
+                        progress_details: '대표실무자',
+                        inspector_id: currentUserId
+                    };
                     message = '대표실무자로 진행합니다.';
                 } else if (documentData.progress_details === '대표실무자') {
                     updated = { ...documentData, status: 'assigned' as const, progress_details: '실무자' };
@@ -766,6 +852,7 @@ export default function CompanyCreateForm() {
                     progress_details: '영업자',
                     manager_name: null,
                     manager_id: null,
+                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -794,6 +881,7 @@ export default function CompanyCreateForm() {
                     progress_details: '영업자',
                     manager_name: null,
                     manager_id: null,
+                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -812,6 +900,7 @@ export default function CompanyCreateForm() {
                         progress_details: '검수자',
                         manager_name: null,
                         manager_id: null,
+                        inspector_id: null,
                         reason: null,
                         reason_read: false
                     };
@@ -851,6 +940,7 @@ export default function CompanyCreateForm() {
                     stopped_time: null,
                     manager_name: null,
                     manager_id: null,
+                    inspector_id: null,
                     completed_date: null,
                     reason: null,
                     reason_read: false
@@ -902,11 +992,53 @@ export default function CompanyCreateForm() {
     return (
         <div className={styles.formContainer}>
             <div className={styles.formHeader}>
-                <h2 className={styles.formTitle}>
-                    {!isViewMode ? '기업 정보 입력' :
-                     isEditMode ? '기업 정보 수정' :
-                     '기업 정보 조회'}
-                </h2>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <h2 className={styles.formTitle}>
+                        {!isViewMode ? '기업 정보 입력' :
+                         isEditMode ? '기업 정보 수정' :
+                         '기업 정보 조회'}
+                    </h2>
+                    {isViewMode && documentData && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                            <span className={`${styles.statusBadge} ${styles[documentData.status]}`}>
+                                {documentData.status === 'approved' ? '승인됨' :
+                                 documentData.status === 'waiting' ? '대기중' :
+                                 documentData.status === 'rejected' ? '반려됨' :
+                                 documentData.status === 'revision' ? '보완중' :
+                                 documentData.status === 'started' ? '진행중' :
+                                 documentData.status === 'submitted' ? '제출됨' :
+                                 documentData.status === 'assigned' ? '배정됨' :
+                                 documentData.status}
+                            </span>
+                            <span style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                padding: '4px 12px',
+                                borderRadius: '4px',
+                                display: 'inline-block',
+                                backgroundColor: documentData.progress_details === '검수자' ? '#FFF3CD' :
+                                                documentData.progress_details === '대표실무자' ? '#D1ECF1' :
+                                                documentData.progress_details === '실무자' ? '#E7D4F5' :
+                                                '#E8E8E8',
+                                color: documentData.progress_details === '검수자' ? '#856404' :
+                                       documentData.progress_details === '대표실무자' ? '#0C5460' :
+                                       documentData.progress_details === '실무자' ? '#6A1B9A' :
+                                       '#333'
+                            }}>
+                                {documentData.progress_details === '검수자' ? (
+                                    supervisorInfo ? `검수자: ${supervisorInfo.name}(${supervisorInfo.user_id})` : '검수자 대기중'
+                                ) :
+                                 documentData.progress_details === '대표실무자' ? (
+                                    supervisorInfo ? `검수자: ${supervisorInfo.name}(${supervisorInfo.user_id})` : '대표실무자 진행중'
+                                 ) :
+                                 documentData.progress_details === '실무자' ? (
+                                    documentData.manager_name ? `실무자: ${documentData.manager_name}(${documentData.manager_id})` : '실무자 진행중'
+                                 ) :
+                                 documentData.progress_details}
+                            </span>
+                        </div>
+                    )}
+                </div>
                 <p className={styles.formSubtitle}>
                     {!isViewMode ? '새로운 기업 정보를 등록해주세요.' :
                      isEditMode ? '기업 정보를 수정해주세요.' :
@@ -1133,15 +1265,33 @@ export default function CompanyCreateForm() {
                     {/* 메모 목록 (타임라인) - 보기/수정 모드에서만 */}
                     {isViewMode && documentData?.memos && documentData.memos.length > 0 && (
                         <div className={styles.memoTimeline}>
-                            {documentData.memos.map((memo: DocumentMemo, index: number) => (
-                                <div key={index} className={styles.memoItem}>
-                                    <div className={styles.memoHeader}>
-                                        <span className={styles.memoTime}>{memo.timestamp}</span>
-                                        <span className={styles.memoAuthor}>{memo.user_name} ({memo.user_id})</span>
+                            {documentData.memos.map((memo: DocumentMemo, index: number) => {
+                                const adminData = getAdminData();
+                                const userLevel = adminData?.position?.level;
+                                const canDeleteMemo = userLevel === 1 || userLevel === 2;
+
+                                return (
+                                    <div key={index} className={styles.memoItem}>
+                                        <div className={styles.memoHeader}>
+                                            <div>
+                                                <span className={styles.memoTime}>{memo.timestamp}</span>
+                                                <span className={styles.memoAuthor}>{memo.user_name} ({memo.user_id})</span>
+                                            </div>
+                                            {canDeleteMemo && (
+                                                <button
+                                                    type="button"
+                                                    className={styles.memoDeleteButton}
+                                                    onClick={() => handleDeleteMemo(index)}
+                                                    title="메모 삭제"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className={styles.memoContent}>{memo.content}</div>
                                     </div>
-                                    <div className={styles.memoContent}>{memo.content}</div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
@@ -1177,61 +1327,121 @@ export default function CompanyCreateForm() {
                 )}
 
                 {/* 작업 버튼 그리드 - 보기 모드 */}
-                {isViewMode && !isEditMode && (
-                <div className={styles.actionsGridContainer}>
-                    <div className={styles.actionsGrid}>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-start']}`}
-                            onClick={() => documentData && handleProgressStart(documentData.id)}
-                        >
-                            진행
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-stop']}`}
-                            onClick={() => documentData && handleProgressStop(documentData.id)}
-                        >
-                            중지
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-approve']}`}
-                            onClick={() => documentData && handleApprove(documentData.id)}
-                        >
-                            승인
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-reject']}`}
-                            onClick={() => documentData && handleReject(documentData.id)}
-                        >
-                            반려
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-revision']}`}
-                            onClick={() => documentData && handleRevision(documentData.id)}
-                        >
-                            보완
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-submit']}`}
-                            onClick={() => documentData && handleActionSubmit(documentData.id)}
-                        >
-                            제출
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.actionButton} ${styles['action-delete']}`}
-                            onClick={() => documentData && handleProgressDelete(documentData.id)}
-                        >
-                            삭제
-                        </button>
-                    </div>
-                </div>
-                )}
+                {isViewMode && !isEditMode && (() => {
+                    const adminData = getAdminData();
+                    const userLevel = adminData?.position?.level;
+                    const isSalesperson = userLevel === 4;
+                    const isInspector = userLevel === 6;
+                    // 검수자이면서 progress_details !== '검수자'인 경우는 버튼이 없음
+                    const hasButtons = !(isInspector && documentData?.progress_details !== '검수자');
+
+                    return hasButtons ? (
+                        <div className={styles.actionsGridContainer}>
+                            <div className={styles.actionsGrid}>
+                                {(() => {
+                                    const isRevisionOrRejected = documentData?.status === 'revision' || documentData?.status === 'rejected';
+
+                                    return (
+                                        <>
+                                            {/* 검수자: 승인, 보완만 (단, progress_details가 '검수자'인 경우에만) */}
+                                            {isInspector && documentData?.progress_details === '검수자' && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-approve']}`}
+                                                        onClick={() => documentData && handleApprove(documentData.id)}
+                                                    >
+                                                        승인
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-revision']}`}
+                                                        onClick={() => documentData && handleRevision(documentData.id)}
+                                                    >
+                                                        보완
+                                                    </button>
+                                                </>
+                                            )}
+
+                                            {/* 영업자: 제출만 */}
+                                            {isSalesperson && (
+                                                <button
+                                                    type="button"
+                                                    className={`${styles.actionButton} ${styles['action-submit']}`}
+                                                    onClick={() => documentData && handleActionSubmit(documentData.id)}
+                                                >
+                                                    제출
+                                                </button>
+                                            )}
+
+                                            {/* 그 외 권한 (대표자, 대표실무자 등): 모든 버튼 */}
+                                            {!isSalesperson && !isInspector && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-start']}`}
+                                                        onClick={() => documentData && handleProgressStart(documentData.id)}
+                                                    >
+                                                        진행
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-stop']}`}
+                                                        onClick={() => documentData && handleProgressStop(documentData.id)}
+                                                    >
+                                                        중지
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-approve']}`}
+                                                        onClick={() => documentData && handleApprove(documentData.id)}
+                                                    >
+                                                        승인
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-reject']}`}
+                                                        onClick={() => documentData && handleReject(documentData.id)}
+                                                    >
+                                                        반려
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-revision']}`}
+                                                        onClick={() => documentData && handleRevision(documentData.id)}
+                                                    >
+                                                        보완
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-submit']}`}
+                                                        onClick={() => documentData && handleActionSubmit(documentData.id)}
+                                                    >
+                                                        제출
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-delete']}`}
+                                                        onClick={() => documentData && handleProgressDelete(documentData.id)}
+                                                    >
+                                                        삭제
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-reset']}`}
+                                                        onClick={() => documentData && handleReset(documentData.id)}
+                                                    >
+                                                        초기화
+                                                    </button>
+                                                </>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    ) : null;
+                })()}
 
                 {/* 버튼 */}
                 <div className={styles.formButtons}>
@@ -1443,27 +1653,43 @@ export default function CompanyCreateForm() {
                         borderRadius: '8px',
                         maxWidth: '500px',
                         width: '90%',
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                        overflow: 'visible'
                     }}>
                         <h3 style={{ marginTop: 0, marginBottom: '15px' }}>실무자 선택</h3>
+                        <div style={{ position: 'relative', overflow: 'visible', zIndex: 10, width: '100%' }}>
                         <select
                             value={selectedManager}
                             onChange={(e) => setSelectedManager(e.target.value)}
                             style={{
                                 width: '100%',
-                                padding: '10px',
+                                padding: '10px 40px 10px 14px',
                                 borderRadius: '4px',
                                 border: '1px solid #ddd',
-                                fontSize: '14px'
+                                fontSize: '14px',
+                                appearance: 'none'
                             }}
                         >
                             <option value="">실무자를 선택해주세요.</option>
                             {workers.map((worker) => (
                                 <option key={worker.id} value={worker.user_id}>
-                                    {worker.name}
+                                    {worker.name}({worker.user_id})
                                 </option>
                             ))}
                         </select>
+                        <img
+                            src="/arrow.svg"
+                            alt="드롭다운"
+                            style={{
+                                position: 'absolute',
+                                right: '12px',
+                                top: '10px',
+                                width: '16px',
+                                height: '16px',
+                                pointerEvents: 'none'
+                            }}
+                        />
+                        </div>
                         <div style={{
                             marginTop: '20px',
                             display: 'flex',

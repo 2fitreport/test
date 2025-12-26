@@ -23,6 +23,7 @@ interface Document {
     business_number?: string;
     phone?: string;
     progress_details?: string;
+    inspector_id?: string | null;
     status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
@@ -294,6 +295,7 @@ export default function DocumentSubmissionList() {
                     progress_details: '영업자',
                     manager_name: null,
                     manager_id: null,
+                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -333,6 +335,7 @@ export default function DocumentSubmissionList() {
                     progress_details: '영업자',
                     manager_name: null,
                     manager_id: null,
+                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -359,6 +362,7 @@ export default function DocumentSubmissionList() {
                         status: 'waiting' as const,
                         progress_status: 'not_started' as const,
                         progress_details: '검수자',
+                        inspector_id: null,
                         reason_read: true
                     };
                 } else {
@@ -428,6 +432,7 @@ export default function DocumentSubmissionList() {
                             progress_details: '검수자',
                             manager_name: null,
                             manager_id: null,
+                            inspector_id: null,
                             progress_start_date: null,
                             progress_end_time: null,
                             stopped_time: null,
@@ -493,6 +498,7 @@ export default function DocumentSubmissionList() {
             const adminData = getAdminData();
             const userLevel = adminData?.position?.level;
             const userId = adminData?.user_id;
+            const userIdNumber = adminData?.id;
 
             const response = await fetch('/api/documents');
             if (!response.ok) {
@@ -500,27 +506,8 @@ export default function DocumentSubmissionList() {
             }
             let data = await response.json();
 
-            // 검수자(Level 6)인 경우, 자신이 배정한 영업자들의 문서만 필터링
-            if (userLevel === 6 && userId) {
-                // 모든 사용자 정보 가져오기 (supervisor_id 확인용)
-                try {
-                    const usersResponse = await fetch('/api/users');
-                    if (usersResponse.ok) {
-                        const usersData = await usersResponse.json();
-                        // 현재 검수자가 배정한 영업자 ID 찾기
-                        const assignedSalesManagerIds = usersData
-                            .filter((user: any) => user.supervisor_id === userId)
-                            .map((user: any) => user.user_id);
-
-                        // 해당 영업자들이 올린 문서만 필터링
-                        data = data.filter((doc: Document) =>
-                            assignedSalesManagerIds.includes(doc.user_id)
-                        );
-                    }
-                } catch (error) {
-                    console.error('사용자 정보 조회 실패:', error);
-                }
-            }
+            // API에서 이미 역할별 필터링을 완료했으므로, 클라이언트 사이드 필터링 불필요
+            // (API에서: Level 4는 자신의 문서만, Level 6은 담당 영업자 + 과거 승인한 문서, Level 1/2는 모든 문서)
 
             setDocuments(data);
         } catch (error) {
@@ -588,8 +575,8 @@ export default function DocumentSubmissionList() {
             if (userLevel === 4 && doc.user_id !== userId) {
                 return false;
             }
-            // 검수자는 progress_details가 '검수자'인 문서만 보기
-            if (userLevel === 6 && doc.progress_details !== '검수자') {
+            // 검수자는 자신의 담당 영업자 문서('검수자' 진행상태) + 자신이 승인한 문서(inspector_id) 모두 볼 수 있어야함
+            if (userLevel === 6 && doc.progress_details !== '검수자' && doc.inspector_id !== userId) {
                 return false;
             }
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
@@ -632,12 +619,12 @@ export default function DocumentSubmissionList() {
         const userId = adminData?.user_id;
 
         // 영업자인 경우 자신의 문서만 카운트
-        // 검수자인 경우 progress_details가 '검수자'인 문서만 카운트
+        // 검수자인 경우 자신의 담당 영업자 문서('검수자' 진행상태) + 자신이 승인한 문서(inspector_id) 모두 카운트
         let docsToCount = documents;
         if (userLevel === 4) {
             docsToCount = documents.filter(doc => doc.user_id === userId);
         } else if (userLevel === 6) {
-            docsToCount = documents.filter(doc => doc.progress_details === '검수자');
+            docsToCount = documents.filter(doc => doc.progress_details === '검수자' || doc.inspector_id === userId);
         }
 
         const counts = {

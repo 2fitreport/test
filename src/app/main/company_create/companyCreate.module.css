@@ -433,7 +433,7 @@
 
 .actionsGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 12px;
 }
 
@@ -537,6 +537,17 @@
     border-color: #616161;
 }
 
+.actionButton.action-reset {
+    background-color: #FF6F00;
+    color: white;
+    border-color: #FF6F00;
+}
+
+.actionButton.action-reset:hover {
+    background-color: #E65100;
+    border-color: #E65100;
+}
+
 @media (max-width: 768px) {
     .actionsGrid {
         grid-template-columns: repeat(2, 1fr);
@@ -572,9 +583,16 @@
 
 .memoHeader {
     display: flex;
-    gap: 8px;
     margin-bottom: 4px;
     font-size: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.memoHeader > div {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .memoTime {
@@ -651,6 +669,27 @@
 .memoAddButton:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+}
+
+.memoDeleteButton {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease;
+    outline: none;
+    flex-shrink: 0;
+}
+
+.memoDeleteButton:hover {
+    color: #f44336;
+}
+
+.memoDeleteButton:focus {
+    outline: none;
 }
 
 /* 파일 뷰어 모달 */

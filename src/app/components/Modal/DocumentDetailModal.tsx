@@ -106,6 +106,7 @@ export default function DocumentDetailModal({
         setDownloadError('');
 
         try {
+            const companyNameToSend = document.company_name || '기업';
             const response = await fetch('/api/download/zip', {
                 method: 'POST',
                 headers: {
@@ -114,12 +115,14 @@ export default function DocumentDetailModal({
                 body: JSON.stringify({
                     documentId: document.id,
                     files: document.files,
+                    companyName: companyNameToSend,
                 }),
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || '다운로드 실패');
+                const errorMsg = errorData.message ? `${errorData.error} - ${errorData.message}` : (errorData.error || '다운로드 실패');
+                throw new Error(errorMsg);
             }
 
             const blob = await response.blob();
@@ -128,7 +131,7 @@ export default function DocumentDetailModal({
             link.href = url;
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-            link.download = `document_${document.id}_${dateStr}.zip`;
+            link.download = `${companyNameToSend}_${dateStr}.zip`;
             globalThis.document.body.appendChild(link);
             link.click();
             window.URL.revokeObjectURL(url);
