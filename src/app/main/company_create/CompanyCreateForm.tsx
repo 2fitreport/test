@@ -80,7 +80,7 @@ export default function CompanyCreateForm() {
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
-    const [isViewMode, setIsViewMode] = useState(false);
+    const [isViewMode, setIsViewMode] = useState(!!viewId);  // viewId가 있으면 true로 초기화
     const [isEditMode, setIsEditMode] = useState(false);
     const [canEdit, setCanEdit] = useState(false);
     const [documentData, setDocumentData] = useState<any>(null);
@@ -101,7 +101,7 @@ export default function CompanyCreateForm() {
     const [selectedFile, setSelectedFile] = useState<{ name: string; path: string; size: number } | null>(null);
     const [fileViewUrl, setFileViewUrl] = useState('');
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(!!viewId);  // viewId가 있으면 true로 초기화 (로딩 상태로 시작)
 
     // 초기화: 실무자 목록 로드 및 현재 사용자 정보 설정
     useEffect(() => {
@@ -126,9 +126,6 @@ export default function CompanyCreateForm() {
     // 보기/수정 모드일 때 문서 정보 로드
     useEffect(() => {
         if (viewId) {
-            setIsViewMode(true);
-            // 수정 모드는 일단 false로 설정, 권한 확인 후에 결정
-            setIsEditMode(false);
             fetchDocumentData(parseInt(viewId));
         }
     }, [viewId, editParam]);
@@ -220,6 +217,7 @@ export default function CompanyCreateForm() {
 
             // edit 파라미터가 있지만 권한이 없으면 뷰 페이지로 리다이렉트
             if (editParam === 'true' && !hasEditPermission) {
+                setIsEditMode(false);
                 router.replace(`/main/company_create?view=${viewId}`);
                 return;
             }
@@ -227,6 +225,9 @@ export default function CompanyCreateForm() {
             // 권한이 있을 때만 URL의 edit 파라미터를 반영
             if (hasEditPermission && editParam === 'true') {
                 setIsEditMode(true);
+            } else {
+                // edit 파라미터가 없으면 뷰 모드로 설정
+                setIsEditMode(false);
             }
         } catch (err) {
             console.error('문서 데이터 로드 실패:', err);
@@ -1370,8 +1371,8 @@ export default function CompanyCreateForm() {
                                                 </>
                                             )}
 
-                                            {/* 영업자: 제출만 */}
-                                            {isSalesperson && (
+                                            {/* 영업자: progress_details='영업자'일 때만 제출 가능 */}
+                                            {isSalesperson && documentData?.progress_details === '영업자' && (
                                                 <button
                                                     type="button"
                                                     className={`${styles.actionButton} ${styles['action-submit']}`}
