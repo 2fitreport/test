@@ -52,7 +52,13 @@
       "mcp__supabase__deploy_edge_function",
       "mcp__playwright__playwright_post",
       "Bash(git remote add:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(for id in 51 52 53 54 55)",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(__NEW_LINE__ echo \"완료! 깨진 데이터가 모두 제거되었습니다.\")"
     ],
     "deny": [],
     "ask": []

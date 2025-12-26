@@ -47,9 +47,15 @@ export async function POST(request: NextRequest) {
             completed_date: body.completed_date
         });
 
+        // memos가 없으면 빈 배열로 초기화
+        const documentData = {
+            ...body,
+            memos: body.memos || []
+        };
+
         const { data, error } = await supabase
             .from('documents')
-            .insert([body])
+            .insert([documentData])
             .select();
 
         if (error) {

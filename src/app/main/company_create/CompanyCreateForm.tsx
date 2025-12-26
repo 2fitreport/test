@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import { canEditDocument } from '@/lib/permissions';
 import Modal from '@/app/components/Modal/Modal';
+import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import styles from './companyCreate.module.css';
 
 interface CompanyFormData {
@@ -13,6 +14,46 @@ interface CompanyFormData {
     company_name: string;
     business_number: string;
     phone: string;
+}
+
+interface DocumentMemo {
+    timestamp: string;
+    content: string;
+    user_name: string;
+    user_id: string;
+}
+
+interface Document {
+    id: number;
+    user_id: string;
+    user_name: string;
+    document_type: string;
+    title: string;
+    company_name?: string;
+    representative_name?: string;
+    manager_id?: string | null;
+    manager_name?: string | null;
+    business_number?: string;
+    phone?: string;
+    progress_details?: string;
+    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
+    progress_status: 'in_progress' | 'stopped' | 'not_started';
+    submitted_date: string;
+    completed_date?: string;
+    progress_start_date?: string;
+    progress_end_time?: string;
+    stopped_time?: string;
+    reason?: string;
+    reason_read: boolean;
+    memos?: DocumentMemo[];
+}
+
+interface Worker {
+    id: number;
+    user_id: string;
+    name: string;
+    position_id: number;
+    company_name?: string;
 }
 
 export default function CompanyCreateForm() {
@@ -42,6 +83,42 @@ export default function CompanyCreateForm() {
     const [isEditMode, setIsEditMode] = useState(false);
     const [canEdit, setCanEdit] = useState(false);
     const [documentData, setDocumentData] = useState<any>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
+    const [reasonInputModalOpen, setReasonInputModalOpen] = useState(false);
+    const [reasonInput, setReasonInput] = useState('');
+    const [pendingReasonAction, setPendingReasonAction] = useState<{ id: number; action: 'reject' | 'revision' } | null>(null);
+    const [managerSelectModalOpen, setManagerSelectModalOpen] = useState(false);
+    const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
+    const [selectedManager, setSelectedManager] = useState<string>('');
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [successMessage, setSuccessMessage] = useState('');
+    const [actionConfirmModalOpen, setActionConfirmModalOpen] = useState(false);
+    const [actionConfirmType, setActionConfirmType] = useState<'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset'>('start');
+    const [memoInput, setMemoInput] = useState('');
+    const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+    const [fileViewerOpen, setFileViewerOpen] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<{ name: string; path: string; size: number } | null>(null);
+    const [fileViewUrl, setFileViewUrl] = useState('');
+
+    // 초기화: 실무자 목록 로드 및 현재 사용자 정보 설정
+    useEffect(() => {
+        // 검수자(Level 6)는 기업 생성 불가 (조회/검수만 가능)
+        if (!viewId) {
+            const adminData = getAdminData();
+            if (adminData?.position?.level === 6) {
+                setError('검수자는 기업을 생성할 수 없습니다.');
+                setErrorModalOpen(true);
+                // 모달이 표시되는 동안 리다이렉트 준비
+                const timer = setTimeout(() => {
+                    router.push('/main/document_submission');
+                }, 2000);
+                return () => clearTimeout(timer);
+            }
+        }
+
+        fetchWorkers();
+        initializeCurrentUser();
+    }, [router]);
 
     // 보기/수정 모드일 때 문서 정보 로드
     useEffect(() => {
@@ -384,6 +461,25 @@ export default function CompanyCreateForm() {
                 }
             } else {
                 // 생성 모드: POST 요청
+                // 초기 메모 생성 (작성자가 입력한 메모가 있으면)
+                const initialMemos: DocumentMemo[] = [];
+                if (memoInput.trim()) {
+                    initialMemos.push({
+                        timestamp: now.toLocaleString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                            hour12: false
+                        }),
+                        content: memoInput,
+                        user_name: adminData.name || adminData.user_id,
+                        user_id: adminData.user_id
+                    });
+                }
+
                 const createBody = {
                     ...requestBody,
                     user_id: adminData.user_id,
@@ -396,6 +492,7 @@ export default function CompanyCreateForm() {
                     progress_status: 'not_started',
                     submitted_date: now.toLocaleString('ko-KR'),
                     files: uploadedFiles,
+                    memos: initialMemos,
                 };
 
                 const response = await fetch('/api/documents', {
@@ -411,6 +508,8 @@ export default function CompanyCreateForm() {
                 }
             }
 
+            // 생성/수정 완료 후 메모 입력창 초기화
+            setMemoInput('');
             setSuccessModalOpen(true);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.';
@@ -420,9 +519,368 @@ export default function CompanyCreateForm() {
         }
     };
 
+    const fetchWorkers = async () => {
+        try {
+            const response = await fetch('/api/workers');
+            if (response.ok) {
+                const data = await response.json();
+                setWorkers(data);
+            }
+        } catch (error) {
+            console.error('실무자 목록 조회 실패:', error);
+        }
+    };
+
+    const initializeCurrentUser = () => {
+        const adminData = getAdminData();
+        if (adminData) {
+            setCurrentUser({
+                id: adminData.user_id,
+                name: adminData.name
+            });
+        }
+    };
+
+    const handleAddMemo = async () => {
+        if (!memoInput.trim() || !documentData || !currentUser) return;
+
+        const newMemo: DocumentMemo = {
+            timestamp: new Date().toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }),
+            content: memoInput,
+            user_name: currentUser.name,
+            user_id: currentUser.id
+        };
+
+        const updatedMemos = [...(documentData.memos || []), newMemo];
+        const updated = {
+            ...documentData,
+            memos: updatedMemos
+        };
+
+        await saveDocumentToDatabase(updated);
+        setDocumentData(updated);
+        setMemoInput('');
+        setSuccessMessage('메모가 추가되었습니다.');
+        setSuccessModalOpen(true);
+    };
+
+    const handleViewFile = async (file: { name: string; path: string; size: number }) => {
+        setSelectedFile(file);
+        setFileViewerOpen(true);
+
+        try {
+            const response = await fetch('/api/file/view', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filePath: file.path }),
+            });
+
+            if (!response.ok) {
+                throw new Error('파일 조회 실패');
+            }
+
+            const data = await response.json();
+            setFileViewUrl(data.url);
+        } catch (error) {
+            console.error('파일 조회 오류:', error);
+            setFileViewUrl('');
+        }
+    };
+
+    const getFileExtension = (fileName: string): string => {
+        const parts = fileName.split('.');
+        return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+    };
+
+    const saveDocumentToDatabase = async (document: Document) => {
+        try {
+            const response = await fetch(`/api/documents/${document.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(document),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('데이터베이스 저장 실패:', response.status, errorData);
+            }
+        } catch (error) {
+            console.error('데이터베이스 저장 오류:', error);
+        }
+    };
+
+    const deleteDocumentFromDatabase = async (docId: number) => {
+        try {
+            const response = await fetch(`/api/documents/${docId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                console.error('데이터베이스 삭제 실패');
+            }
+        } catch (error) {
+            console.error('데이터베이스 삭제 오류:', error);
+        }
+    };
+
+    const handleProgressStart = (id: number) => {
+        setPendingAction({ id, action: 'start' });
+        setActionConfirmType('start');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleApprove = (id: number) => {
+        const doc = documentData;
+        if (doc && doc.progress_details === '대표실무자') {
+            setSelectedManagerId(id);
+            setManagerSelectModalOpen(true);
+        } else {
+            setPendingAction({ id, action: 'approve' });
+            setActionConfirmType('approve');
+            setActionConfirmModalOpen(true);
+        }
+    };
+
+    const handleReject = (id: number) => {
+        setPendingReasonAction({ id, action: 'reject' });
+        setReasonInput('');
+        setReasonInputModalOpen(true);
+    };
+
+    const handleRevision = (id: number) => {
+        setPendingReasonAction({ id, action: 'revision' });
+        setReasonInput('');
+        setReasonInputModalOpen(true);
+    };
+
+    const handleActionSubmit = (id: number) => {
+        setPendingAction({ id, action: 'submit' });
+        setActionConfirmType('submit');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleProgressStop = (id: number) => {
+        setPendingAction({ id, action: 'stop' });
+        setActionConfirmType('stop');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleProgressDelete = (id: number) => {
+        setPendingAction({ id, action: 'delete' });
+        setActionConfirmType('delete');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleReset = (id: number) => {
+        setPendingAction({ id, action: 'reset' });
+        setActionConfirmType('reset');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleConfirmAction = async () => {
+        if (!pendingAction && !pendingReasonAction) return;
+
+        const id = pendingAction?.id || pendingReasonAction?.id || documentData?.id;
+        const action = pendingAction?.action || pendingReasonAction?.action;
+
+        if (!id) return;
+
+        const now = new Date();
+        const timeString = now.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
+        try {
+            if (action === 'start') {
+                const updated = {
+                    ...documentData,
+                    status: 'in_progress' as const,
+                    progress_status: 'in_progress' as const,
+                    progress_start_date: now.toISOString()
+                };
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업 진행이 시작되었습니다.');
+                setDocumentData(updated);
+            } else if (action === 'approve') {
+                let updated: Document;
+                let message = '';
+
+                if (documentData.progress_details === '검수자') {
+                    updated = { ...documentData, progress_details: '대표실무자' };
+                    message = '대표실무자로 진행합니다.';
+                } else if (documentData.progress_details === '대표실무자') {
+                    updated = { ...documentData, status: 'assigned' as const, progress_details: '실무자' };
+                    message = '실무자로 배정되었습니다.';
+                } else {
+                    const completedHours = String(now.getHours()).padStart(2, '0');
+                    const completedMinutes = String(now.getMinutes()).padStart(2, '0');
+                    const dateStr = now.toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3');
+                    updated = {
+                        ...documentData,
+                        status: 'approved' as const,
+                        progress_status: 'stopped' as const,
+                        completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
+                    };
+                    message = '기업이 승인되었습니다.';
+                }
+
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage(message);
+                setDocumentData(updated);
+            } else if (action === 'reject') {
+                const timeStr = now.toLocaleString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+
+                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
+
+                const updated = {
+                    ...documentData,
+                    status: 'rejected' as const,
+                    progress_status: 'not_started' as const,
+                    progress_details: '영업자',
+                    manager_name: null,
+                    manager_id: null,
+                    reason: combinedReason,
+                    reason_read: false
+                };
+
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업이 반려되었습니다.');
+                setDocumentData(updated);
+            } else if (action === 'revision') {
+                const timeStr = now.toLocaleString('ko-KR', {
+                    year: '2-digit',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
+
+                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
+
+                const updated = {
+                    ...documentData,
+                    status: 'revision' as const,
+                    progress_status: 'not_started' as const,
+                    progress_details: '영업자',
+                    manager_name: null,
+                    manager_id: null,
+                    reason: combinedReason,
+                    reason_read: false
+                };
+
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업 보완이 요청되었습니다.');
+                setDocumentData(updated);
+            } else if (action === 'submit') {
+                let updated: Document;
+
+                if (documentData.status === 'rejected' || documentData.status === 'revision') {
+                    updated = {
+                        ...documentData,
+                        status: 'waiting' as const,
+                        progress_status: 'not_started' as const,
+                        progress_details: '검수자',
+                        manager_name: null,
+                        manager_id: null,
+                        reason: null,
+                        reason_read: false
+                    };
+                } else {
+                    updated = {
+                        ...documentData,
+                        status: 'submitted' as const,
+                        progress_status: 'stopped' as const,
+                        submitted_date: now.toLocaleString('ko-KR')
+                    };
+                }
+
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업이 제출되었습니다.');
+                setDocumentData(updated);
+            } else if (action === 'stop') {
+                const updated = {
+                    ...documentData,
+                    progress_status: 'stopped' as const,
+                    progress_end_time: timeString
+                };
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업 진행이 중지되었습니다.');
+                setDocumentData(updated);
+            } else if (action === 'delete') {
+                await deleteDocumentFromDatabase(id);
+                setSuccessMessage('기업이 삭제되었습니다.');
+                setDocumentData(null);
+            } else if (action === 'reset') {
+                const updated = {
+                    ...documentData,
+                    status: 'waiting' as const,
+                    progress_status: 'not_started' as const,
+                    progress_details: '검수자',
+                    progress_start_date: null,
+                    progress_end_time: null,
+                    stopped_time: null,
+                    manager_name: null,
+                    manager_id: null,
+                    completed_date: null,
+                    reason: null,
+                    reason_read: false
+                };
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업이 초기화되었습니다.');
+                setDocumentData(updated);
+            }
+
+            setActionConfirmModalOpen(false);
+            setPendingAction(null);
+            setPendingReasonAction(null);
+            setReasonInput('');
+            setSuccessModalOpen(true);
+        } catch (error) {
+            console.error('작업 수행 중 오류:', error);
+            setError('작업 처리 중 오류가 발생했습니다.');
+            setErrorModalOpen(true);
+        }
+    };
+
     const handleSuccessClose = () => {
         setSuccessModalOpen(false);
-        router.push('/main/document_submission');
+        // 삭제된 경우 목록으로 이동
+        if (documentData === null) {
+            router.push('/main/document_submission');
+        } else {
+            // 변경사항 반영을 위해 새로고침
+            window.location.reload();
+        }
     };
 
     const handleEnterEditMode = () => {
@@ -625,7 +1083,14 @@ export default function CompanyCreateForm() {
                         <ul className={styles.files}>
                             {existingFiles.map((file, index) => (
                                 <li key={index} className={styles.fileItem}>
-                                    <span className={styles.fileName}>{file.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleViewFile(file)}
+                                        className={styles.fileNameButton}
+                                        title="클릭하여 보기"
+                                    >
+                                        {file.name}
+                                    </button>
                                     <span className={styles.fileSize}>
                                         ({(file.size / 1024 / 1024).toFixed(2)}MB)
                                     </span>
@@ -657,6 +1122,112 @@ export default function CompanyCreateForm() {
                             disabled={isDownloading}
                         >
                             {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
+                        </button>
+                    </div>
+                </div>
+                )}
+
+                {/* 메모 섹션 */}
+                {(isViewMode || !isViewMode) && (
+                <div className={styles.memoSection}>
+                    {/* 메모 목록 (타임라인) - 보기/수정 모드에서만 */}
+                    {isViewMode && documentData?.memos && documentData.memos.length > 0 && (
+                        <div className={styles.memoTimeline}>
+                            {documentData.memos.map((memo: DocumentMemo, index: number) => (
+                                <div key={index} className={styles.memoItem}>
+                                    <div className={styles.memoHeader}>
+                                        <span className={styles.memoTime}>{memo.timestamp}</span>
+                                        <span className={styles.memoAuthor}>{memo.user_name} ({memo.user_id})</span>
+                                    </div>
+                                    <div className={styles.memoContent}>{memo.content}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* 메모 없음 */}
+                    {isViewMode && (!documentData?.memos || documentData.memos.length === 0) && (
+                        <div className={styles.noMemos}>등록된 메모가 없습니다.</div>
+                    )}
+
+                    {/* 메모 입력 - 생성 모드 또는 수정 모드일 때 */}
+                    {(!isViewMode || isEditMode) && (
+                        <div className={styles.memoInputContainer}>
+                            <label className={styles.memoInputLabel}>메모 (선택사항)</label>
+                            <textarea
+                                value={memoInput}
+                                onChange={(e) => setMemoInput(e.target.value)}
+                                placeholder="메모를 입력해주세요."
+                                className={styles.memoInput}
+                                rows={3}
+                            />
+                            {isViewMode && isEditMode && (
+                                <button
+                                    type="button"
+                                    onClick={handleAddMemo}
+                                    className={styles.memoAddButton}
+                                    disabled={!memoInput.trim()}
+                                >
+                                    메모 추가
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+                )}
+
+                {/* 작업 버튼 그리드 - 보기 모드 */}
+                {isViewMode && !isEditMode && (
+                <div className={styles.actionsGridContainer}>
+                    <div className={styles.actionsGrid}>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-start']}`}
+                            onClick={() => documentData && handleProgressStart(documentData.id)}
+                        >
+                            진행
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-stop']}`}
+                            onClick={() => documentData && handleProgressStop(documentData.id)}
+                        >
+                            중지
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-approve']}`}
+                            onClick={() => documentData && handleApprove(documentData.id)}
+                        >
+                            승인
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-reject']}`}
+                            onClick={() => documentData && handleReject(documentData.id)}
+                        >
+                            반려
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-revision']}`}
+                            onClick={() => documentData && handleRevision(documentData.id)}
+                        >
+                            보완
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-submit']}`}
+                            onClick={() => documentData && handleActionSubmit(documentData.id)}
+                        >
+                            제출
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.actionButton} ${styles['action-delete']}`}
+                            onClick={() => documentData && handleProgressDelete(documentData.id)}
+                        >
+                            삭제
                         </button>
                     </div>
                 </div>
@@ -723,9 +1294,9 @@ export default function CompanyCreateForm() {
                 showConfirmButton={false}
             />
 
-            {/* 확인 모달 */}
+            {/* 확인 모달 - 폼 등록/저장 시에만 표시 */}
             <Modal
-                isOpen={confirmModalOpen}
+                isOpen={confirmModalOpen && !pendingAction && !pendingReasonAction}
                 message="입력하신 기업 정보를 등록하시겠습니까?"
                 type="info"
                 onConfirm={handleConfirmSubmit}
@@ -737,13 +1308,361 @@ export default function CompanyCreateForm() {
             {/* 완료 모달 */}
             <Modal
                 isOpen={successModalOpen}
-                message="기업 정보가 성공적으로 등록되었습니다."
+                message={successMessage || "기업 정보가 성공적으로 등록되었습니다."}
                 type="success"
                 onConfirm={handleSuccessClose}
                 onClose={handleSuccessClose}
                 confirmText="확인"
                 showConfirmButton={false}
             />
+
+            {/* 이유 입력 모달 */}
+            {reasonInputModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1001
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px' }}>
+                            {pendingReasonAction?.action === 'reject' ? '반려 사유' : '보완 사유'}
+                        </h3>
+                        <textarea
+                            value={reasonInput}
+                            onChange={(e) => setReasonInput(e.target.value)}
+                            placeholder="사유를 입력해주세요."
+                            style={{
+                                width: '100%',
+                                minHeight: '100px',
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid #ddd',
+                                fontFamily: 'inherit',
+                                resize: 'vertical'
+                            }}
+                        />
+                        <div style={{
+                            marginTop: '20px',
+                            display: 'flex',
+                            gap: '10px',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setReasonInputModalOpen(false);
+                                    setPendingReasonAction(null);
+                                    setReasonInput('');
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    backgroundColor: '#f5f5f5',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setPendingAction({
+                                        id: pendingReasonAction?.id || documentData?.id,
+                                        action: pendingReasonAction?.action === 'reject' ? 'reject' : 'revision'
+                                    });
+                                    setActionConfirmType(pendingReasonAction?.action === 'reject' ? 'reject' : 'revision');
+                                    setReasonInputModalOpen(false);
+                                    setActionConfirmModalOpen(true);
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#007bff',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 액션 확인 모달 (이미지 있는 커스텀 모달) */}
+            <ConfirmModal
+                isOpen={actionConfirmModalOpen}
+                type="warning"
+                message={
+                    actionConfirmType === 'start' ? '기업 진행을 시작하시겠습니까?' :
+                    actionConfirmType === 'stop' ? '기업 진행을 중지하시겠습니까?' :
+                    actionConfirmType === 'delete' ? '이 기업을 삭제하시겠습니까?' :
+                    actionConfirmType === 'approve' ? '기업을 승인하시겠습니까?' :
+                    actionConfirmType === 'reject' ? '기업을 반려하시겠습니까?' :
+                    actionConfirmType === 'revision' ? '기업 보완을 요청하시겠습니까?' :
+                    actionConfirmType === 'submit' ? '기업을 제출하시겠습니까?' :
+                    '기업을 초기화하시겠습니까?\n(대기 상태로 돌아갑니다)'
+                }
+                onConfirm={handleConfirmAction}
+                onCancel={() => setActionConfirmModalOpen(false)}
+                confirmButtonText="확인"
+                cancelButtonText="취소"
+            />
+
+            {/* 실무자 선택 모달 */}
+            {managerSelectModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1001
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px' }}>실무자 선택</h3>
+                        <select
+                            value={selectedManager}
+                            onChange={(e) => setSelectedManager(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                borderRadius: '4px',
+                                border: '1px solid #ddd',
+                                fontSize: '14px'
+                            }}
+                        >
+                            <option value="">실무자를 선택해주세요.</option>
+                            {workers.map((worker) => (
+                                <option key={worker.id} value={worker.user_id}>
+                                    {worker.name}
+                                </option>
+                            ))}
+                        </select>
+                        <div style={{
+                            marginTop: '20px',
+                            display: 'flex',
+                            gap: '10px',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setManagerSelectModalOpen(false);
+                                    setSelectedManagerId(null);
+                                    setSelectedManager('');
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    backgroundColor: '#f5f5f5',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (selectedManager) {
+                                        const selectedWorker = workers.find(w => w.user_id === selectedManager);
+                                        const updated = {
+                                            ...documentData,
+                                            progress_details: '실무자',
+                                            manager_id: selectedManager,
+                                            manager_name: selectedWorker?.name || ''
+                                        };
+                                        await saveDocumentToDatabase(updated);
+                                        setDocumentData(updated);
+                                        setSuccessMessage('실무자가 배정되었습니다.');
+                                        setManagerSelectModalOpen(false);
+                                        setSelectedManagerId(null);
+                                        setSelectedManager('');
+                                        setSuccessModalOpen(true);
+                                    }
+                                }}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    backgroundColor: '#007bff',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 파일 뷰어 모달 */}
+            {fileViewerOpen && selectedFile && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1002
+                }}>
+                    <div className={styles.fileViewerModal}>
+                        {/* 헤더 */}
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '16px 20px',
+                            borderBottom: '1px solid #e0e0e0'
+                        }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+                                {selectedFile.name}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setFileViewerOpen(false);
+                                    setSelectedFile(null);
+                                    setFileViewUrl('');
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '24px',
+                                    cursor: 'pointer',
+                                    padding: '0'
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* 콘텐츠 */}
+                        <div style={{
+                            flex: 1,
+                            overflow: 'auto',
+                            padding: '16px',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            backgroundColor: '#f5f5f5'
+                        }}>
+                            {fileViewUrl ? (
+                                (() => {
+                                    const ext = getFileExtension(selectedFile.name);
+                                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                                    const isPdf = ext === 'pdf';
+
+                                    return (
+                                        <>
+                                            {isImage && (
+                                                <img
+                                                    src={fileViewUrl}
+                                                    alt={selectedFile.name}
+                                                    style={{
+                                                        maxWidth: '100%',
+                                                        maxHeight: '100%',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                />
+                                            )}
+                                            {isPdf && (
+                                                <iframe
+                                                    src={fileViewUrl}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        border: 'none'
+                                                    }}
+                                                />
+                                            )}
+                                            {!isImage && !isPdf && (
+                                                <div style={{
+                                                    textAlign: 'center',
+                                                    color: '#666'
+                                                }}>
+                                                    <p>이 파일은 웹에서 미리 볼 수 없습니다.</p>
+                                                    <a
+                                                        href={fileViewUrl}
+                                                        download
+                                                        style={{
+                                                            color: 'var(--main-color)',
+                                                            textDecoration: 'none',
+                                                            fontWeight: '600'
+                                                        }}
+                                                    >
+                                                        파일 다운로드
+                                                    </a>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()
+                            ) : (
+                                <div style={{ color: '#999' }}>파일을 불러오는 중...</div>
+                            )}
+                        </div>
+
+                        {/* 푸터 */}
+                        <div style={{
+                            padding: '12px 20px',
+                            borderTop: '1px solid #e0e0e0',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                        }}>
+                            <span style={{ fontSize: '12px', color: '#999' }}>
+                                {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
+                            </span>
+                            <a
+                                href={fileViewUrl}
+                                download={selectedFile.name}
+                                style={{
+                                    padding: '6px 14px',
+                                    backgroundColor: 'var(--main-color)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    textDecoration: 'none',
+                                    fontSize: '13px',
+                                    fontWeight: '600'
+                                }}
+                            >
+                                다운로드
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

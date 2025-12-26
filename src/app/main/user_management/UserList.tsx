@@ -22,6 +22,7 @@ interface User {
     email_display: string;
     created_at?: string;
     password?: string;
+    supervisor_id?: number | null;
 }
 
 type SortColumn = 'user_id' | 'name' | 'position' | 'phone' | 'email_display' | 'address' | 'company_name' | 'status' | 'created_at';
@@ -44,6 +45,7 @@ interface CreateUserForm {
     address_detail: string;
     company_name: string;
     status: 'active' | 'inactive';
+    supervisor_id?: number | null;
 }
 
 interface UserListHandle {
@@ -53,6 +55,7 @@ interface UserListHandle {
 const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     const [users, setUsers] = useState<User[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
+    const [supervisors, setSupervisors] = useState<Array<{ id: number; name: string; user_id: string }>>([]);
     const [loading, setLoading] = useState(true);
     const [sortColumn, setSortColumn] = useState<SortColumn>('position');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -87,6 +90,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         address_detail: '',
         company_name: '',
         status: 'active',
+        supervisor_id: null,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [validationErrorModalOpen, setValidationErrorModalOpen] = useState(false);
@@ -178,6 +182,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     useEffect(() => {
         fetchUsers();
         fetchPositions();
+        fetchSupervisors();
     }, []);
 
     useEffect(() => {
@@ -213,6 +218,21 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
             setPositions(data);
         } catch (error) {
             console.error('직급 조회 실패:', error);
+        }
+    };
+
+    const fetchSupervisors = async () => {
+        try {
+            const response = await fetch('/api/users?position_level=6');
+            if (!response.ok) throw new Error('검수자 조회 실패');
+            const data = await response.json();
+            // Level 6 (검수자)만 필터링
+            const inspectors = data
+                .filter((user: User) => user.position?.level === 6)
+                .map((user: User) => ({ id: user.id, name: user.name, user_id: user.user_id }));
+            setSupervisors(inspectors);
+        } catch (error) {
+            console.error('검수자 조회 실패:', error);
         }
     };
 
@@ -363,6 +383,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
             address_detail: user.address_detail || '',
             company_name: user.company_name || '',
             status: user.status as 'active' | 'inactive',
+            supervisor_id: user.supervisor_id || null,
         });
         setErrors({});
         setCreateModalOpen(true);
@@ -929,19 +950,16 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 cancelButtonText="취소"
             />
 
-            <ConfirmModal
+            <Modal
                 isOpen={errorModalOpen}
                 message={errorMessage}
-                onCancel={() => {
+                onClose={() => {
                     setErrorModalOpen(false);
                     setErrorMessage('');
                 }}
-                onConfirm={() => {
-                    setErrorModalOpen(false);
-                    setErrorMessage('');
-                }}
-                confirmButtonText="확인"
                 type="error"
+                confirmText="확인"
+                showConfirmButton={false}
             />
 
             <Modal
@@ -1095,6 +1113,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                         address_detail: '',
                         company_name: '',
                         status: 'active',
+                        supervisor_id: null,
                     });
                     setErrors({});
                 }}
@@ -1259,6 +1278,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                             address_detail: '',
                             company_name: '',
                             status: 'active',
+                            supervisor_id: null,
                         });
                         fetchUsers();
                         setSuccessMessage(isEditMode ? '사용자가 수정되었습니다.' : '사용자가 생성되었습니다.');
@@ -1274,6 +1294,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                     }
                 }}
                 positions={positions}
+                supervisors={supervisors}
                 userIdRef={userIdRef}
                 passwordRef={passwordRef}
                 nameRef={nameRef}

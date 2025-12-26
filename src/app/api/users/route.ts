@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
         address_detail,
         company_name,
         password,
+        supervisor_id,
         created_at
       `)
       .order('position_id', { ascending: true })
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status } = body;
+    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status, supervisor_id } = body;
 
     // 필수 항목 검증
     if (!user_id || !name || !position_id || !password) {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
           address_detail: address_detail || null,
           company_name: company_name || null,
           status: status || 'active',
+          supervisor_id: supervisor_id || null,
         },
       ])
       .select(`
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
         address,
         address_detail,
         company_name,
+        supervisor_id,
         created_at
       `)
       .single();

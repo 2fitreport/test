@@ -15,6 +15,7 @@ interface CreateUserFormData {
     address_detail: string;
     company_name: string;
     status: 'active' | 'inactive';
+    supervisor_id?: number | null;
 }
 
 interface CreateUserModalProps {
@@ -27,6 +28,7 @@ interface CreateUserModalProps {
     onClose: () => void;
     onSubmit: (isDuplicateUserIdChecked: boolean, isDuplicateUserIdExists: boolean) => Promise<void>;
     positions: Array<{ id: number; name: string; level: number }>;
+    supervisors: Array<{ id: number; name: string; user_id: string }>;
     userIdRef: Ref<HTMLInputElement>;
     passwordRef: Ref<HTMLInputElement>;
     nameRef: Ref<HTMLInputElement>;
@@ -46,6 +48,7 @@ export default function CreateUserModal({
     onClose,
     onSubmit,
     positions,
+    supervisors,
     userIdRef,
     passwordRef,
     nameRef,
@@ -293,10 +296,11 @@ export default function CreateUserModal({
                     <select
                         ref={positionRef}
                         className={styles.createSelect}
-                        value={createFormData.position_id}
+                        value={createFormData.position_id || ''}
                         onChange={(e) => {
-                            setCreateFormData({ ...createFormData, position_id: Number(e.target.value) });
-                            if (Number(e.target.value) !== 0) {
+                            const value = e.target.value;
+                            setCreateFormData({ ...createFormData, position_id: value ? Number(value) : 0 });
+                            if (value) {
                                 setErrors((prev: { [key: string]: string }) => ({ ...prev, position_id: '' }));
                             }
                         }}
@@ -305,7 +309,7 @@ export default function CreateUserModal({
                             borderColor: errors.position_id ? '#d32f2f' : undefined,
                         }}
                     >
-                        <option value={0} disabled hidden>직급을 선택해주세요</option>
+                        <option value="" disabled hidden>직급을 선택해주세요</option>
                         {positions.filter(position => position.level !== 1).map(position => (
                             <option key={position.id} value={position.id}>
                                 {position.name}
@@ -314,6 +318,36 @@ export default function CreateUserModal({
                     </select>
                     {errors.position_id && <span className={styles.errorMessage}>{errors.position_id}</span>}
                 </div>
+
+                {/* 영업자(Level 4)일 때 검수자 선택 필드 표시 */}
+                {createFormData.position_id > 0 &&
+                 positions.find(p => p.id === createFormData.position_id)?.level === 4 && (
+                    <div className={styles.createFormGroup}>
+                        <label className={styles.createLabel}>담당 검수자 <span className={styles.required}>*</span></label>
+                        <select
+                            className={styles.createSelect}
+                            value={createFormData.supervisor_id || ''}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setCreateFormData({
+                                    ...createFormData,
+                                    supervisor_id: value ? Number(value) : null
+                                });
+                            }}
+                            style={{
+                                borderColor: errors.supervisor_id ? '#d32f2f' : undefined,
+                            }}
+                        >
+                            <option value='' disabled hidden>검수자를 선택해주세요</option>
+                            {supervisors.map(supervisor => (
+                                <option key={supervisor.id} value={supervisor.id}>
+                                    {supervisor.name} ({supervisor.user_id})
+                                </option>
+                            ))}
+                        </select>
+                        {errors.supervisor_id && <span className={styles.errorMessage}>{errors.supervisor_id}</span>}
+                    </div>
+                )}
 
                 <div className={styles.createFormGroup}>
                     <label className={styles.createLabel}>연락처 <span className={styles.required}>*</span></label>

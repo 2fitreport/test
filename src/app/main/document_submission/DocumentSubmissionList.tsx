@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { getAdminData } from '@/lib/auth';
 import Pagination from '@/app/components/Pagination/Pagination';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
-import ActionModal from '@/app/components/Modal/ActionModal';
 import TimeAgo from './TimeAgo';
 import styles from './documentSubmissionList.module.css';
 import modalStyles from '@/app/components/Modal/Modal.module.css';
@@ -68,8 +67,6 @@ export default function DocumentSubmissionList() {
     const [reasonInputModalOpen, setReasonInputModalOpen] = useState(false);
     const [reasonInput, setReasonInput] = useState('');
     const [pendingReasonAction, setPendingReasonAction] = useState<{ id: number; action: 'reject' | 'revision' } | null>(null);
-    const [actionModalOpen, setActionModalOpen] = useState(false);
-    const [selectedDocumentForAction, setSelectedDocumentForAction] = useState<Document | null>(null);
     const [managerSelectModalOpen, setManagerSelectModalOpen] = useState(false);
     const [selectedManagerId, setSelectedManagerId] = useState<number | null>(null);
     const [selectedManager, setSelectedManager] = useState<string>('');
@@ -164,11 +161,6 @@ export default function DocumentSubmissionList() {
         setPendingAction({ id, action: 'delete' });
         setConfirmMessage('이 기업을 삭제하시겠습니까?');
         setConfirmModalOpen(true);
-    };
-
-    const handleOpenActionModal = (doc: Document) => {
-        setSelectedDocumentForAction(doc);
-        setActionModalOpen(true);
     };
 
     const handleReset = (id: number) => {
@@ -498,11 +490,38 @@ export default function DocumentSubmissionList() {
 
     const fetchDocuments = async () => {
         try {
+            const adminData = getAdminData();
+            const userLevel = adminData?.position?.level;
+            const userId = adminData?.user_id;
+
             const response = await fetch('/api/documents');
             if (!response.ok) {
                 throw new Error('기업 목록 조회 실패');
             }
-            const data = await response.json();
+            let data = await response.json();
+
+            // 검수자(Level 6)인 경우, 자신이 배정한 영업자들의 문서만 필터링
+            if (userLevel === 6 && userId) {
+                // 모든 사용자 정보 가져오기 (supervisor_id 확인용)
+                try {
+                    const usersResponse = await fetch('/api/users');
+                    if (usersResponse.ok) {
+                        const usersData = await usersResponse.json();
+                        // 현재 검수자가 배정한 영업자 ID 찾기
+                        const assignedSalesManagerIds = usersData
+                            .filter((user: any) => user.supervisor_id === userId)
+                            .map((user: any) => user.user_id);
+
+                        // 해당 영업자들이 올린 문서만 필터링
+                        data = data.filter((doc: Document) =>
+                            assignedSalesManagerIds.includes(doc.user_id)
+                        );
+                    }
+                } catch (error) {
+                    console.error('사용자 정보 조회 실패:', error);
+                }
+            }
+
             setDocuments(data);
         } catch (error) {
             console.error('기업 목록 조회 실패:', error);
@@ -1042,12 +1061,12 @@ export default function DocumentSubmissionList() {
                                     <th className={styles.sortableHeader} onClick={() => handleSort('representative_name')}>
                                         대표자명{getSortIcon('representative_name')}
                                     </th>
-                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                    {!isUserSalesManager && (
                                         <th className={styles.sortableHeader}>
                                             실무자 ID
                                         </th>
                                     )}
-                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                    {!isUserSalesManager && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
                                             실무자{getSortIcon('manager_name')}
                                         </th>
@@ -1093,10 +1112,10 @@ export default function DocumentSubmissionList() {
                                         )}
                                         <td className={styles.companyName}>{doc.company_name || '-'}</td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
-                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        {!isUserSalesManager && (
                                             <td className={styles.managerId}>{doc.manager_id || '-'}</td>
                                         )}
-                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        {!isUserSalesManager && (
                                             <td className={styles.managerName}>{doc.manager_name || '-'}</td>
                                         )}
                                         <td className={styles.progressDetails}>
@@ -1163,9 +1182,9 @@ export default function DocumentSubmissionList() {
                                         <td className={styles.actionsCell}>
                                             <button
                                                 className={styles.actionButton}
-                                                onClick={() => handleOpenActionModal(doc)}
+                                                onClick={() => router.push(`/main/company_create?view=${doc.id}`)}
                                             >
-                                                작업
+                                                보기
                                             </button>
                                         </td>
                                     </tr>
@@ -1327,28 +1346,6 @@ export default function DocumentSubmissionList() {
                         </div>
                     </div>
                 )}
-
-                <ActionModal
-                    isOpen={actionModalOpen}
-                    document={selectedDocumentForAction}
-                    onClose={() => {
-                        setActionModalOpen(false);
-                        setSelectedDocumentForAction(null);
-                    }}
-                    onEdit={(id) => {
-                        router.push(`/main/company_create?view=${id}`);
-                    }}
-                    onReset={handleReset}
-                    onProgressStart={handleProgressStart}
-                    onProgressStop={handleProgressStop}
-                    onApprove={handleApprove}
-                    onReject={handleReject}
-                    onRevision={handleRevision}
-                    onSubmit={handleSubmit}
-                    onDelete={handleProgressDelete}
-                    isUserSalesManager={isUserSalesManager}
-                    userRoleLevel={userRoleLevel}
-                />
 
                 {managerSelectModalOpen && selectedManagerId && (
                     <div className={modalStyles.overlay} onClick={() => {

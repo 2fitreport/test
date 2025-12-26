@@ -36,6 +36,7 @@ export async function PATCH(
           address_detail,
           company_name,
           password,
+          supervisor_id,
           created_at
         `)
         .single();
@@ -49,7 +50,7 @@ export async function PATCH(
     }
 
     // 전체 정보 수정
-    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status } = body;
+    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, supervisor_id } = body;
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
@@ -61,6 +62,7 @@ export async function PATCH(
     if (address_detail !== undefined) updateData.address_detail = address_detail;
     if (company_name !== undefined) updateData.company_name = company_name;
     if (status !== undefined) updateData.status = status;
+    if (supervisor_id !== undefined) updateData.supervisor_id = supervisor_id > 0 ? supervisor_id : null;
 
     const { data, error } = await supabase
       .from('users')
@@ -79,6 +81,7 @@ export async function PATCH(
         address_detail,
         company_name,
         password,
+        supervisor_id,
         created_at
       `)
       .single();

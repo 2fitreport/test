@@ -19,6 +19,9 @@ export function canEditDocument(
   // Level 4 (영업자): 자신이 작성한 문서만 수정 가능
   if (userRoleLevel === 4) return userId === documentUserId;
 
-  // Level 6 (검수자) 및 기타: 수정 불가
+  // Level 6 (검수자): 모든 문서 수정 가능
+  if (userRoleLevel === 6) return true;
+
+  // 기타: 수정 불가
   return false;
 }
