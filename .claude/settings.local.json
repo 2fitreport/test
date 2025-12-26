@@ -58,7 +58,11 @@
       "Bash(do)",
       "Bash(echo:*)",
       "Bash(done)",
-      "Bash(__NEW_LINE__ echo \"완료! 깨진 데이터가 모두 제거되었습니다.\")"
+      "Bash(__NEW_LINE__ echo \"완료! 깨진 데이터가 모두 제거되었습니다.\")",
+      "Bash(pkill:*)",
+      "Bash(dir srcapp*login*)",
+      "Bash(dir:*)",
+      "Bash(gh auth status:*)"
     ],
     "deny": [],
     "ask": []

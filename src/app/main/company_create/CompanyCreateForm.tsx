@@ -101,6 +101,7 @@ export default function CompanyCreateForm() {
     const [selectedFile, setSelectedFile] = useState<{ name: string; path: string; size: number } | null>(null);
     const [fileViewUrl, setFileViewUrl] = useState('');
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     // 초기화: 실무자 목록 로드 및 현재 사용자 정보 설정
     useEffect(() => {
@@ -133,6 +134,7 @@ export default function CompanyCreateForm() {
     }, [viewId, editParam]);
 
     const fetchDocumentData = async (docId: number) => {
+        setIsLoading(true);
         try {
             const adminData = getAdminData();
             const userLevel = adminData?.position?.level;
@@ -245,6 +247,8 @@ export default function CompanyCreateForm() {
             console.error('문서 데이터 로드 실패:', err);
             setError('문서 정보를 불러오지 못했습니다.');
             setErrorModalOpen(true);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -996,6 +1000,17 @@ export default function CompanyCreateForm() {
 
     const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자' : '법인사업자';
 
+    // 뷰페이지 로딩 중이면 로딩 메시지 표시
+    if (isViewMode && isLoading) {
+        return (
+            <div className={styles.formContainer}>
+                <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                    로딩 중...
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className={styles.formContainer}>
             <div className={styles.formHeader}>
@@ -1007,6 +1022,10 @@ export default function CompanyCreateForm() {
                     </h2>
                     {isViewMode && documentData && (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                            {/* 디버깅: manager_id 표시 */}
+                            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>
+                                manager_id: {documentData.manager_id || 'null'} | canEdit: {canEdit ? 'true' : 'false'}
+                            </div>
                             <span className={`${styles.statusBadge} ${styles[documentData.status]}`}>
                                 {documentData.status === 'approved' ? '승인됨' :
                                  documentData.status === 'waiting' ? '대기중' :
