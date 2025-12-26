@@ -7,6 +7,7 @@
  * @param assignedSalesManagerIds - 검수자가 담당하는 영업자들의 user_id 배열
  * @param inspectorId - 과거 담당했던 검수자의 user_id (과거 담당자는 수정 불가)
  * @param managerId - 배정된 실무자 ID (Level 1, 2의 경우 필요)
+ * @param progressDetails - 문서의 현재 처리 단계 (영업자는 '영업자' 상태일 때만 수정 가능)
  * @returns 수정 권한 여부
  */
 export function canEditDocument(
@@ -16,26 +17,25 @@ export function canEditDocument(
   supervisorId?: number | null,
   assignedSalesManagerIds?: string[],
   inspectorId?: string | null,
-  managerId?: string | null
+  managerId?: string | null,
+  progressDetails?: string | null
 ): boolean {
-  // Level 1 (대표자): 실무자가 배정된 경우만 수정 가능 (과거 담당 검수자 제외)
+  // Level 1 (대표자): 실무자가 배정된 경우만 수정 가능
+  // (대표자는 검수자가 아니므로 inspector_id 체크 불필요)
   if (userRoleLevel === 1) {
-    // 자신이 과거 담당했던 검수자라면 수정 불가
-    if (inspectorId && inspectorId === userId) return false;
-    // 실무자가 배정된 경우에만 수정 가능
     return !!managerId;
   }
 
-  // Level 2 (대표실무자): 실무자가 배정된 경우만 수정 가능 (과거 담당 검수자 제외)
+  // Level 2 (대표실무자): 실무자가 배정된 경우만 수정 가능
+  // (대표실무자는 검수자가 아니므로 inspector_id 체크 불필요)
   if (userRoleLevel === 2) {
-    // 자신이 과거 담당했던 검수자라면 수정 불가
-    if (inspectorId && inspectorId === userId) return false;
-    // 실무자가 배정된 경우에만 수정 가능
     return !!managerId;
   }
 
-  // Level 4 (영업자): 자신이 작성한 문서만 수정 가능
-  if (userRoleLevel === 4) return userId === documentUserId;
+  // Level 4 (영업자): 자신이 작성한 문서이면서 '영업자' 상태일 때만 수정 가능
+  if (userRoleLevel === 4) {
+    return userId === documentUserId && progressDetails === '영업자';
+  }
 
   // Level 6 (검수자): 자신이 담당하는 영업자의 문서만 수정 가능 (단, 과거 담당자는 수정 불가)
   if (userRoleLevel === 6) {

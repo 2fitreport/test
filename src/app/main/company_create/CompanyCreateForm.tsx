@@ -154,14 +154,6 @@ export default function CompanyCreateForm() {
             const data = await docResponse.json();
             const usersData = usersResponse.ok ? await usersResponse.json() : [];
 
-            // 디버깅: 반환된 문서 데이터 확인
-            console.log('📄 문서 데이터:', {
-                id: data.id,
-                manager_id: data.manager_id,
-                status: data.status,
-                progress_details: data.progress_details
-            });
-
             // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
             if (userLevel === 4 && userId !== data.user_id) {
                 setError('접근 권한이 없습니다.');
@@ -220,16 +212,9 @@ export default function CompanyCreateForm() {
                 undefined,
                 assignedSalesManagerIds.length > 0 ? assignedSalesManagerIds : undefined,
                 data.inspector_id,
-                data.manager_id
+                data.manager_id,
+                data.progress_details
             );
-
-            // 디버깅: 권한 확인 결과
-            console.log('🔐 권한 확인:', {
-                userLevel,
-                userId,
-                managerId: data.manager_id,
-                hasEditPermission
-            });
 
             setCanEdit(hasEditPermission);
 
@@ -1022,10 +1007,6 @@ export default function CompanyCreateForm() {
                     </h2>
                     {isViewMode && documentData && (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                            {/* 디버깅: manager_id 표시 */}
-                            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>
-                                manager_id: {documentData.manager_id || 'null'} | canEdit: {canEdit ? 'true' : 'false'}
-                            </div>
                             <span className={`${styles.statusBadge} ${styles[documentData.status]}`}>
                                 {documentData.status === 'approved' ? '승인됨' :
                                  documentData.status === 'waiting' ? '대기중' :
