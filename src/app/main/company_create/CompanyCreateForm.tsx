@@ -152,6 +152,14 @@ export default function CompanyCreateForm() {
             const data = await docResponse.json();
             const usersData = usersResponse.ok ? await usersResponse.json() : [];
 
+            // 디버깅: 반환된 문서 데이터 확인
+            console.log('📄 문서 데이터:', {
+                id: data.id,
+                manager_id: data.manager_id,
+                status: data.status,
+                progress_details: data.progress_details
+            });
+
             // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
             if (userLevel === 4 && userId !== data.user_id) {
                 setError('접근 권한이 없습니다.');
@@ -212,6 +220,15 @@ export default function CompanyCreateForm() {
                 data.inspector_id,
                 data.manager_id
             );
+
+            // 디버깅: 권한 확인 결과
+            console.log('🔐 권한 확인:', {
+                userLevel,
+                userId,
+                managerId: data.manager_id,
+                hasEditPermission
+            });
+
             setCanEdit(hasEditPermission);
 
             // edit 파라미터가 있지만 권한이 없으면 뷰 페이지로 리다이렉트
