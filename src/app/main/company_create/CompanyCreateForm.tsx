@@ -134,17 +134,23 @@ export default function CompanyCreateForm() {
 
     const fetchDocumentData = async (docId: number) => {
         try {
-            const response = await fetch(`/api/documents/${docId}`);
-            if (!response.ok) {
-                throw new Error('문서 조회 실패');
-            }
-            const data = await response.json();
-
-            // 권한 확인 (데이터 표시 전에)
             const adminData = getAdminData();
             const userLevel = adminData?.position?.level;
             const userId = adminData?.user_id;
             const userIdNumber = adminData?.id;
+
+            // 병렬로 문서와 사용자 정보 조회 (users 정보는 권한 확인과 담당검수자 조회 모두에 필요)
+            const [docResponse, usersResponse] = await Promise.all([
+                fetch(`/api/documents/${docId}`),
+                fetch('/api/users')
+            ]);
+
+            if (!docResponse.ok) {
+                throw new Error('문서 조회 실패');
+            }
+
+            const data = await docResponse.json();
+            const usersData = usersResponse.ok ? await usersResponse.json() : [];
 
             // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
             if (userLevel === 4 && userId !== data.user_id) {
@@ -156,48 +162,32 @@ export default function CompanyCreateForm() {
             // 검수자(level=6)는 자신이 담당하는 영업자의 문서 또는 과거에 담당했던 문서를 볼 수 있음
             let assignedSalesManagerIds: string[] = [];
             if (userLevel === 6 && userIdNumber) {
-                try {
-                    const usersResponse = await fetch('/api/users');
-                    if (usersResponse.ok) {
-                        const usersData = await usersResponse.json();
-                        assignedSalesManagerIds = usersData
-                            .filter((user: any) => user.supervisor_id === userIdNumber)
-                            .map((user: any) => user.user_id);
+                assignedSalesManagerIds = usersData
+                    .filter((user: any) => user.supervisor_id === userIdNumber)
+                    .map((user: any) => user.user_id);
 
-                        // 자신의 담당 영업자의 문서이거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
-                        const isAssignedDocument = assignedSalesManagerIds.includes(data.user_id);
-                        const isPastInspector = data.inspector_id === userId;
+                // 자신의 담당 영업자의 문서이거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
+                const isAssignedDocument = assignedSalesManagerIds.includes(data.user_id);
+                const isPastInspector = data.inspector_id === userId;
 
-                        if (!isAssignedDocument && !isPastInspector) {
-                            setError('접근 권한이 없습니다.');
-                            setErrorModalOpen(true);
-                            return;
-                        }
-                    }
-                } catch (error) {
-                    console.error('사용자 정보 조회 실패:', error);
+                if (!isAssignedDocument && !isPastInspector) {
+                    setError('접근 권한이 없습니다.');
+                    setErrorModalOpen(true);
+                    return;
+                }
+            }
+
+            // 담당검수자 정보 조회
+            const documentOwner = usersData.find((user: any) => user.user_id === data.user_id);
+            if (documentOwner && documentOwner.supervisor_id) {
+                const supervisor = usersData.find((user: any) => user.id === documentOwner.supervisor_id);
+                if (supervisor) {
+                    setSupervisorInfo({ name: supervisor.name, user_id: supervisor.user_id });
                 }
             }
 
             // 권한이 확인되었으면 데이터 표시
             setDocumentData(data);
-
-            // 담당검수자 정보 조회
-            try {
-                const usersResponse = await fetch('/api/users');
-                if (usersResponse.ok) {
-                    const usersData = await usersResponse.json();
-                    const documentOwner = usersData.find((user: any) => user.user_id === data.user_id);
-                    if (documentOwner && documentOwner.supervisor_id) {
-                        const supervisor = usersData.find((user: any) => user.id === documentOwner.supervisor_id);
-                        if (supervisor) {
-                            setSupervisorInfo({ name: supervisor.name, user_id: supervisor.user_id });
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('담당검수자 정보 조회 실패:', error);
-            }
 
             setFormData({
                 businessType: data.type || 'individual',
