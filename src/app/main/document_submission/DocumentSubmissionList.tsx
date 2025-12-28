@@ -60,7 +60,7 @@ export default function DocumentSubmissionList() {
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
-    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string } | null>(null);
     const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
@@ -75,6 +75,8 @@ export default function DocumentSubmissionList() {
     const [isUserSalesManager, setIsUserSalesManager] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const [userRoleLevel, setUserRoleLevel] = useState<number | undefined>();
+    const [errorModalOpen, setErrorModalOpen] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         const adminData = getAdminData();
@@ -115,6 +117,15 @@ export default function DocumentSubmissionList() {
     };
 
     const handleProgressStart = (id: number) => {
+        const doc = documents.find(d => d.id === id);
+
+        // 진행 조건 확인
+        if (!doc?.manager_id || doc?.status !== 'waiting') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 대기일 때만 진행할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
         setPendingAction({ id, action: 'start' });
         setConfirmMessage('기업 진행을 시작하시겠습니까?');
         setConfirmModalOpen(true);
@@ -153,8 +164,32 @@ export default function DocumentSubmissionList() {
     };
 
     const handleProgressStop = (id: number) => {
+        const doc = documents.find(d => d.id === id);
+
+        // 중지 조건 확인
+        if (!doc?.manager_id || doc?.status !== 'in_progress') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 진행일 때만 중지할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
         setPendingAction({ id, action: 'stop' });
         setConfirmMessage('기업 진행을 중지하시겠습니까?');
+        setConfirmModalOpen(true);
+    };
+
+    const handleProgressRestart = (id: number) => {
+        const doc = documents.find(d => d.id === id);
+
+        // 재시작 조건 확인
+        if (!doc?.manager_id || doc?.status !== 'stopped') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 중지일 때만 재시작할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
+        setPendingAction({ id, action: 'restart' });
+        setConfirmMessage('기업 진행을 재시작하시겠습니까?');
         setConfirmModalOpen(true);
     };
 
@@ -222,17 +257,22 @@ export default function DocumentSubmissionList() {
         });
 
         if (action === 'start') {
-            setDocuments(docs =>
-                docs.map(doc =>
-                    doc.id === id ? {
-                        ...doc,
-                        status: 'in_progress' as const,
-                        progress_status: 'in_progress' as const,
-                        progress_start_date: now.toISOString()
-                    } : doc
-                )
-            );
-            setSuccessMessage('기업 진행이 시작되었습니다.');
+            const doc = documents.find(d => d.id === id);
+            if (doc) {
+                const updatedDoc = {
+                    ...doc,
+                    status: 'in_progress' as const,
+                    progress_status: 'in_progress' as const,
+                    progress_start_date: String(Date.now())
+                };
+
+                // DB에 저장
+                await saveDocumentToDatabase(updatedDoc);
+
+                // UI 상태 업데이트
+                setDocuments(docs => docs.map(d => d.id === id ? updatedDoc : d));
+                setSuccessMessage('기업 진행이 시작되었습니다.');
+            }
         } else if (action === 'approve') {
             const doc = documents.find(d => d.id === id);
             if (!doc) return;
@@ -390,9 +430,19 @@ export default function DocumentSubmissionList() {
             setDocuments(docs =>
                 docs.map(doc => {
                     if (doc.id === id && doc.progress_start_date) {
-                        const startTime = new Date(doc.progress_start_date);
-                        const stopTime = new Date();
-                        const diffMs = stopTime.getTime() - startTime.getTime();
+                        let startTime: number;
+
+                        // ISO 문자열인지 확인 (T 문자가 있으면 ISO 형식)
+                        if (doc.progress_start_date.includes('T')) {
+                            startTime = new Date(doc.progress_start_date).getTime();
+                        } else {
+                            // 타임스탐프 (숫자 문자열)
+                            const pastTimestamp = parseInt(doc.progress_start_date);
+                            startTime = !isNaN(pastTimestamp) ? pastTimestamp : new Date(doc.progress_start_date).getTime();
+                        }
+
+                        const stopTime = Date.now();
+                        const diffMs = stopTime - startTime;
                         const totalSeconds = Math.floor(diffMs / 1000);
                         const hours = Math.floor(totalSeconds / 3600);
                         const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -443,6 +493,36 @@ export default function DocumentSubmissionList() {
                 })
             );
             setSuccessMessage('기업이 초기화되었습니다.');
+        } else if (action === 'restart') {
+            setDocuments(docs =>
+                docs.map(doc => {
+                    if (doc.id === id) {
+                        // stopped_time을 초 단위로 변환
+                        let stoppedSeconds = 0;
+                        if (doc.stopped_time) {
+                            const parts = doc.stopped_time.split(':');
+                            const hours = parseInt(parts[0]) || 0;
+                            const minutes = parseInt(parts[1]) || 0;
+                            const seconds = parseInt(parts[2]) || 0;
+                            stoppedSeconds = hours * 3600 + minutes * 60 + seconds;
+                        }
+
+                        // 현재 시간에서 stopped_time을 빼서 progress_start_date 설정
+                        // 이렇게 하면 timeUtils에서 계산할 때 stopped_time이 누적됨
+                        const newStartTime = Date.now() - (stoppedSeconds * 1000);
+
+                        return {
+                            ...doc,
+                            status: 'in_progress' as const,
+                            progress_status: 'in_progress' as const,
+                            progress_start_date: String(newStartTime),
+                            stopped_time: null
+                        };
+                    }
+                    return doc;
+                })
+            );
+            setSuccessMessage('기업 진행이 재시작되었습니다.');
         }
 
         setConfirmModalOpen(false);
@@ -451,8 +531,8 @@ export default function DocumentSubmissionList() {
         setPendingReasonAction(null);
         setSuccessModalOpen(true);
 
-        // 데이터베이스에 저장 (이미 처리된 액션: approve, delete, reject, revision, submit)
-        if (action === 'start' || action === 'stop' || action === 'reset') {
+        // 데이터베이스에 저장 (이미 처리된 액션: approve, start, delete, reject, revision, submit)
+        if (action === 'stop' || action === 'reset' || action === 'restart') {
             const updatedDoc = documents.find(doc => doc.id === id);
             if (updatedDoc) {
                 await saveDocumentToDatabase(updatedDoc);
@@ -1325,6 +1405,33 @@ export default function DocumentSubmissionList() {
                                     onClick={() => {
                                         setSuccessModalOpen(false);
                                         setSuccessMessage('');
+                                    }}
+                                >
+                                    확인
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {errorModalOpen && (
+                    <div className={modalStyles.overlay} onClick={() => {
+                        setErrorModalOpen(false);
+                        setErrorMessage('');
+                    }}>
+                        <div className={`${modalStyles.modal} ${modalStyles.error}`} onClick={(e) => e.stopPropagation()}>
+                            <div className={modalStyles.content}>
+                                <div className={modalStyles.iconWrapper}>
+                                    <img src="/error.svg" alt="error" className={modalStyles.icon} />
+                                </div>
+                                <p className={modalStyles.message}>{errorMessage}</p>
+                            </div>
+                            <div className={modalStyles.footer}>
+                                <button
+                                    className={modalStyles.confirmButton}
+                                    onClick={() => {
+                                        setErrorModalOpen(false);
+                                        setErrorMessage('');
                                     }}
                                 >
                                     확인

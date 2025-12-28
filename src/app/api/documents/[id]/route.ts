@@ -50,6 +50,21 @@ export async function PUT(
         const body = await request.json();
         const docId = parseInt(id);
 
+        // progress_start_date가 숫자(타임스탐프)면 로컬 시간 기준 ISO 문자열로 변환
+        if (body.progress_start_date && typeof body.progress_start_date === 'string') {
+            const timestamp = parseInt(body.progress_start_date);
+            if (!isNaN(timestamp)) {
+                const d = new Date(timestamp);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                const seconds = String(d.getSeconds()).padStart(2, '0');
+                body.progress_start_date = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            }
+        }
+
         const { data, error } = await supabase
             .from('documents')
             .update(body)
@@ -61,10 +76,16 @@ export async function PUT(
         }
 
         return NextResponse.json(data[0]);
-    } catch (error) {
-        console.error('기업 업데이트 실패:', error);
+    } catch (error: any) {
+        const errorMessage = error?.message || String(error);
+        const errorDetails = error?.details || error?.hint || '';
+        console.error('기업 업데이트 실패:', {
+            message: errorMessage,
+            details: errorDetails,
+            fullError: error
+        });
         return NextResponse.json(
-            { error: '기업 업데이트 실패' },
+            { error: '기업 업데이트 실패', message: errorMessage, details: errorDetails },
             { status: 500 }
         );
     }

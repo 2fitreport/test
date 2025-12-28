@@ -20,16 +20,14 @@ export function canEditDocument(
   managerId?: string | null,
   progressDetails?: string | null
 ): boolean {
-  // Level 1 (대표자): 실무자가 배정된 경우만 수정 가능
-  // (대표자는 검수자가 아니므로 inspector_id 체크 불필요)
+  // Level 1 (대표자): 모든 글 수정 가능
   if (userRoleLevel === 1) {
-    return !!managerId;
+    return true;
   }
 
-  // Level 2 (대표실무자): 실무자가 배정된 경우만 수정 가능
-  // (대표실무자는 검수자가 아니므로 inspector_id 체크 불필요)
+  // Level 2 (대표실무자): 모든 글 수정 가능
   if (userRoleLevel === 2) {
-    return !!managerId;
+    return true;
   }
 
   // Level 4 (영업자): 자신이 작성한 문서이면서 '영업자' 상태일 때만 수정 가능

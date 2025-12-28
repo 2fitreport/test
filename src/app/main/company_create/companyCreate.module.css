@@ -548,6 +548,17 @@
     border-color: #E65100;
 }
 
+.actionButton.action-restart {
+    background-color: #00BCD4;
+    color: white;
+    border-color: #00BCD4;
+}
+
+.actionButton.action-restart:hover {
+    background-color: #0097A7;
+    border-color: #0097A7;
+}
+
 @media (max-width: 768px) {
     .actionsGrid {
         grid-template-columns: repeat(2, 1fr);

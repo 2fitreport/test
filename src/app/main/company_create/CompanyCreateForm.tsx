@@ -80,11 +80,12 @@ export default function CompanyCreateForm() {
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
     const [isViewMode, setIsViewMode] = useState(!!viewId);  // viewId가 있으면 true로 초기화
     const [isEditMode, setIsEditMode] = useState(false);
     const [canEdit, setCanEdit] = useState(false);
     const [documentData, setDocumentData] = useState<any>(null);
-    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
     const [reasonInputModalOpen, setReasonInputModalOpen] = useState(false);
     const [reasonInput, setReasonInput] = useState('');
     const [pendingReasonAction, setPendingReasonAction] = useState<{ id: number; action: 'reject' | 'revision' } | null>(null);
@@ -94,7 +95,7 @@ export default function CompanyCreateForm() {
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [successMessage, setSuccessMessage] = useState('');
     const [actionConfirmModalOpen, setActionConfirmModalOpen] = useState(false);
-    const [actionConfirmType, setActionConfirmType] = useState<'start' | 'stop' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset'>('start');
+    const [actionConfirmType, setActionConfirmType] = useState<'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset'>('start');
     const [memoInput, setMemoInput] = useState('');
     const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
     const [fileViewerOpen, setFileViewerOpen] = useState(false);
@@ -565,6 +566,15 @@ export default function CompanyCreateForm() {
 
             // 생성/수정 완료 후 메모 입력창 초기화
             setMemoInput('');
+
+            // 수정/생성 완료 메시지 설정
+            if (isViewMode && isEditMode) {
+                setSuccessMessage('기업 정보가 성공적으로 수정되었습니다.');
+            } else {
+                setSuccessMessage('기업 정보가 성공적으로 등록되었습니다.');
+            }
+
+            setLoading(false);
             setSuccessModalOpen(true);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.';
@@ -712,6 +722,13 @@ export default function CompanyCreateForm() {
     };
 
     const handleProgressStart = (id: number) => {
+        // 진행 조건 확인
+        if (!documentData?.manager_id || documentData?.status !== 'waiting') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 대기일 때만 진행할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
         setPendingAction({ id, action: 'start' });
         setActionConfirmType('start');
         setActionConfirmModalOpen(true);
@@ -748,8 +765,28 @@ export default function CompanyCreateForm() {
     };
 
     const handleProgressStop = (id: number) => {
+        // 중지 조건 확인
+        if (!documentData?.manager_id || documentData?.status !== 'in_progress') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 진행일 때만 중지할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
         setPendingAction({ id, action: 'stop' });
         setActionConfirmType('stop');
+        setActionConfirmModalOpen(true);
+    };
+
+    const handleProgressRestart = (id: number) => {
+        // 재시작 조건 확인
+        if (!documentData?.manager_id || documentData?.status !== 'stopped') {
+            setErrorMessage('실무자가 배정되어 있고<br>상태가 중지일 때만 재시작할 수 있습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
+        setPendingAction({ id, action: 'restart' });
+        setActionConfirmType('restart');
         setActionConfirmModalOpen(true);
     };
 
@@ -790,7 +827,7 @@ export default function CompanyCreateForm() {
                     ...documentData,
                     status: 'in_progress' as const,
                     progress_status: 'in_progress' as const,
-                    progress_start_date: now.toISOString()
+                    progress_start_date: String(Date.now())
                 };
                 await saveDocumentToDatabase(updated);
                 setSuccessMessage('기업 진행이 시작되었습니다.');
@@ -914,10 +951,38 @@ export default function CompanyCreateForm() {
                 setSuccessMessage('기업이 제출되었습니다.');
                 setDocumentData(updated);
             } else if (action === 'stop') {
+                // progress_start_date로부터 경과 시간 계산
+                let stoppedTime = '';
+                if (documentData?.progress_start_date) {
+                    let startTime: number;
+
+                    // ISO 문자열인지 확인 (T 문자가 있으면 ISO 형식)
+                    if (documentData.progress_start_date.includes('T')) {
+                        startTime = new Date(documentData.progress_start_date).getTime();
+                    } else {
+                        // 타임스탐프 (숫자 문자열)
+                        const pastTimestamp = parseInt(documentData.progress_start_date);
+                        startTime = !isNaN(pastTimestamp) ? pastTimestamp : new Date(documentData.progress_start_date).getTime();
+                    }
+
+                    const stopTime = Date.now();
+                    const diffMs = stopTime - startTime;
+                    const totalSeconds = Math.floor(diffMs / 1000);
+                    const hours = Math.floor(totalSeconds / 3600);
+                    const minutes = Math.floor((totalSeconds % 3600) / 60);
+                    const seconds = totalSeconds % 60;
+
+                    const formattedHours = String(hours).padStart(2, '0');
+                    const formattedMinutes = String(minutes).padStart(2, '0');
+                    const formattedSeconds = String(seconds).padStart(2, '0');
+                    stoppedTime = `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+                }
+
                 const updated = {
                     ...documentData,
+                    status: 'stopped' as const,
                     progress_status: 'stopped' as const,
-                    progress_end_time: timeString
+                    stopped_time: stoppedTime
                 };
                 await saveDocumentToDatabase(updated);
                 setSuccessMessage('기업 진행이 중지되었습니다.');
@@ -945,6 +1010,31 @@ export default function CompanyCreateForm() {
                 await saveDocumentToDatabase(updated);
                 setSuccessMessage('기업이 초기화되었습니다.');
                 setDocumentData(updated);
+            } else if (action === 'restart') {
+                // stopped_time을 초 단위로 변환
+                let stoppedSeconds = 0;
+                if (documentData?.stopped_time) {
+                    const parts = documentData.stopped_time.split(':');
+                    const hours = parseInt(parts[0]) || 0;
+                    const minutes = parseInt(parts[1]) || 0;
+                    const seconds = parseInt(parts[2]) || 0;
+                    stoppedSeconds = hours * 3600 + minutes * 60 + seconds;
+                }
+
+                // 현재 시간에서 stopped_time을 빼서 progress_start_date 설정
+                // 이렇게 하면 timeUtils에서 계산할 때 stopped_time이 누적됨
+                const newStartTime = Date.now() - (stoppedSeconds * 1000);
+
+                const updated = {
+                    ...documentData,
+                    status: 'in_progress' as const,
+                    progress_status: 'in_progress' as const,
+                    progress_start_date: String(newStartTime),
+                    stopped_time: null
+                };
+                await saveDocumentToDatabase(updated);
+                setSuccessMessage('기업 진행이 재시작되었습니다.');
+                setDocumentData(updated);
             }
 
             setActionConfirmModalOpen(false);
@@ -964,9 +1054,12 @@ export default function CompanyCreateForm() {
         // 삭제된 경우 목록으로 이동
         if (documentData === null) {
             router.push('/main/document_submission');
+        } else if (isViewMode && isEditMode) {
+            // 수정 완료: 뷰페이지로 리다이렉트
+            router.replace(`/main/company_create?view=${viewId}`);
         } else {
-            // 변경사항 반영을 위해 새로고침
-            window.location.reload();
+            // 등록 완료: 목록으로 이동
+            router.push('/main/document_submission');
         }
     };
 
@@ -1392,13 +1485,23 @@ export default function CompanyCreateForm() {
                                                     >
                                                         진행
                                                     </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-stop']}`}
-                                                        onClick={() => documentData && handleProgressStop(documentData.id)}
-                                                    >
-                                                        중지
-                                                    </button>
+                                                    {documentData?.status === 'stopped' ? (
+                                                        <button
+                                                            type="button"
+                                                            className={`${styles.actionButton} ${styles['action-restart']}`}
+                                                            onClick={() => documentData && handleProgressRestart(documentData.id)}
+                                                        >
+                                                            재시작
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className={`${styles.actionButton} ${styles['action-stop']}`}
+                                                            onClick={() => documentData && handleProgressStop(documentData.id)}
+                                                        >
+                                                            중지
+                                                        </button>
+                                                    )}
                                                     <button
                                                         type="button"
                                                         className={`${styles.actionButton} ${styles['action-approve']}`}
@@ -1467,7 +1570,7 @@ export default function CompanyCreateForm() {
                             )}
                             <button
                                 type="button"
-                                onClick={() => router.back()}
+                                onClick={() => router.push('/main/document_submission')}
                                 className={styles.cancelButton}
                             >
                                 닫기
@@ -1515,11 +1618,11 @@ export default function CompanyCreateForm() {
             {/* 확인 모달 - 폼 등록/저장 시에만 표시 */}
             <Modal
                 isOpen={confirmModalOpen && !pendingAction && !pendingReasonAction}
-                message="입력하신 기업 정보를 등록하시겠습니까?"
+                message={isViewMode && isEditMode ? "입력하신 기업 정보를 수정하시겠습니까?" : "입력하신 기업 정보를 등록하시겠습니까?"}
                 type="info"
                 onConfirm={handleConfirmSubmit}
                 onClose={() => setConfirmModalOpen(false)}
-                confirmText="등록"
+                confirmText={isViewMode && isEditMode ? "수정" : "등록"}
                 showConfirmButton={true}
             />
 
@@ -1530,6 +1633,23 @@ export default function CompanyCreateForm() {
                 type="success"
                 onConfirm={handleSuccessClose}
                 onClose={handleSuccessClose}
+                confirmText="확인"
+                showConfirmButton={false}
+            />
+
+            {/* 에러 모달 */}
+            <Modal
+                isOpen={errorModalOpen}
+                message={errorMessage}
+                type="error"
+                onConfirm={() => {
+                    setErrorModalOpen(false);
+                    setErrorMessage('');
+                }}
+                onClose={() => {
+                    setErrorModalOpen(false);
+                    setErrorMessage('');
+                }}
                 confirmText="확인"
                 showConfirmButton={false}
             />
@@ -1628,6 +1748,7 @@ export default function CompanyCreateForm() {
                 message={
                     actionConfirmType === 'start' ? '기업 진행을 시작하시겠습니까?' :
                     actionConfirmType === 'stop' ? '기업 진행을 중지하시겠습니까?' :
+                    actionConfirmType === 'restart' ? '기업 진행을 재시작하시겠습니까?' :
                     actionConfirmType === 'delete' ? '이 기업을 삭제하시겠습니까?' :
                     actionConfirmType === 'approve' ? '기업을 승인하시겠습니까?' :
                     actionConfirmType === 'reject' ? '기업을 반려하시겠습니까?' :
@@ -1679,11 +1800,19 @@ export default function CompanyCreateForm() {
                             }}
                         >
                             <option value="">실무자를 선택해주세요.</option>
-                            {workers.map((worker) => (
-                                <option key={worker.id} value={worker.user_id}>
-                                    {worker.name}({worker.user_id})
-                                </option>
-                            ))}
+                            {(() => {
+                                const adminData = getAdminData();
+                                const userLevel = adminData?.position?.level;
+                                // 대표자(Level 1)와 대표실무자(Level 2)는 Level 2인 사람들만 표시
+                                const filteredWorkers = (userLevel === 1 || userLevel === 2) ?
+                                    workers.filter((w) => w.position_id === 2) :
+                                    workers;
+                                return filteredWorkers.map((worker) => (
+                                    <option key={worker.id} value={worker.user_id}>
+                                        {worker.name}({worker.user_id})
+                                    </option>
+                                ));
+                            })()}
                         </select>
                         <img
                             src="/arrow.svg"
