@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const userLevel = currentUser.position?.level;
     const userIdNumber = currentUser.id;
 
-    // 사용자 조회 (비밀번호 제외)
+    // 사용자 조회
     let query = supabase
       .from('users')
       .select(`
@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         address,
         address_detail,
         company_name,
+        password,
         supervisor_id,
         created_at
       `)

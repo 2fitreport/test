@@ -165,88 +165,105 @@ export default function CreateUserModal({
 
                 <div className={styles.createFormGroup}>
                     <label className={styles.createLabel}>사용자 ID <span className={styles.required}>*</span></label>
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+                    {isEditMode ? (
                         <input
                             ref={userIdRef}
                             type="text"
                             className={styles.createInput}
-                            placeholder="사용자 ID를 입력하세요"
                             value={createFormData.user_id}
-                            onChange={(e) => {
-                                let value = e.target.value;
-
-                                // 한글 입력 감지
-                                if (/[가-힣㄀-ㅎㅏ-ㅣ]/.test(value)) {
-                                    setShowKoreanWarning(true);
-                                    return;
-                                }
-
-                                // 영문, 숫자, 밑줄, 하이픈만 허용
-                                value = value.replace(/[^a-zA-Z0-9_-]/g, '');
-                                // 5글자 이상 10글자 이하로 제한
-                                if (value.length > 10) {
-                                    value = value.slice(0, 10);
-                                }
-                                setCreateFormData({ ...createFormData, user_id: value });
-                                // 값이 변경되면 중복확인 상태 초기화
-                                setIsDuplicateUserIdChecked(false);
-                                setIsDuplicateUserIdExists(false);
-                                // 값이 입력되면 에러 제거
-                                if (value) {
-                                    setErrors((prev: { [key: string]: string }) => ({ ...prev, user_id: '' }));
-                                }
-                            }}
-                            onBlur={() => handleFieldBlur('user_id')}
+                            disabled
                             style={{
-                                flex: 1,
-                                minWidth: 0,
-                                borderColor: errors.user_id ? '#d32f2f' : undefined,
+                                backgroundColor: '#f5f5f5',
+                                cursor: 'not-allowed',
+                                color: '#666',
                             }}
                         />
-                        <button
-                            type="button"
-                            onClick={handleCheckDuplicateUserId}
-                            disabled={isCheckingDuplicate}
-                            style={{
-                                padding: '8px 12px',
-                                whiteSpace: 'nowrap',
-                                backgroundColor: 'var(--main-color)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: isCheckingDuplicate ? 'not-allowed' : 'pointer',
-                                fontSize: '12px',
-                                fontWeight: '500',
-                                opacity: isCheckingDuplicate ? 0.6 : 1,
-                                flexShrink: 0,
-                            }}
-                        >
-                            {isCheckingDuplicate ? '중...' : '확인'}
-                        </button>
-                    </div>
-                    {isDuplicateUserIdChecked && (
-                        <span
-                            style={{
-                                fontSize: '13px',
-                                marginTop: '8px',
-                                display: 'block',
-                                color: isDuplicateUserIdExists ? '#d32f2f' : '#22a84a',
-                                fontWeight: '500',
-                            }}
-                        >
-                            {isDuplicateUserIdExists ? '이미 존재하는 사용자 ID입니다.' : '사용 가능한 사용자 ID입니다.'}
-                        </span>
+                    ) : (
+                        <>
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
+                                <input
+                                    ref={userIdRef}
+                                    type="text"
+                                    className={styles.createInput}
+                                    placeholder="사용자 ID를 입력하세요"
+                                    value={createFormData.user_id}
+                                    onChange={(e) => {
+                                        let value = e.target.value;
+
+                                        // 한글 입력 감지
+                                        if (/[가-힣㄀-ㅎㅏ-ㅣ]/.test(value)) {
+                                            setShowKoreanWarning(true);
+                                            return;
+                                        }
+
+                                        // 영문, 숫자, 밑줄, 하이픈만 허용
+                                        value = value.replace(/[^a-zA-Z0-9_-]/g, '');
+                                        // 5글자 이상 10글자 이하로 제한
+                                        if (value.length > 10) {
+                                            value = value.slice(0, 10);
+                                        }
+                                        setCreateFormData({ ...createFormData, user_id: value });
+                                        // 값이 변경되면 중복확인 상태 초기화
+                                        setIsDuplicateUserIdChecked(false);
+                                        setIsDuplicateUserIdExists(false);
+                                        // 값이 입력되면 에러 제거
+                                        if (value) {
+                                            setErrors((prev: { [key: string]: string }) => ({ ...prev, user_id: '' }));
+                                        }
+                                    }}
+                                    onBlur={() => handleFieldBlur('user_id')}
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        borderColor: errors.user_id ? '#d32f2f' : undefined,
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCheckDuplicateUserId}
+                                    disabled={isCheckingDuplicate}
+                                    style={{
+                                        padding: '8px 12px',
+                                        whiteSpace: 'nowrap',
+                                        backgroundColor: 'var(--main-color)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: isCheckingDuplicate ? 'not-allowed' : 'pointer',
+                                        fontSize: '12px',
+                                        fontWeight: '500',
+                                        opacity: isCheckingDuplicate ? 0.6 : 1,
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {isCheckingDuplicate ? '중...' : '확인'}
+                                </button>
+                            </div>
+                            {isDuplicateUserIdChecked && (
+                                <span
+                                    style={{
+                                        fontSize: '13px',
+                                        marginTop: '8px',
+                                        display: 'block',
+                                        color: isDuplicateUserIdExists ? '#d32f2f' : '#22a84a',
+                                        fontWeight: '500',
+                                    }}
+                                >
+                                    {isDuplicateUserIdExists ? '이미 존재하는 사용자 ID입니다.' : '사용 가능한 사용자 ID입니다.'}
+                                </span>
+                            )}
+                        </>
                     )}
                     {errors.user_id && <span className={styles.errorMessage}>{errors.user_id}</span>}
                 </div>
 
                 <div className={styles.createFormGroup}>
-                    <label className={styles.createLabel}>비밀번호 {!isEditMode && <span className={styles.required}>*</span>}</label>
+                    <label className={styles.createLabel}>비밀번호 <span className={styles.required}>*</span></label>
                     <input
                         ref={passwordRef}
                         type="text"
                         className={styles.createInput}
-                        placeholder={isEditMode ? `기존 비밀번호: ${createFormData.password}` : "비밀번호를 입력하세요"}
+                        placeholder="비밀번호를 입력하세요"
                         value={createFormData.password}
                         onChange={(e) => {
                             setCreateFormData({ ...createFormData, password: e.target.value });
@@ -291,6 +308,8 @@ export default function CreateUserModal({
                     {errors.name && <span className={styles.errorMessage}>{errors.name}</span>}
                 </div>
 
+                {/* 수정 모드이고 대표자(Level 1)인 경우 직급 수정 불가 */}
+                {!(isEditMode && positions.find(p => p.id === createFormData.position_id)?.level === 1) && (
                 <div className={styles.createFormGroup}>
                     <label className={styles.createLabel}>직급 <span className={styles.required}>*</span></label>
                     <select
@@ -318,6 +337,7 @@ export default function CreateUserModal({
                     </select>
                     {errors.position_id && <span className={styles.errorMessage}>{errors.position_id}</span>}
                 </div>
+                )}
 
                 {/* 영업자(Level 4)일 때 검수자 선택 필드 표시 */}
                 {createFormData.position_id > 0 &&

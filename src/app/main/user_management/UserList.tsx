@@ -1176,7 +1176,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                             }
                         }
                     }
-                    if (!isEditMode && !createFormData.password) {
+                    if (!createFormData.password) {
                         newErrors.password = '비밀번호를 입력해주세요.';
                         if (!firstErrorField) {
                             firstErrorField = 'password';

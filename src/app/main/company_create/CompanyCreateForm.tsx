@@ -54,6 +54,7 @@ interface Worker {
     user_id: string;
     name: string;
     position_id: number;
+    position?: { id: number; name: string; level: number };
     company_name?: string;
 }
 
@@ -1801,11 +1802,9 @@ export default function CompanyCreateForm() {
                         >
                             <option value="">실무자를 선택해주세요.</option>
                             {(() => {
-                                const adminData = getAdminData();
-                                const userLevel = adminData?.position?.level;
-                                // 대표자(Level 1)와 대표실무자(Level 2)는 Level 2인 사람들만 표시
-                                const filteredWorkers = (userLevel === 1 || userLevel === 2) ?
-                                    workers.filter((w) => w.position_id === 2) :
+                                // 문서의 진행상태가 '대표실무자'일 때는 실무자(Level 3)만 표시
+                                const filteredWorkers = documentData?.progress_details === '대표실무자' ?
+                                    workers.filter((w) => w.position?.level === 3) :
                                     workers;
                                 return filteredWorkers.map((worker) => (
                                     <option key={worker.id} value={worker.user_id}>

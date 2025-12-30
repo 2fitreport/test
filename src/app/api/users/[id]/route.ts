@@ -53,6 +53,7 @@ export async function PATCH(
     const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, supervisor_id } = body;
 
     const updateData: Record<string, unknown> = {};
+    // user_id는 수정 불가 (documents 테이블에서 참조됨)
     if (name !== undefined) updateData.name = name;
     if (position_id !== undefined) updateData.position_id = position_id;
     if (password !== undefined) updateData.password = password;
@@ -92,10 +93,10 @@ export async function PATCH(
       { message: '사용자 정보가 수정되었습니다', data },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('사용자 수정 실패:', error);
     return NextResponse.json(
-      { message: '사용자 수정 실패' },
+      { message: '사용자 수정 실패', error: error?.message || error },
       { status: 500 }
     );
   }
