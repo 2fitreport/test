@@ -178,7 +178,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
 
     const handleFieldBlur = (fieldName: string) => {
         const value = createFormData[fieldName as keyof CreateUserForm];
-        const error = validateField(fieldName, value);
+        const error = validateField(fieldName, Array.isArray(value) ? value.join(',') : value);
         setErrors(prev => ({
             ...prev,
             [fieldName]: error,
