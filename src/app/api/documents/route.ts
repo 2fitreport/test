@@ -69,20 +69,31 @@ export async function GET(request: NextRequest) {
         else if (userLevel === 4) {
             filteredDocuments = data.filter((doc: any) => doc.user_id === userId);
         }
-        // Level 6 (검수자): progress_details가 '검수자'인 자신의 담당 영업자 문서 또는 과거에 승인했던 문서 (영업자 상태는 제외)
+        // Level 6 (검수자): 자신의 담당 소속에 해당하는 영업자 문서만 (progress_details가 '검수자'이거나 과거에 승인한 문서)
         else if (userLevel === 6) {
-            const { data: usersData, error: usersError } = await supabase
-                .from('users')
-                .select('user_id')
-                .eq('supervisor_id', userIdNumber);
+            // 검수자의 담당 소속 조회
+            const { data: affiliationsData, error: affiliationsError } = await supabase
+                .from('inspector_affiliations')
+                .select('affiliation_name')
+                .eq('inspector_id', userIdNumber);
 
-            if (!usersError && usersData) {
-                const assignedUserIds = usersData.map((u: any) => u.user_id);
-                // 자신이 담당하고 진행상태가 '검수자'인 문서 OR 과거에 승인했던 문서 (하지만 '영업자' 상태로 돌아간 것은 제외)
-                filteredDocuments = data.filter((doc: any) =>
-                    (assignedUserIds.includes(doc.user_id) && doc.progress_details === '검수자') ||
-                    (doc.inspector_id === userId && doc.progress_details !== '영업자')
-                );
+            if (!affiliationsError && affiliationsData) {
+                const affiliationNames = affiliationsData.map((a: any) => a.affiliation_name);
+
+                // 해당 소속에 속한 영업자들의 user_id 조회
+                const { data: usersData, error: usersError } = await supabase
+                    .from('users')
+                    .select('user_id')
+                    .in('company_name', affiliationNames);
+
+                if (!usersError && usersData) {
+                    const assignedUserIds = usersData.map((u: any) => u.user_id);
+                    // 담당 소속의 영업자가 올린 문서 중 진행상태가 '검수자'인 문서 OR 과거에 승인했던 문서 (하지만 '영업자' 상태로 돌아간 것은 제외)
+                    filteredDocuments = data.filter((doc: any) =>
+                        (assignedUserIds.includes(doc.user_id) && doc.progress_details === '검수자') ||
+                        (doc.inspector_id === userId && doc.progress_details !== '영업자')
+                    );
+                }
             }
         }
         // Level 1 (대표자), Level 2 (대표실무자): 필터링 없음 (모든 문서)

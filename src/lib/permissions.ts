@@ -35,12 +35,12 @@ export function canEditDocument(
     return userId === documentUserId && progressDetails === '영업자';
   }
 
-  // Level 6 (검수자): 자신이 담당하는 영업자의 문서만 수정 가능 (단, 과거 담당자는 수정 불가)
+  // Level 6 (검수자): 자신의 소속과 일치하는 문서이면서 progress_details가 '검수자'일 때만 수정 가능
   if (userRoleLevel === 6) {
     const isAssignedDocument = assignedSalesManagerIds ? assignedSalesManagerIds.includes(documentUserId) : false;
     const isPastInspector = inspectorId === userId;
-    // 담당하는 영업자의 문서이면서, 과거 담당자가 아닌 경우만 수정 가능
-    return isAssignedDocument && !isPastInspector;
+    // 담당하는 영업자의 문서이면서, 과거 담당자가 아니며, progress_details가 '검수자'인 경우만 수정 가능
+    return isAssignedDocument && !isPastInspector && progressDetails === '검수자';
   }
 
   // 기타: 수정 불가

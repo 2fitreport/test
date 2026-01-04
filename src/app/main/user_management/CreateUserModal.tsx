@@ -16,6 +16,7 @@ interface CreateUserFormData {
     company_name: string;
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
+    affiliations?: string[];
 }
 
 interface CreateUserModalProps {
@@ -36,6 +37,9 @@ interface CreateUserModalProps {
     emailRef: Ref<HTMLInputElement>;
     handleFieldBlur: (fieldName: string) => void;
     onCheckDuplicateUserId?: (userId: string) => Promise<boolean>;
+    allAffiliations?: string[];
+    takenAffiliations?: string[];
+    editingUserId?: number | null;
 }
 
 export default function CreateUserModal({
@@ -56,6 +60,9 @@ export default function CreateUserModal({
     emailRef,
     handleFieldBlur,
     onCheckDuplicateUserId,
+    allAffiliations = [],
+    takenAffiliations = [],
+    editingUserId,
 }: CreateUserModalProps) {
     const innerContentRef = useRef<HTMLDivElement>(null);
     const [showKoreanWarning, setShowKoreanWarning] = useState(false);
@@ -63,6 +70,7 @@ export default function CreateUserModal({
     const [isDuplicateUserIdChecked, setIsDuplicateUserIdChecked] = useState(false);
     const [isDuplicateUserIdExists, setIsDuplicateUserIdExists] = useState(false);
     const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
+    const [affiliationSearch, setAffiliationSearch] = useState('');
 
     useEffect(() => {
         if (isOpen && innerContentRef.current) {
@@ -74,6 +82,7 @@ export default function CreateUserModal({
         } else {
             setIsDuplicateUserIdChecked(false);
             setIsDuplicateUserIdExists(false);
+            setAffiliationSearch('');
         }
     }, [isOpen]);
 
@@ -339,33 +348,92 @@ export default function CreateUserModal({
                 </div>
                 )}
 
-                {/* 영업자(Level 4)일 때 검수자 선택 필드 표시 */}
+                {/* 검수자(Level 6)일 때 소속 체크박스 표시 */}
                 {createFormData.position_id > 0 &&
-                 positions.find(p => p.id === createFormData.position_id)?.level === 4 && (
+                 positions.find(p => p.id === createFormData.position_id)?.level === 6 && (
                     <div className={styles.createFormGroup}>
-                        <label className={styles.createLabel}>담당 검수자 <span className={styles.required}>*</span></label>
-                        <select
-                            className={styles.createSelect}
-                            value={createFormData.supervisor_id || ''}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setCreateFormData({
-                                    ...createFormData,
-                                    supervisor_id: value ? Number(value) : null
-                                });
-                            }}
+                        <label className={styles.createLabel}>담당 소속 <span className={styles.required}>*</span></label>
+                        <input
+                            type="text"
+                            placeholder="소속 검색..."
+                            value={affiliationSearch}
+                            onChange={(e) => setAffiliationSearch(e.target.value)}
                             style={{
-                                borderColor: errors.supervisor_id ? '#d32f2f' : undefined,
+                                width: '100%',
+                                padding: '6px 10px',
+                                marginBottom: '8px',
+                                border: '1px solid #ddd',
+                                borderRadius: '4px',
+                                fontSize: '13px',
                             }}
-                        >
-                            <option value='' disabled hidden>검수자를 선택해주세요</option>
-                            {supervisors.map(supervisor => (
-                                <option key={supervisor.id} value={supervisor.id}>
-                                    {supervisor.name} ({supervisor.user_id})
-                                </option>
-                            ))}
-                        </select>
-                        {errors.supervisor_id && <span className={styles.errorMessage}>{errors.supervisor_id}</span>}
+                        />
+                        <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            padding: '12px',
+                            border: '1px solid #e0e0e0',
+                            borderRadius: '4px',
+                            backgroundColor: '#fafafa',
+                            maxHeight: '200px',
+                            overflowY: 'auto'
+                        }}>
+                            {allAffiliations
+                                .filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase()))
+                                .map(affName => {
+                                const isChecked = createFormData.affiliations?.includes(affName) || false;
+                                const isTakenByOther = takenAffiliations.includes(affName) && !isChecked;
+
+                                return (
+                                    <label
+                                        key={affName}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            cursor: isTakenByOther ? 'not-allowed' : 'pointer',
+                                            opacity: isTakenByOther ? 0.5 : 1,
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
+                                            color: isChecked ? '#fff' : '#333',
+                                            border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            disabled={isTakenByOther}
+                                            onChange={(e) => {
+                                                const currentAffiliations = createFormData.affiliations || [];
+                                                if (e.target.checked) {
+                                                    setCreateFormData({
+                                                        ...createFormData,
+                                                        affiliations: [...currentAffiliations, affName]
+                                                    });
+                                                } else {
+                                                    setCreateFormData({
+                                                        ...createFormData,
+                                                        affiliations: currentAffiliations.filter(a => a !== affName)
+                                                    });
+                                                }
+                                                if (errors.affiliations) {
+                                                    setErrors((prev: { [key: string]: string }) => ({ ...prev, affiliations: '' }));
+                                                }
+                                            }}
+                                            style={{ display: 'none' }}
+                                        />
+                                        <span style={{ fontWeight: '500', cursor: 'pointer' }}>{affName}</span>
+                                        {isTakenByOther && <span style={{ fontSize: '11px', color: '#999' }}>(배정됨)</span>}
+                                    </label>
+                                );
+                            })}
+                            {allAffiliations.filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase())).length === 0 && (
+                                <span style={{ color: '#999', fontSize: '13px' }}>검색 결과가 없습니다</span>
+                            )}
+                        </div>
+                        {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
                     </div>
                 )}
 

@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock } from 'react-icons/fi';
 import { clearAuthToken, getAdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -15,6 +15,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
     { path: '/main/document_submission', label: '기업관리' },
     { path: '/main/user_management', label: '사용자 관리' },
+    { path: '/main/history', label: '히스토리' },
 ];
 
 export default function Sidebar() {
@@ -140,6 +141,10 @@ export default function Sidebar() {
                         if (item.path === '/main/user_management' && adminData?.position?.level !== 1) {
                             return null;
                         }
+                        // 히스토리는 대표자(level=1)만 접근 가능
+                        if (item.path === '/main/history' && adminData?.position?.level !== 1) {
+                            return null;
+                        }
 
                         const isActive = pathname === item.path ||
                             (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create'));
@@ -152,6 +157,8 @@ export default function Sidebar() {
                                 >
                                     {item.path === '/main/user_management' ? (
                                         <FiUsers className={styles.menuIcon} />
+                                    ) : item.path === '/main/history' ? (
+                                        <FiClock className={styles.menuIcon} />
                                     ) : (
                                         <FiFile className={styles.menuIcon} />
                                     )}

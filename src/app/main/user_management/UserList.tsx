@@ -46,6 +46,7 @@ interface CreateUserForm {
     company_name: string;
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
+    affiliations?: string[];
 }
 
 interface UserListHandle {
@@ -56,6 +57,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     const [users, setUsers] = useState<User[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
     const [supervisors, setSupervisors] = useState<Array<{ id: number; name: string; user_id: string }>>([]);
+    const [allAffiliations, setAllAffiliations] = useState<string[]>([]);
+    const [takenAffiliations, setTakenAffiliations] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [sortColumn, setSortColumn] = useState<SortColumn>('position');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -91,6 +94,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         company_name: '',
         status: 'active',
         supervisor_id: null,
+        affiliations: [],
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [validationErrorModalOpen, setValidationErrorModalOpen] = useState(false);
@@ -105,6 +109,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
 
     useImperativeHandle(ref, () => ({
         openCreateModal: () => {
+            // 소속 데이터 새로 불러오기 (새 영업자의 소속이 반영되도록)
+            fetchAffiliationsData();
             setCreateModalOpen(true);
             setErrors({});
             // 모달 스크롤을 맨 위로
@@ -183,6 +189,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         fetchUsers();
         fetchPositions();
         fetchSupervisors();
+        fetchAffiliationsData();
     }, []);
 
     useEffect(() => {
@@ -233,6 +240,34 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
             setSupervisors(inspectors);
         } catch (error) {
             console.error('검수자 조회 실패:', error);
+        }
+    };
+
+    const fetchAffiliationsData = async (excludeInspectorId?: number) => {
+        try {
+            let url = '/api/affiliations?get_all=true';
+            if (excludeInspectorId) {
+                url += `&exclude_inspector_id=${excludeInspectorId}`;
+            }
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('소속 조회 실패');
+            const data = await response.json();
+            setAllAffiliations(data.allAffiliations || []);
+            setTakenAffiliations(data.takenAffiliations || []);
+        } catch (error) {
+            console.error('소속 조회 실패:', error);
+        }
+    };
+
+    const fetchUserAffiliations = async (inspectorId: number): Promise<string[]> => {
+        try {
+            const response = await fetch(`/api/affiliations?inspector_id=${inspectorId}`);
+            if (!response.ok) throw new Error('검수자 소속 조회 실패');
+            const data = await response.json();
+            return data.affiliations || [];
+        } catch (error) {
+            console.error('검수자 소속 조회 실패:', error);
+            return [];
         }
     };
 
@@ -368,10 +403,19 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         setViewModalOpen(true);
     };
 
-    const handleEditUser = (user: User) => {
+    const handleEditUser = async (user: User) => {
         setIsEditMode(true);
         setEditingUserId(user.id);
         setOriginalUserId(user.user_id);
+
+        // 검수자(Level 6)인 경우 소속 데이터 가져오기
+        let userAffiliations: string[] = [];
+        if (user.position?.level === 6) {
+            userAffiliations = await fetchUserAffiliations(user.id);
+            // 현재 검수자를 제외한 소속 데이터 가져오기
+            await fetchAffiliationsData(user.id);
+        }
+
         setCreateFormData({
             user_id: user.user_id,
             name: user.name,
@@ -384,6 +428,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
             company_name: user.company_name || '',
             status: user.status as 'active' | 'inactive',
             supervisor_id: user.supervisor_id || null,
+            affiliations: userAffiliations,
         });
         setErrors({});
         setCreateModalOpen(true);
@@ -1114,8 +1159,10 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                         company_name: '',
                         status: 'active',
                         supervisor_id: null,
+                        affiliations: [],
                     });
                     setErrors({});
+                    fetchAffiliationsData(); // 소속 데이터 새로고침
                 }}
                 onSubmit={async (isDuplicateUserIdChecked: boolean, isDuplicateUserIdExists: boolean) => {
                     // ID가 변경되었거나 새로 생성할 때 중복확인 검사
@@ -1237,6 +1284,16 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                         }
                     }
 
+                    // 검수자(Level 6)인 경우 담당 소속 필수 확인
+                    const selectedPosition = positions.find(p => p.id === createFormData.position_id);
+                    if (selectedPosition?.level === 6 && (!createFormData.affiliations || createFormData.affiliations.length === 0)) {
+                        newErrors.affiliations = '담당 소속을 선택해주세요.';
+                        if (!firstErrorField) {
+                            firstErrorField = 'affiliations';
+                            firstErrorMessage = '검수자는 최소 1개 이상의<br>담당 소속을 선택해야 합니다.';
+                        }
+                    }
+
                     if (Object.keys(newErrors).length > 0) {
                         setErrors(newErrors);
                         setValidationErrorMessage(firstErrorMessage);
@@ -1279,8 +1336,10 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                             company_name: '',
                             status: 'active',
                             supervisor_id: null,
+                            affiliations: [],
                         });
                         fetchUsers();
+                        fetchAffiliationsData(); // 소속 데이터 새로고침
                         setSuccessMessage(isEditMode ? '사용자가 수정되었습니다.' : '사용자가 생성되었습니다.');
                         setSuccessModalOpen(true);
                     } catch (error) {
@@ -1302,6 +1361,9 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 emailRef={emailRef}
                 handleFieldBlur={handleFieldBlur}
                 onCheckDuplicateUserId={handleCheckDuplicateUserId}
+                allAffiliations={allAffiliations}
+                takenAffiliations={takenAffiliations}
+                editingUserId={editingUserId}
             />
         </div>
         </>

@@ -50,7 +50,7 @@ export async function PATCH(
     }
 
     // 전체 정보 수정
-    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, supervisor_id } = body;
+    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations } = body;
 
     const updateData: Record<string, unknown> = {};
     // user_id는 수정 불가 (documents 테이블에서 참조됨)
@@ -63,7 +63,25 @@ export async function PATCH(
     if (address_detail !== undefined) updateData.address_detail = address_detail;
     if (company_name !== undefined) updateData.company_name = company_name;
     if (status !== undefined) updateData.status = status;
-    if (supervisor_id !== undefined) updateData.supervisor_id = supervisor_id > 0 ? supervisor_id : null;
+
+    // position level 확인
+    let isInspector = false;
+    if (position_id) {
+      const { data: positionData } = await supabase
+        .from('position')
+        .select('level')
+        .eq('id', position_id)
+        .single();
+      isInspector = positionData?.level === 6;
+    }
+
+    // 검수자인 경우 소속 필수 확인
+    if (isInspector && affiliations !== undefined && affiliations.length === 0) {
+      return NextResponse.json(
+        { message: '검수자는 최소 1개 이상의 소속을 선택해야 합니다.' },
+        { status: 400 }
+      );
+    }
 
     const { data, error } = await supabase
       .from('users')
@@ -82,12 +100,44 @@ export async function PATCH(
         address_detail,
         company_name,
         password,
-        supervisor_id,
         created_at
       `)
       .single();
 
     if (error) throw error;
+
+    // 검수자인 경우 소속 업데이트
+    if (isInspector && affiliations !== undefined) {
+      // 기존 소속 삭제
+      const { error: deleteError } = await supabase
+        .from('inspector_affiliations')
+        .delete()
+        .eq('inspector_id', userId);
+
+      if (deleteError) throw deleteError;
+
+      // 새 소속 추가
+      if (affiliations.length > 0) {
+        const insertData = affiliations.map((affName: string) => ({
+          inspector_id: userId,
+          affiliation_name: affName
+        }));
+
+        const { error: affError } = await supabase
+          .from('inspector_affiliations')
+          .insert(insertData);
+
+        if (affError) {
+          if (affError.code === '23505') {
+            return NextResponse.json(
+              { message: '이미 다른 검수자에게 배정된 소속이 있습니다.' },
+              { status: 400 }
+            );
+          }
+          throw affError;
+        }
+      }
+    }
 
     return NextResponse.json(
       { message: '사용자 정보가 수정되었습니다', data },

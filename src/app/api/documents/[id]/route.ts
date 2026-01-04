@@ -99,15 +99,109 @@ export async function DELETE(
         const { id } = await params;
         const docId = parseInt(id);
 
-        // 먼저 문서 조회하여 파일 정보 가져오기
+        // 인증 확인
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (!authToken) {
+            return NextResponse.json(
+                { error: '인증이 필요합니다.' },
+                { status: 401 }
+            );
+        }
+
+        // 토큰 디코딩
+        let tokenData;
+        try {
+            const decodedToken = Buffer.from(authToken, 'base64').toString('utf-8');
+            tokenData = JSON.parse(decodedToken);
+        } catch (err) {
+            return NextResponse.json(
+                { error: '유효하지 않은 토큰입니다.' },
+                { status: 401 }
+            );
+        }
+
+        const userId = tokenData.user_id;
+
+        // 현재 사용자 정보 조회
+        const { data: currentUser, error: userError } = await supabase
+            .from('users')
+            .select('*, position(level)')
+            .eq('user_id', userId)
+            .single();
+
+        if (userError || !currentUser) {
+            return NextResponse.json(
+                { error: '사용자 정보를 찾을 수 없습니다.' },
+                { status: 404 }
+            );
+        }
+
+        const userLevel = currentUser.position?.level;
+
+        // 먼저 문서 조회하여 전체 데이터 가져오기 (히스토리 저장용)
         const { data: docData, error: fetchError } = await supabase
             .from('documents')
-            .select('files')
+            .select('*')
             .eq('id', docId)
             .single();
 
         if (fetchError) {
             throw fetchError;
+        }
+
+        // 검수자(Level 6)인 경우: 대표실무자로 넘어간 문서는 삭제 불가
+        if (userLevel === 6) {
+            const progress = docData?.progress_details;
+            if (progress !== '검수자') {
+                return NextResponse.json(
+                    { error: '대표실무자에게 넘어간 문서는 삭제할 수 없습니다.' },
+                    { status: 403 }
+                );
+            }
+        }
+
+        // 히스토리 테이블에 삭제할 문서 데이터 저장
+        const historyData = {
+            original_id: docData.id,
+            user_id: docData.user_id,
+            user_name: docData.user_name,
+            document_type: docData.document_type,
+            title: docData.title,
+            status: docData.status,
+            progress_status: docData.progress_status,
+            submitted_date: docData.submitted_date,
+            completed_date: docData.completed_date,
+            progress_start_date: docData.progress_start_date,
+            progress_end_time: docData.progress_end_time,
+            stopped_time: docData.stopped_time,
+            reason: docData.reason,
+            reason_read: docData.reason_read,
+            files: docData.files,
+            type: docData.type,
+            company_name: docData.company_name,
+            representative_name: docData.representative_name,
+            manager_name: docData.manager_name,
+            progress_details: docData.progress_details,
+            business_number: docData.business_number,
+            phone: docData.phone,
+            manager_id: docData.manager_id,
+            memos: docData.memos,
+            inspector_id: docData.inspector_id,
+            cretop_file: docData.cretop_file,
+            cretop_none: docData.cretop_none,
+            original_created_at: docData.created_at,
+            original_updated_at: docData.updated_at,
+            deleted_by_id: currentUser.user_id,
+            deleted_by_name: currentUser.name || currentUser.user_id,
+        };
+
+        const { error: historyError } = await supabase
+            .from('documents_history')
+            .insert(historyData);
+
+        if (historyError) {
+            console.error('히스토리 저장 실패:', historyError);
+            // 히스토리 저장 실패해도 삭제는 진행
         }
 
         // 스토리지에서 파일 삭제

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import { canEditDocument } from '@/lib/permissions';
@@ -47,6 +47,8 @@ interface Document {
     reason?: string;
     reason_read: boolean;
     memos?: DocumentMemo[];
+    cretop_file?: { name: string; path: string; url: string } | null;
+    cretop_none?: boolean;
 }
 
 interface Worker {
@@ -104,6 +106,26 @@ export default function CompanyCreateForm() {
     const [fileViewUrl, setFileViewUrl] = useState('');
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
     const [isLoading, setIsLoading] = useState(!!viewId);  // viewId가 있으면 true로 초기화 (로딩 상태로 시작)
+    const [isMobile, setIsMobile] = useState(false);
+    const [imageZoom, setImageZoom] = useState(1);
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [sidePanelWidth, setSidePanelWidth] = useState(700);
+    const [isResizing, setIsResizing] = useState(false);
+    const [imageRotation, setImageRotation] = useState(0);
+    const [cretopUploading, setCretopUploading] = useState(false);
+    const cretopInputRef = useRef<HTMLInputElement>(null);
+
+    // 모바일 감지
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // 초기화: 실무자 목록 로드 및 현재 사용자 정보 설정
     useEffect(() => {
@@ -160,21 +182,27 @@ export default function CompanyCreateForm() {
                 return;
             }
 
-            // 검수자(level=6)는 자신이 담당하는 영업자의 문서 또는 과거에 담당했던 문서를 볼 수 있음
+            // 검수자(level=6)는 자신의 소속(inspector_affiliations)과 일치하는 company_name의 문서를 볼 수 있음
             let assignedSalesManagerIds: string[] = [];
             if (userLevel === 6 && userIdNumber) {
-                assignedSalesManagerIds = usersData
-                    .filter((user: any) => user.supervisor_id === userIdNumber)
-                    .map((user: any) => user.user_id);
+                // inspector_affiliations에서 현재 검수자의 소속 조회
+                const affiliationsResponse = await fetch(`/api/affiliations?inspector_id=${userIdNumber}`);
+                const affiliationsData = affiliationsResponse.ok ? await affiliationsResponse.json() : { affiliations: [] };
+                const inspectorCompanies = affiliationsData.affiliations || [];
 
-                // 자신의 담당 영업자의 문서이거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
-                const isAssignedDocument = assignedSalesManagerIds.includes(data.user_id);
+                // 문서의 company_name이 검수자의 소속에 포함되거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
+                const isAffiliatedDocument = inspectorCompanies.includes(data.company_name);
                 const isPastInspector = data.inspector_id === userId;
 
-                if (!isAssignedDocument && !isPastInspector) {
+                if (!isAffiliatedDocument && !isPastInspector) {
                     setError('접근 권한이 없습니다.');
                     setErrorModalOpen(true);
                     return;
+                }
+
+                // 수정 권한 확인을 위해 assignedSalesManagerIds에 추가
+                if (isAffiliatedDocument) {
+                    assignedSalesManagerIds = [data.user_id];
                 }
             }
 
@@ -288,6 +316,25 @@ export default function CompanyCreateForm() {
         }
     };
 
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.dataTransfer.files) {
+            setSelectedFiles(Array.from(e.dataTransfer.files));
+        }
+    };
+
     const handleRemoveFile = (index: number) => {
         setSelectedFiles(prev => prev.filter((_, i) => i !== index));
     };
@@ -365,6 +412,61 @@ export default function CompanyCreateForm() {
         }
     };
 
+    const handleDownloadCretopZip = async () => {
+        if (!documentData?.cretop_file) {
+            setDownloadError('다운로드할 크레탑 파일이 없습니다.');
+            return;
+        }
+
+        setIsDownloading(true);
+        setDownloadError('');
+
+        try {
+            const companyNameToSend = documentData?.company_name || '기업';
+            const cretopFiles = [{
+                name: documentData.cretop_file.name,
+                path: documentData.cretop_file.path,
+                size: 0
+            }];
+
+            const response = await fetch('/api/download/zip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    documentId: viewId || documentData?.id,
+                    files: cretopFiles,
+                    companyName: `${companyNameToSend}_크레탑`,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                const errorMsg = errorData.message ? `${errorData.error} - ${errorData.message}` : (errorData.error || '다운로드 실패');
+                throw new Error(errorMsg);
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = globalThis.document.createElement('a');
+            link.href = url;
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            link.download = `${companyNameToSend}_크레탑_${dateStr}.zip`;
+            globalThis.document.body.appendChild(link);
+            link.click();
+            window.URL.revokeObjectURL(url);
+            globalThis.document.body.removeChild(link);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '파일 다운로드 중 오류가 발생했습니다.';
+            setDownloadError(errorMessage);
+            console.error('크레탑 ZIP 다운로드 오류:', error);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     const validateForm = () => {
         if (!formData.representative_name.trim()) {
             setError('대표자명을 입력해주세요.');
@@ -394,19 +496,19 @@ export default function CompanyCreateForm() {
         // 생성 모드: 새 파일 필수
         // 수정 모드: 기존 파일 또는 새 파일 중 최소 1개 필수
         if (!isViewMode && !isEditMode && selectedFiles.length === 0) {
-            setError('파일을 최소 1개 이상 업로드해주세요.');
+            setErrorMessage('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
         }
 
         if (!isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
-            setError('파일을 최소 1개 이상 업로드해주세요.');
+            setErrorMessage('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
         }
 
         if (isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
-            setError('파일을 최소 1개 이상 보유해야 합니다.');
+            setErrorMessage('파일을 최소 1개 이상 보유해야 합니다.');
             setErrorModalOpen(true);
             return false;
         }
@@ -659,9 +761,144 @@ export default function CompanyCreateForm() {
         });
     };
 
+    // 크레탑 파일 업로드
+    const handleCretopUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0] || !documentData) return;
+
+        const file = e.target.files[0];
+        setCretopUploading(true);
+
+        try {
+            const fileName = `cretop_${documentData.id}_${Date.now()}_${file.name}`;
+            const filePath = `cretop/${fileName}`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('path', filePath);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || '업로드 실패');
+            }
+
+            const { fullPath } = await response.json();
+
+            const cretopFile = {
+                name: file.name,
+                path: filePath,
+                url: fullPath
+            };
+
+            const updated = {
+                ...documentData,
+                cretop_file: cretopFile,
+                cretop_none: false
+            };
+
+            await saveDocumentToDatabase(updated);
+            setDocumentData(updated);
+            setSuccessMessage('크레탑 파일이 업로드되었습니다.');
+        } catch (err: any) {
+            console.error('크레탑 파일 업로드 실패:', err);
+            setError(err.message || '크레탑 파일 업로드에 실패했습니다.');
+        } finally {
+            setCretopUploading(false);
+            if (cretopInputRef.current) {
+                cretopInputRef.current.value = '';
+            }
+        }
+    };
+
+    // 기업정보없음 설정
+    const handleCretopNone = async () => {
+        if (!documentData) return;
+
+        const updated = {
+            ...documentData,
+            cretop_file: null,
+            cretop_none: true
+        };
+
+        await saveDocumentToDatabase(updated);
+        setDocumentData(updated);
+        setSuccessMessage('기업정보없음으로 설정되었습니다.');
+    };
+
+    // 크레탑 파일 삭제
+    const handleCretopDelete = async () => {
+        if (!documentData) return;
+
+        const updated = {
+            ...documentData,
+            cretop_file: null,
+            cretop_none: false
+        };
+
+        await saveDocumentToDatabase(updated);
+        setDocumentData(updated);
+        setSuccessMessage('크레탑 파일이 삭제되었습니다.');
+    };
+
+    const handleImageWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setImageZoom(prev => Math.min(Math.max(0.5, prev + delta), 3));
+    };
+
+    const handleImageMouseDown = (e: React.MouseEvent) => {
+        if (imageZoom > 1) {
+            setIsDragging(true);
+            setDragStart({ x: e.clientX - imagePosition.x, y: e.clientY - imagePosition.y });
+        }
+    };
+
+    const handleImageMouseMove = (e: React.MouseEvent) => {
+        if (isDragging && imageZoom > 1) {
+            setImagePosition({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            });
+        }
+    };
+
+    const handleImageMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+
+        const startX = e.clientX;
+        const startWidth = sidePanelWidth;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const diff = startX - moveEvent.clientX;
+            const newWidth = Math.min(Math.max(400, startWidth + diff), window.innerWidth * 0.8);
+            setSidePanelWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
     const handleViewFile = async (file: { name: string; path: string; size: number }) => {
         setSelectedFile(file);
         setFileViewerOpen(true);
+        setImageZoom(1);
+        setImagePosition({ x: 0, y: 0 });
+        setImageRotation(0);
 
         try {
             const response = await fetch('/api/file/view', {
@@ -737,6 +974,16 @@ export default function CompanyCreateForm() {
 
     const handleApprove = (id: number) => {
         const doc = documentData;
+
+        // 검수자 상태에서 크레탑 기업정보 선택 필수 확인
+        if (doc && doc.progress_details === '검수자') {
+            if (!doc.cretop_file && !doc.cretop_none) {
+                setErrorMessage('크레탑 기업정보를 선택해야 합니다.');
+                setErrorModalOpen(true);
+                return;
+            }
+        }
+
         if (doc && doc.progress_details === '대표실무자') {
             setSelectedManagerId(id);
             setManagerSelectModalOpen(true);
@@ -838,8 +1085,14 @@ export default function CompanyCreateForm() {
                 let message = '';
                 const adminData = getAdminData();
                 const currentUserId = adminData?.user_id;
+                const userLevel = adminData?.position?.level;
 
                 if (documentData.progress_details === '검수자') {
+                    // 검수자 상태에서 승인 시 크레탑 파일 업로드 또는 기업정보없음 선택 필수
+                    if (!documentData.cretop_file && !documentData.cretop_none) {
+                        setError('승인하려면 크레탑 파일을 업로드하거나 기업정보없음을 선택해주세요.');
+                        return;
+                    }
                     // 검수자가 승인할 때 inspector_id 저장
                     updated = {
                         ...documentData,
@@ -928,6 +1181,7 @@ export default function CompanyCreateForm() {
                 let updated: Document;
 
                 if (documentData.status === 'rejected' || documentData.status === 'revision') {
+                    // 제출 시 사유는 초기화하지 않고 유지 (타임라인처럼 쌓임)
                     updated = {
                         ...documentData,
                         status: 'waiting' as const,
@@ -936,8 +1190,7 @@ export default function CompanyCreateForm() {
                         manager_name: null,
                         manager_id: null,
                         inspector_id: null,
-                        reason: null,
-                        reason_read: false
+                        reason_read: true
                     };
                 } else {
                     updated = {
@@ -1092,6 +1345,7 @@ export default function CompanyCreateForm() {
     }
 
     return (
+        <div className={`${styles.pageWrapper} ${fileViewerOpen && !isMobile ? styles.withSidePanel : ''}`}>
         <div className={styles.formContainer}>
             <div className={styles.formHeader}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1151,38 +1405,42 @@ export default function CompanyCreateForm() {
             <form onSubmit={handleSubmit} className={styles.form}>
                 {/* 사업자 타입 선택 */}
                 <div className={styles.businessTypeSection}>
-                    <div className={styles.radioGroup}>
-                        <div className={styles.radioOption}>
-                            <input
-                                type="radio"
-                                id="individual"
-                                name="businessType"
-                                value="individual"
-                                checked={formData.businessType === 'individual'}
-                                onChange={() => handleBusinessTypeChange('individual')}
-                                className={styles.radioInput}
-                                disabled={isViewMode && !isEditMode}
-                            />
-                            <label htmlFor="individual" className={styles.radioLabel}>
-                                개인사업자
-                            </label>
+                    {isViewMode && !isEditMode ? (
+                        <div className={styles.businessTypeDisplay}>
+                            {formData.businessType === 'individual' ? '개인사업자' : '법인사업자'}
                         </div>
-                        <div className={styles.radioOption}>
-                            <input
-                                type="radio"
-                                id="business"
-                                name="businessType"
-                                value="business"
-                                checked={formData.businessType === 'business'}
-                                onChange={() => handleBusinessTypeChange('business')}
-                                className={styles.radioInput}
-                                disabled={isViewMode && !isEditMode}
-                            />
-                            <label htmlFor="business" className={styles.radioLabel}>
-                                법인사업자
-                            </label>
+                    ) : (
+                        <div className={styles.radioGroup}>
+                            <div className={styles.radioOption}>
+                                <input
+                                    type="radio"
+                                    id="individual"
+                                    name="businessType"
+                                    value="individual"
+                                    checked={formData.businessType === 'individual'}
+                                    onChange={() => handleBusinessTypeChange('individual')}
+                                    className={styles.radioInput}
+                                />
+                                <label htmlFor="individual" className={styles.radioLabel}>
+                                    개인사업자
+                                </label>
+                            </div>
+                            <div className={styles.radioOption}>
+                                <input
+                                    type="radio"
+                                    id="business"
+                                    name="businessType"
+                                    value="business"
+                                    checked={formData.businessType === 'business'}
+                                    onChange={() => handleBusinessTypeChange('business')}
+                                    className={styles.radioInput}
+                                />
+                                <label htmlFor="business" className={styles.radioLabel}>
+                                    법인사업자
+                                </label>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* 공통 입력 폼 */}
@@ -1260,7 +1518,12 @@ export default function CompanyCreateForm() {
                     <label className={styles.sectionTitle}>
                         파일 업로드 ({fileTypeLabel})
                     </label>
-                    <div className={styles.uploadArea}>
+                    <div
+                        className={styles.uploadArea}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
                         <label htmlFor="fileInput" className={styles.uploadLabel} style={isViewMode && !isEditMode ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
                             <div className={styles.uploadIcon}>📎</div>
                             <div className={styles.uploadText}>
@@ -1361,19 +1624,180 @@ export default function CompanyCreateForm() {
                 </div>
                 )}
 
+                {/* 크레탑 정보 섹션 - 보기/수정 모드에서 표시 */}
+                {(() => {
+                    const adminData = getAdminData();
+                    const userLevel = adminData?.position?.level;
+                    // 크레탑 수정 가능: 검수자(6)이고 progress_details가 '검수자'이거나, 대표자(1) 또는 대표실무자(2)는 수정 모드일 때
+                    const canEditCretop = isEditMode && (
+                        (userLevel === 6 && documentData?.progress_details === '검수자') ||
+                        userLevel === 1 ||
+                        userLevel === 2
+                    );
+                    // 크레탑 섹션 표시 조건: 파일이 있거나 none이 true이거나, 대표자/대표실무자거나, 검수자이고 progress_details='검수자'이거나, 수정 가능한 경우
+                    const showCretopSection = (documentData?.cretop_file || documentData?.cretop_none || canEditCretop || userLevel === 1 || userLevel === 2 || (userLevel === 6 && documentData?.progress_details === '검수자'));
+
+                    return showCretopSection ? (
+                        <div className={styles.fileSection}>
+                            <label className={styles.sectionTitle}>
+                                크레탑 기업정보
+                            </label>
+                            {documentData?.cretop_file ? (
+                                <div className={styles.fileList} style={{ marginBottom: '16px' }}>
+                                    <p className={styles.fileListTitle}>파일 (1개)</p>
+                                    <ul className={styles.files}>
+                                        <li className={styles.fileItem}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewFile({
+                                                    name: documentData.cretop_file!.name,
+                                                    path: documentData.cretop_file!.path,
+                                                    size: 0
+                                                })}
+                                                className={styles.fileNameButton}
+                                                title="클릭하여 보기"
+                                            >
+                                                {documentData.cretop_file.name}
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div>
+                            ) : documentData?.cretop_none ? (
+                                <div style={{
+                                    backgroundColor: '#f8f9fa',
+                                    border: '2px dashed #dee2e6',
+                                    borderRadius: '8px',
+                                    padding: '32px 20px',
+                                    textAlign: 'center',
+                                    marginBottom: '16px'
+                                }}>
+                                    <p style={{ color: '#666', fontSize: '18px', fontWeight: '700', margin: '0' }}>
+                                        기업정보없음
+                                    </p>
+                                </div>
+                            ) : null}
+
+                            {/* ZIP 다운로드 버튼 */}
+                            {(isViewMode && !isEditMode && documentData?.cretop_file) && (
+                                <div className={styles.downloadButtonContainer} style={{ marginBottom: '16px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadCretopZip}
+                                        disabled={isDownloading}
+                                        className={styles.downloadButton}
+                                    >
+                                        {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* 제어 버튼들 - 파일업로드, 기업정보없음, 삭제, 취소 */}
+                            {(canEditCretop || (userLevel === 6 && documentData?.progress_details === '검수자') || userLevel === 1 || userLevel === 2) && (
+                                <div style={{ display: 'flex', gap: '12px', marginTop: documentData?.cretop_file || documentData?.cretop_none ? '0' : '16px' }}>
+                                    {documentData?.cretop_file && (
+                                        <button
+                                            type="button"
+                                            onClick={handleCretopDelete}
+                                            style={{
+                                                padding: '8px 16px',
+                                                fontSize: '14px',
+                                                backgroundColor: '#dc3545',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            삭제
+                                        </button>
+                                    )}
+                                    {documentData?.cretop_none && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={handleCretopDelete}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    fontSize: '14px',
+                                                    backgroundColor: '#6c757d',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                취소
+                                            </button>
+                                        </>
+                                    )}
+                                    {!documentData?.cretop_file && !documentData?.cretop_none && (
+                                        <>
+                                            <input
+                                                type="file"
+                                                ref={cretopInputRef}
+                                                onChange={handleCretopUpload}
+                                                style={{ display: 'none' }}
+                                                accept=".pdf,.jpg,.jpeg,.png,.gif"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => cretopInputRef.current?.click()}
+                                                disabled={cretopUploading}
+                                                style={{
+                                                    padding: '12px 24px',
+                                                    fontSize: '15px',
+                                                    backgroundColor: '#2196f3',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: cretopUploading ? 'not-allowed' : 'pointer',
+                                                    opacity: cretopUploading ? 0.6 : 1,
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                {cretopUploading ? '업로드 중...' : '파일 업로드'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={handleCretopNone}
+                                                style={{
+                                                    padding: '12px 24px',
+                                                    fontSize: '15px',
+                                                    backgroundColor: '#78909c',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                기업정보없음
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : null;
+                })()}
+
                 {/* 메모 섹션 */}
                 {(isViewMode || !isViewMode) && (
                 <div className={styles.memoSection}>
-                    {/* 메모 목록 (타임라인) - 보기/수정 모드에서만 */}
+                    {/* 메모 목록 (타임라인) - 보기/수정 모드에서만, 최근순 */}
                     {isViewMode && documentData?.memos && documentData.memos.length > 0 && (
                         <div className={styles.memoTimeline}>
-                            {documentData.memos.map((memo: DocumentMemo, index: number) => {
+                            {[...documentData.memos].reverse().map((memo: DocumentMemo, reversedIndex: number) => {
                                 const adminData = getAdminData();
                                 const userLevel = adminData?.position?.level;
                                 const canDeleteMemo = userLevel === 1 || userLevel === 2;
+                                // 역순 인덱스를 원래 인덱스로 변환
+                                const originalIndex = documentData.memos!.length - 1 - reversedIndex;
 
                                 return (
-                                    <div key={index} className={styles.memoItem}>
+                                    <div key={originalIndex} className={styles.memoItem}>
                                         <div className={styles.memoHeader}>
                                             <div>
                                                 <span className={styles.memoTime}>{memo.timestamp}</span>
@@ -1383,7 +1807,7 @@ export default function CompanyCreateForm() {
                                                 <button
                                                     type="button"
                                                     className={styles.memoDeleteButton}
-                                                    onClick={() => handleDeleteMemo(index)}
+                                                    onClick={() => handleDeleteMemo(originalIndex)}
                                                     title="메모 삭제"
                                                 >
                                                     ×
@@ -1434,8 +1858,14 @@ export default function CompanyCreateForm() {
                     const userLevel = adminData?.position?.level;
                     const isSalesperson = userLevel === 4;
                     const isInspector = userLevel === 6;
-                    // 검수자이면서 progress_details !== '검수자'인 경우는 버튼이 없음
-                    const hasButtons = !(isInspector && documentData?.progress_details !== '검수자');
+                    const isManager = userLevel === 2;
+                    // 영업자는 보완/반려 상태이거나 progress_details='영업자'일 때 버튼 있음
+                    // 검수자는 progress_details가 '검수자'일 때만 버튼 있음
+                    // 기타는 항상 버튼 있음
+                    const hasSalespersonButtons = isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자');
+                    const hasInspectorButtons = isInspector && documentData?.progress_details === '검수자';
+                    const hasOtherButtons = !isSalesperson && !isInspector;
+                    const hasButtons = hasSalespersonButtons || hasInspectorButtons || hasOtherButtons;
 
                     return hasButtons ? (
                         <div className={styles.actionsGridContainer}>
@@ -1445,7 +1875,7 @@ export default function CompanyCreateForm() {
 
                                     return (
                                         <>
-                                            {/* 검수자: 승인, 보완만 (단, progress_details가 '검수자'인 경우에만) */}
+                                            {/* 검수자: 크레탑 파일 필수 조건 체크 후 승인/보완/삭제 버튼 */}
                                             {isInspector && documentData?.progress_details === '검수자' && (
                                                 <>
                                                     <button
@@ -1462,11 +1892,18 @@ export default function CompanyCreateForm() {
                                                     >
                                                         보완
                                                     </button>
+                                                    <button
+                                                        type="button"
+                                                        className={`${styles.actionButton} ${styles['action-delete']}`}
+                                                        onClick={() => documentData && handleProgressDelete(documentData.id)}
+                                                    >
+                                                        삭제
+                                                    </button>
                                                 </>
                                             )}
 
-                                            {/* 영업자: progress_details='영업자'일 때만 제출 가능 */}
-                                            {isSalesperson && documentData?.progress_details === '영업자' && (
+                                            {/* 영업자: 보완/반려 상태이거나 progress_details='영업자'일 때 제출 가능 */}
+                                            {isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자') && (
                                                 <button
                                                     type="button"
                                                     className={`${styles.actionButton} ${styles['action-submit']}`}
@@ -1476,75 +1913,112 @@ export default function CompanyCreateForm() {
                                                 </button>
                                             )}
 
-                                            {/* 그 외 권한 (대표자, 대표실무자 등): 모든 버튼 */}
+                                            {/* 그 외 권한: 권한별로 다른 버튼 */}
                                             {!isSalesperson && !isInspector && (
                                                 <>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-start']}`}
-                                                        onClick={() => documentData && handleProgressStart(documentData.id)}
-                                                    >
-                                                        진행
-                                                    </button>
-                                                    {documentData?.status === 'stopped' ? (
-                                                        <button
-                                                            type="button"
-                                                            className={`${styles.actionButton} ${styles['action-restart']}`}
-                                                            onClick={() => documentData && handleProgressRestart(documentData.id)}
-                                                        >
-                                                            재시작
-                                                        </button>
+                                                    {/* 대표실무자: 진행(대표실무자), 배정, 반려, 보완 */}
+                                                    {isManager ? (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-start']}`}
+                                                                onClick={() => documentData && handleProgressStart(documentData.id)}
+                                                            >
+                                                                진행(대표실무자)
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-approve']}`}
+                                                                onClick={() => documentData && handleApprove(documentData.id)}
+                                                            >
+                                                                배정
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-reject']}`}
+                                                                onClick={() => documentData && handleReject(documentData.id)}
+                                                            >
+                                                                반려
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-revision']}`}
+                                                                onClick={() => documentData && handleRevision(documentData.id)}
+                                                            >
+                                                                보완
+                                                            </button>
+                                                        </>
                                                     ) : (
-                                                        <button
-                                                            type="button"
-                                                            className={`${styles.actionButton} ${styles['action-stop']}`}
-                                                            onClick={() => documentData && handleProgressStop(documentData.id)}
-                                                        >
-                                                            중지
-                                                        </button>
+                                                        /* 대표자 등 다른 권한: 모든 버튼 */
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-start']}`}
+                                                                onClick={() => documentData && handleProgressStart(documentData.id)}
+                                                            >
+                                                                진행
+                                                            </button>
+                                                            {documentData?.status === 'stopped' ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className={`${styles.actionButton} ${styles['action-restart']}`}
+                                                                    onClick={() => documentData && handleProgressRestart(documentData.id)}
+                                                                >
+                                                                    재시작
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    className={`${styles.actionButton} ${styles['action-stop']}`}
+                                                                    onClick={() => documentData && handleProgressStop(documentData.id)}
+                                                                >
+                                                                    중지
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-approve']}`}
+                                                                onClick={() => documentData && handleApprove(documentData.id)}
+                                                            >
+                                                                승인
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-reject']}`}
+                                                                onClick={() => documentData && handleReject(documentData.id)}
+                                                            >
+                                                                반려
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-revision']}`}
+                                                                onClick={() => documentData && handleRevision(documentData.id)}
+                                                            >
+                                                                보완
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-submit']}`}
+                                                                onClick={() => documentData && handleActionSubmit(documentData.id)}
+                                                            >
+                                                                제출
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-delete']}`}
+                                                                onClick={() => documentData && handleProgressDelete(documentData.id)}
+                                                            >
+                                                                삭제
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                className={`${styles.actionButton} ${styles['action-reset']}`}
+                                                                onClick={() => documentData && handleReset(documentData.id)}
+                                                            >
+                                                                초기화
+                                                            </button>
+                                                        </>
                                                     )}
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-approve']}`}
-                                                        onClick={() => documentData && handleApprove(documentData.id)}
-                                                    >
-                                                        승인
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-reject']}`}
-                                                        onClick={() => documentData && handleReject(documentData.id)}
-                                                    >
-                                                        반려
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-revision']}`}
-                                                        onClick={() => documentData && handleRevision(documentData.id)}
-                                                    >
-                                                        보완
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-submit']}`}
-                                                        onClick={() => documentData && handleActionSubmit(documentData.id)}
-                                                    >
-                                                        제출
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-delete']}`}
-                                                        onClick={() => documentData && handleProgressDelete(documentData.id)}
-                                                    >
-                                                        삭제
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        className={`${styles.actionButton} ${styles['action-reset']}`}
-                                                        onClick={() => documentData && handleReset(documentData.id)}
-                                                    >
-                                                        초기화
-                                                    </button>
                                                 </>
                                             )}
                                         </>
@@ -1683,17 +2157,22 @@ export default function CompanyCreateForm() {
                         <textarea
                             value={reasonInput}
                             onChange={(e) => setReasonInput(e.target.value)}
-                            placeholder="사유를 입력해주세요."
+                            placeholder="사유를 입력해주세요. (필수)"
                             style={{
                                 width: '100%',
                                 minHeight: '100px',
                                 padding: '10px',
                                 borderRadius: '4px',
-                                border: '1px solid #ddd',
+                                border: `1px solid ${!reasonInput.trim() ? '#ff6b6b' : '#ddd'}`,
                                 fontFamily: 'inherit',
                                 resize: 'vertical'
                             }}
                         />
+                        {!reasonInput.trim() && (
+                            <p style={{ color: '#ff6b6b', fontSize: '12px', margin: '5px 0 0 0' }}>
+                                사유를 입력해주세요.
+                            </p>
+                        )}
                         <div style={{
                             marginTop: '20px',
                             display: 'flex',
@@ -1718,6 +2197,7 @@ export default function CompanyCreateForm() {
                             </button>
                             <button
                                 onClick={() => {
+                                    if (!reasonInput.trim()) return;
                                     setPendingAction({
                                         id: pendingReasonAction?.id || documentData?.id,
                                         action: pendingReasonAction?.action === 'reject' ? 'reject' : 'revision'
@@ -1726,13 +2206,15 @@ export default function CompanyCreateForm() {
                                     setReasonInputModalOpen(false);
                                     setActionConfirmModalOpen(true);
                                 }}
+                                disabled={!reasonInput.trim()}
                                 style={{
                                     padding: '8px 16px',
                                     borderRadius: '4px',
-                                    backgroundColor: '#007bff',
+                                    backgroundColor: !reasonInput.trim() ? '#ccc' : '#007bff',
                                     color: 'white',
                                     border: 'none',
-                                    cursor: 'pointer'
+                                    cursor: !reasonInput.trim() ? 'not-allowed' : 'pointer',
+                                    opacity: !reasonInput.trim() ? 0.6 : 1
                                 }}
                             >
                                 확인
@@ -1883,8 +2365,151 @@ export default function CompanyCreateForm() {
                 </div>
             )}
 
-            {/* 파일 뷰어 모달 */}
-            {fileViewerOpen && selectedFile && (
+        </div>
+
+            {/* PC: 사이드 패널 */}
+            {!isMobile && fileViewerOpen && selectedFile && (
+                <div className={styles.sidePanel} style={{ width: `${sidePanelWidth}px` }}>
+                    {/* 리사이즈 핸들 */}
+                    <div
+                        className={`${styles.sidePanelResizeHandle} ${isResizing ? styles.active : ''}`}
+                        onMouseDown={handleResizeStart}
+                    />
+                    {/* 헤더 */}
+                    <div className={styles.sidePanelHeader}>
+                        <h3 className={styles.sidePanelTitle}>
+                            {selectedFile.name}
+                        </h3>
+                        <button
+                            onClick={() => {
+                                setFileViewerOpen(false);
+                                setSelectedFile(null);
+                                setFileViewUrl('');
+                                setImageZoom(1);
+                            }}
+                            className={styles.sidePanelCloseButton}
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    {/* 콘텐츠 */}
+                    <div
+                        className={styles.sidePanelContent}
+                        onWheel={handleImageWheel}
+                    >
+                        {fileViewUrl ? (
+                            (() => {
+                                const ext = getFileExtension(selectedFile.name);
+                                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                                const isPdf = ext === 'pdf';
+
+                                return (
+                                    <>
+                                        {isImage && (
+                                            <img
+                                                src={fileViewUrl}
+                                                alt={selectedFile.name}
+                                                onMouseDown={handleImageMouseDown}
+                                                onMouseMove={handleImageMouseMove}
+                                                onMouseUp={handleImageMouseUp}
+                                                onMouseLeave={handleImageMouseUp}
+                                                draggable={false}
+                                                style={{
+                                                    maxWidth: '100%',
+                                                    maxHeight: '100%',
+                                                    objectFit: 'contain',
+                                                    transform: `scale(${imageZoom}) translate(${imagePosition.x / imageZoom}px, ${imagePosition.y / imageZoom}px) rotate(${imageRotation}deg)`,
+                                                    cursor: imageZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+                                                    userSelect: 'none'
+                                                }}
+                                            />
+                                        )}
+                                        {isPdf && (
+                                            <iframe
+                                                src={fileViewUrl}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    border: 'none'
+                                                }}
+                                            />
+                                        )}
+                                        {!isImage && !isPdf && (
+                                            <div style={{
+                                                textAlign: 'center',
+                                                color: '#666'
+                                            }}>
+                                                <p>이 파일은 웹에서 미리 볼 수 없습니다.</p>
+                                                <a
+                                                    href={fileViewUrl}
+                                                    download
+                                                    style={{
+                                                        color: 'var(--main-color)',
+                                                        textDecoration: 'none',
+                                                        fontWeight: '600'
+                                                    }}
+                                                >
+                                                    파일 다운로드
+                                                </a>
+                                            </div>
+                                        )}
+                                    </>
+                                );
+                            })()
+                        ) : (
+                            <div style={{ color: '#999' }}>파일을 불러오는 중...</div>
+                        )}
+                    </div>
+
+                    {/* 푸터 */}
+                    <div className={styles.sidePanelFooter}>
+                        <span style={{ fontSize: '12px', color: '#999' }}>
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
+                        </span>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                                onClick={() => setImageRotation(prev => prev - 90)}
+                                style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px'
+                                }}
+                                title="왼쪽으로 회전"
+                            >
+                                ↺
+                            </button>
+                            <button
+                                onClick={() => setImageRotation(prev => prev + 90)}
+                                style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px'
+                                }}
+                                title="오른쪽으로 회전"
+                            >
+                                ↻
+                            </button>
+                            <a
+                                href={fileViewUrl}
+                                download={selectedFile.name}
+                                className={styles.sidePanelDownloadButton}
+                            >
+                                다운로드
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 모바일: 모달 */}
+            {isMobile && fileViewerOpen && selectedFile && (
                 <div style={{
                     position: 'fixed',
                     top: 0,

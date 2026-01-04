@@ -62,7 +62,7 @@ export default function DocumentSubmissionList() {
     const [confirmMessage, setConfirmMessage] = useState('');
     const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
-    const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string } | null>(null);
+    const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string; status?: string } | null>(null);
     const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());
     const [isDeleteAllMode, setIsDeleteAllMode] = useState(false);
     const [reasonInputModalOpen, setReasonInputModalOpen] = useState(false);
@@ -1076,7 +1076,7 @@ export default function DocumentSubmissionList() {
                         </div>
                     ) : (
                         <>
-                            {!isUserSalesManager && userRoleLevel !== 6 && (
+                            {!isUserSalesManager && userRoleLevel !== 6 && userRoleLevel !== 2 && (
                                 <div className={styles.deleteButtonsContainer}>
                                     <button
                                         className={styles.deleteAllButton}
@@ -1098,7 +1098,7 @@ export default function DocumentSubmissionList() {
                             <table className={styles.documentTable}>
                             <thead>
                                 <tr>
-                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                    {!isUserSalesManager && userRoleLevel !== 6 && userRoleLevel !== 2 && (
                                         <th className={styles.checkboxHeader}>
                                             <input
                                                 type="checkbox"
@@ -1112,32 +1112,13 @@ export default function DocumentSubmissionList() {
                                             />
                                         </th>
                                     )}
-                                    {!isUserSalesManager && (
-                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
-                                            작성자 ID{getSortIcon('user_id')}
-                                        </th>
-                                    )}
-                                    {!isUserSalesManager && (
-                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
-                                            작성자{getSortIcon('user_name')}
-                                        </th>
-                                    )}
+                                    <th>작업</th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
                                         기업명{getSortIcon('company_name')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('representative_name')}>
                                         대표자명{getSortIcon('representative_name')}
                                     </th>
-                                    {!isUserSalesManager && (
-                                        <th className={styles.sortableHeader}>
-                                            실무자 ID
-                                        </th>
-                                    )}
-                                    {!isUserSalesManager && (
-                                        <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
-                                            실무자{getSortIcon('manager_name')}
-                                        </th>
-                                    )}
                                     <th className={styles.sortableHeader} onClick={() => handleSort('progress_details')}>
                                         진행상황{getSortIcon('progress_details')}
                                     </th>
@@ -1147,22 +1128,41 @@ export default function DocumentSubmissionList() {
                                     <th className={styles.sortableHeader} onClick={() => handleSort('reason')}>
                                         사유{getSortIcon('reason')}
                                     </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('progress_start_date')}>
+                                        시간 경과{getSortIcon('progress_start_date')}
+                                    </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('submitted_date')}>
                                         제출일{getSortIcon('submitted_date')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('completed_date')}>
                                         완료일{getSortIcon('completed_date')}
                                     </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('progress_start_date')}>
-                                        시간 경과{getSortIcon('progress_start_date')}
-                                    </th>
-                                    <th>작업</th>
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
+                                            작성자{getSortIcon('user_name')}
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
+                                            작성자 ID{getSortIcon('user_id')}
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
+                                            실무자{getSortIcon('manager_name')}
+                                        </th>
+                                    )}
+                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        <th className={styles.sortableHeader}>
+                                            실무자 ID
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
                                 {getPaginatedDocuments().map((doc) => (
                                     <tr key={doc.id} className={styles.documentRow}>
-                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        {!isUserSalesManager && userRoleLevel !== 6 && userRoleLevel !== 2 && (
                                             <td className={styles.checkboxCell}>
                                                 <input
                                                     type="checkbox"
@@ -1171,20 +1171,16 @@ export default function DocumentSubmissionList() {
                                                 />
                                             </td>
                                         )}
-                                        {!isUserSalesManager && (
-                                            <td className={styles.userId}>{doc.user_id}</td>
-                                        )}
-                                        {!isUserSalesManager && (
-                                            <td className={styles.userName}>{doc.user_name}</td>
-                                        )}
+                                        <td className={styles.actionsCell}>
+                                            <button
+                                                className={styles.actionButton}
+                                                onClick={() => router.push(`/main/company_create?view=${doc.id}`)}
+                                            >
+                                                보기
+                                            </button>
+                                        </td>
                                         <td className={styles.companyName}>{doc.company_name || '-'}</td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
-                                        {!isUserSalesManager && (
-                                            <td className={styles.managerId}>{doc.manager_id || '-'}</td>
-                                        )}
-                                        {!isUserSalesManager && (
-                                            <td className={styles.managerName}>{doc.manager_name || '-'}</td>
-                                        )}
                                         <td className={styles.progressDetails}>
                                             {doc.progress_details ? (
                                                 <span className={styles.badge}>{doc.progress_details}</span>
@@ -1204,7 +1200,7 @@ export default function DocumentSubmissionList() {
                                                     onClick={async () => {
                                                         const wasUnread = !doc.reason_read;
 
-                                                        setSelectedReason({ id: doc.id, reason: doc.reason! });
+                                                        setSelectedReason({ id: doc.id, reason: doc.reason!, status: doc.status });
                                                         setReasonModalOpen(true);
                                                         setDocuments(docs =>
                                                             docs.map(d =>
@@ -1224,17 +1220,11 @@ export default function DocumentSubmissionList() {
                                                     }}
                                                 >
                                                     보기
-                                                    {(() => {
-                                                        const reasonCount = doc.reason.split('\n').length;
-                                                        return reasonCount >= 2 ? <span className={styles.reasonCount}>{reasonCount}</span> : null;
-                                                    })()}
                                                 </button>
                                             ) : (
                                                 <span className={styles.noReason}>없음</span>
                                             )}
                                         </td>
-                                        <td className={styles.date}>{formatSubmittedDate(doc.submitted_date)}</td>
-                                        <td className={styles.completedDate}>{formatSubmittedDate(doc.completed_date || '')}</td>
                                         <td className={styles.timeAgo}>
                                             {doc.status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
@@ -1246,14 +1236,20 @@ export default function DocumentSubmissionList() {
                                                 <span>-</span>
                                             )}
                                         </td>
-                                        <td className={styles.actionsCell}>
-                                            <button
-                                                className={styles.actionButton}
-                                                onClick={() => router.push(`/main/company_create?view=${doc.id}`)}
-                                            >
-                                                보기
-                                            </button>
-                                        </td>
+                                        <td className={styles.date}>{formatSubmittedDate(doc.submitted_date)}</td>
+                                        <td className={styles.completedDate}>{formatSubmittedDate(doc.completed_date || '')}</td>
+                                        {!isUserSalesManager && (
+                                            <td className={styles.userName}>{doc.user_name}</td>
+                                        )}
+                                        {!isUserSalesManager && (
+                                            <td className={styles.userId}>{doc.user_id}</td>
+                                        )}
+                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                            <td className={styles.managerName}>{doc.manager_name || '-'}</td>
+                                        )}
+                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                            <td className={styles.managerId}>{doc.manager_id || '-'}</td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -1369,8 +1365,92 @@ export default function DocumentSubmissionList() {
                                     ×
                                 </button>
                             </div>
-                            <div className={styles.reasonModalBody}>
-                                <p className={styles.reasonText}>{selectedReason.reason}</p>
+                            <div className={styles.reasonModalBody} style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                                <div style={{ display: 'flex', gap: '20px' }}>
+                                    {/* 보완 섹션 */}
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ margin: '0 0 12px 0', color: '#ff9800', fontSize: '16px', fontWeight: '600' }}>
+                                            보완
+                                        </h3>
+                                        <div>
+                                            {(() => {
+                                                const revisionItems = selectedReason.reason.split('\n').filter((line: string) => {
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    if (timeMatch) {
+                                                        const message = timeMatch[2];
+                                                        return message.includes('보완');
+                                                    }
+                                                    return false;
+                                                });
+
+                                                if (revisionItems.length === 0) {
+                                                    return <p style={{ color: '#999', fontSize: '14px', margin: '0' }}>없음</p>;
+                                                }
+
+                                                return revisionItems.reverse().map((line: string, index: number) => {
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    if (timeMatch) {
+                                                        const time = timeMatch[1];
+                                                        const message = timeMatch[2];
+                                                        return (
+                                                            <div key={index} style={{ marginBottom: '12px', paddingLeft: '12px', borderLeft: '3px solid #ff9800' }}>
+                                                                <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>
+                                                                    {time}
+                                                                </p>
+                                                                <p style={{ margin: '0', color: '#333', fontSize: '14px', lineHeight: '1.5' }}>
+                                                                    {message}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }).filter(Boolean);
+                                            })()}
+                                        </div>
+                                    </div>
+
+                                    {/* 반려 섹션 */}
+                                    <div style={{ flex: 1 }}>
+                                        <h3 style={{ margin: '0 0 12px 0', color: '#dc3545', fontSize: '16px', fontWeight: '600' }}>
+                                            반려
+                                        </h3>
+                                        <div>
+                                            {(() => {
+                                                const rejectionItems = selectedReason.reason.split('\n').filter((line: string) => {
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    if (timeMatch) {
+                                                        const message = timeMatch[2];
+                                                        return message.includes('반려');
+                                                    }
+                                                    return false;
+                                                });
+
+                                                if (rejectionItems.length === 0) {
+                                                    return <p style={{ color: '#999', fontSize: '14px', margin: '0' }}>없음</p>;
+                                                }
+
+                                                return rejectionItems.reverse().map((line: string, index: number) => {
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    if (timeMatch) {
+                                                        const time = timeMatch[1];
+                                                        const message = timeMatch[2];
+                                                        return (
+                                                            <div key={index} style={{ marginBottom: '12px', paddingLeft: '12px', borderLeft: '3px solid #dc3545' }}>
+                                                                <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>
+                                                                    {time}
+                                                                </p>
+                                                                <p style={{ margin: '0', color: '#333', fontSize: '14px', lineHeight: '1.5' }}>
+                                                                    {message}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }).filter(Boolean);
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div className={styles.reasonModalFooter}>
                                 <button
