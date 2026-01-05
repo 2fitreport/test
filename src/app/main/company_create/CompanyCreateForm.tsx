@@ -182,7 +182,7 @@ export default function CompanyCreateForm() {
                 return;
             }
 
-            // 검수자(level=6)는 자신의 소속(inspector_affiliations)과 일치하는 company_name의 문서를 볼 수 있음
+            // 검수자(level=6)는 자신의 소속(inspector_affiliations)과 일치하는 영업자가 작성한 문서를 볼 수 있음
             let assignedSalesManagerIds: string[] = [];
             if (userLevel === 6 && userIdNumber) {
                 // inspector_affiliations에서 현재 검수자의 소속 조회
@@ -190,8 +190,12 @@ export default function CompanyCreateForm() {
                 const affiliationsData = affiliationsResponse.ok ? await affiliationsResponse.json() : { affiliations: [] };
                 const inspectorCompanies = affiliationsData.affiliations || [];
 
-                // 문서의 company_name이 검수자의 소속에 포함되거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
-                const isAffiliatedDocument = inspectorCompanies.includes(data.company_name);
+                // 문서 작성자(영업자)의 소속(company_name)을 조회
+                const documentAuthor = usersData.find((user: any) => user.user_id === data.user_id);
+                const authorCompanyName = documentAuthor?.company_name || '';
+
+                // 영업자의 소속이 검수자의 소속에 포함되거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
+                const isAffiliatedDocument = inspectorCompanies.includes(authorCompanyName);
                 const isPastInspector = data.inspector_id === userId;
 
                 if (!isAffiliatedDocument && !isPastInspector) {
