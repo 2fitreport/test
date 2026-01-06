@@ -141,11 +141,12 @@ export default function CompanyCreateForm() {
                 }, 2000);
                 return () => clearTimeout(timer);
             }
+            // 생성 모드에서만 workers 조회 (뷰 모드에서는 fetchDocumentData에서 조회)
+            fetchWorkers();
         }
 
-        fetchWorkers();
         initializeCurrentUser();
-    }, [router]);
+    }, [router, viewId]);
 
     // 보기/수정 모드일 때 문서 정보 로드
     useEffect(() => {
@@ -160,62 +161,37 @@ export default function CompanyCreateForm() {
             const adminData = getAdminData();
             const userLevel = adminData?.position?.level;
             const userId = adminData?.user_id;
-            const userIdNumber = adminData?.id;
 
-            // 병렬로 문서와 사용자 정보 조회 (users 정보는 권한 확인과 담당검수자 조회 모두에 필요)
-            const [docResponse, usersResponse] = await Promise.all([
-                fetch(`/api/documents/${docId}`),
-                fetch('/api/users')
-            ]);
+            // 통합 API로 한 번에 모든 데이터 조회
+            const response = await fetch(`/api/documents/${docId}/view`);
 
-            if (!docResponse.ok) {
-                throw new Error('문서 조회 실패');
-            }
-
-            const data = await docResponse.json();
-            const usersData = usersResponse.ok ? await usersResponse.json() : [];
-
-            // 영업자(level=4)는 자신이 작성하지 않은 문서는 보기도 불가
-            if (userLevel === 4 && userId !== data.user_id) {
-                setError('접근 권한이 없습니다.');
-                setErrorModalOpen(true);
-                return;
-            }
-
-            // 검수자(level=6)는 자신의 소속(inspector_affiliations)과 일치하는 영업자가 작성한 문서를 볼 수 있음
-            let assignedSalesManagerIds: string[] = [];
-            if (userLevel === 6 && userIdNumber) {
-                // inspector_affiliations에서 현재 검수자의 소속 조회
-                const affiliationsResponse = await fetch(`/api/affiliations?inspector_id=${userIdNumber}`);
-                const affiliationsData = affiliationsResponse.ok ? await affiliationsResponse.json() : { affiliations: [] };
-                const inspectorCompanies = affiliationsData.affiliations || [];
-
-                // 문서 작성자(영업자)의 소속(company_name)을 조회
-                const documentAuthor = usersData.find((user: any) => user.user_id === data.user_id);
-                const authorCompanyName = documentAuthor?.company_name || '';
-
-                // 영업자의 소속이 검수자의 소속에 포함되거나, 과거에 담당했던 문서(inspector_id)이면 접근 가능
-                const isAffiliatedDocument = inspectorCompanies.includes(authorCompanyName);
-                const isPastInspector = data.inspector_id === userId;
-
-                if (!isAffiliatedDocument && !isPastInspector) {
+            if (!response.ok) {
+                const errorData = await response.json();
+                if (response.status === 403) {
                     setError('접근 권한이 없습니다.');
                     setErrorModalOpen(true);
                     return;
                 }
-
-                // 수정 권한 확인을 위해 assignedSalesManagerIds에 추가
-                if (isAffiliatedDocument) {
-                    assignedSalesManagerIds = [data.user_id];
-                }
+                throw new Error(errorData.error || '문서 조회 실패');
             }
 
-            // 담당검수자 정보 조회
-            const documentOwner = usersData.find((user: any) => user.user_id === data.user_id);
-            if (documentOwner && documentOwner.supervisor_id) {
-                const supervisor = usersData.find((user: any) => user.id === documentOwner.supervisor_id);
-                if (supervisor) {
-                    setSupervisorInfo({ name: supervisor.name, user_id: supervisor.user_id });
+            const { document: data, users: usersData, supervisorInfo: supervisorData, inspectorAffiliations } = await response.json();
+
+            // workers 상태 업데이트
+            setWorkers(usersData);
+
+            // 담당검수자 정보 설정
+            if (supervisorData) {
+                setSupervisorInfo(supervisorData);
+            }
+
+            // 검수자 수정 권한을 위한 assignedSalesManagerIds
+            let assignedSalesManagerIds: string[] = [];
+            if (userLevel === 6 && inspectorAffiliations?.length > 0) {
+                const documentAuthor = usersData.find((user: any) => user.user_id === data.user_id);
+                const authorCompanyName = documentAuthor?.company_name || '';
+                if (inspectorAffiliations.includes(authorCompanyName)) {
+                    assignedSalesManagerIds = [data.user_id];
                 }
             }
 
@@ -545,14 +521,10 @@ export default function CompanyCreateForm() {
 
             let uploadedFiles: Array<{ name: string; path: string; size: number }> = [];
 
-            // 새로운 파일 업로드 (생성 모드 또는 수정 모드에서 새 파일 추가)
+            // 새로운 파일 업로드 (Signed URL 사용 - 대용량 파일 지원)
             if (selectedFiles.length > 0) {
                 for (const file of selectedFiles) {
                     try {
-                        // 파일 크기 확인 (50MB 제한)
-                        if (file.size > 50 * 1024 * 1024) {
-                            throw new Error(`${file.name}은(는) 50MB 이상으로 업로드할 수 없습니다.`);
-                        }
 
                         const fileExt = file.name.split('.').pop();
                         const timestamp = Date.now();
@@ -563,24 +535,34 @@ export default function CompanyCreateForm() {
                         const businessTypeFolder = formData.businessType === 'individual' ? 'individual' : 'business';
                         const filePath = `companies/${businessTypeFolder}/${fileName}`;
 
-                        const uploadFormData = new FormData();
-                        uploadFormData.append('file', file);
-                        uploadFormData.append('path', filePath);
-
-                        const uploadResponse = await fetch('/api/upload', {
+                        // 1. Signed URL 요청
+                        const signedUrlResponse = await fetch('/api/upload/signed-url', {
                             method: 'POST',
-                            body: uploadFormData,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ path: filePath, contentType: file.type }),
+                        });
+
+                        if (!signedUrlResponse.ok) {
+                            const errorData = await signedUrlResponse.json();
+                            throw new Error(errorData.error || `Signed URL 생성 실패: ${file.name}`);
+                        }
+
+                        const { signedUrl } = await signedUrlResponse.json();
+
+                        // 2. Signed URL로 직접 파일 업로드 (Vercel 함수 우회)
+                        const uploadResponse = await fetch(signedUrl, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': file.type },
+                            body: file,
                         });
 
                         if (!uploadResponse.ok) {
-                            const errorData = await uploadResponse.json();
-                            throw new Error(errorData.error || `파일 업로드 실패: ${file.name}`);
+                            throw new Error(`파일 업로드 실패: ${file.name}`);
                         }
 
-                        const uploadData = await uploadResponse.json();
                         uploadedFiles.push({
                             name: file.name,
-                            path: uploadData.path,
+                            path: filePath,
                             size: file.size,
                         });
                     } catch (err) {
@@ -765,7 +747,7 @@ export default function CompanyCreateForm() {
         });
     };
 
-    // 크레탑 파일 업로드
+    // 크레탑 파일 업로드 (Signed URL 사용 - 대용량 파일 지원)
     const handleCretopUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || !e.target.files[0] || !documentData) return;
 
@@ -776,21 +758,30 @@ export default function CompanyCreateForm() {
             const fileName = `cretop_${documentData.id}_${Date.now()}_${file.name}`;
             const filePath = `cretop/${fileName}`;
 
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('path', filePath);
-
-            const response = await fetch('/api/upload', {
+            // 1. Signed URL 요청
+            const signedUrlResponse = await fetch('/api/upload/signed-url', {
                 method: 'POST',
-                body: formData,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: filePath, contentType: file.type }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || '업로드 실패');
+            if (!signedUrlResponse.ok) {
+                const errorData = await signedUrlResponse.json();
+                throw new Error(errorData.error || 'Signed URL 생성 실패');
             }
 
-            const { fullPath } = await response.json();
+            const { signedUrl, fullPath } = await signedUrlResponse.json();
+
+            // 2. Signed URL로 직접 파일 업로드 (Vercel 함수 우회)
+            const uploadResponse = await fetch(signedUrl, {
+                method: 'PUT',
+                headers: { 'Content-Type': file.type },
+                body: file,
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('파일 업로드 실패');
+            }
 
             const cretopFile = {
                 name: file.name,
@@ -810,6 +801,7 @@ export default function CompanyCreateForm() {
         } catch (err: any) {
             console.error('크레탑 파일 업로드 실패:', err);
             setError(err.message || '크레탑 파일 업로드에 실패했습니다.');
+            setErrorModalOpen(true);
         } finally {
             setCretopUploading(false);
             if (cretopInputRef.current) {
@@ -1095,6 +1087,7 @@ export default function CompanyCreateForm() {
                     // 검수자 상태에서 승인 시 크레탑 파일 업로드 또는 기업정보없음 선택 필수
                     if (!documentData.cretop_file && !documentData.cretop_none) {
                         setError('승인하려면 크레탑 파일을 업로드하거나 기업정보없음을 선택해주세요.');
+                        setErrorModalOpen(true);
                         return;
                     }
                     // 검수자가 승인할 때 inspector_id 저장
@@ -1920,7 +1913,7 @@ export default function CompanyCreateForm() {
                                             {/* 그 외 권한: 권한별로 다른 버튼 */}
                                             {!isSalesperson && !isInspector && (
                                                 <>
-                                                    {/* 대표실무자: 진행(대표실무자), 배정, 반려, 보완 */}
+                                                    {/* 대표실무자: 진행(대표실무자), 승인/배정, 반려, 보완 */}
                                                     {isManager ? (
                                                         <>
                                                             <button
@@ -1935,7 +1928,7 @@ export default function CompanyCreateForm() {
                                                                 className={`${styles.actionButton} ${styles['action-approve']}`}
                                                                 onClick={() => documentData && handleApprove(documentData.id)}
                                                             >
-                                                                배정
+                                                                {documentData?.progress_details === '대표실무자' ? '배정' : '승인'}
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -2232,17 +2225,22 @@ export default function CompanyCreateForm() {
             <ConfirmModal
                 isOpen={actionConfirmModalOpen}
                 type="warning"
-                message={
-                    actionConfirmType === 'start' ? '기업 진행을 시작하시겠습니까?' :
-                    actionConfirmType === 'stop' ? '기업 진행을 중지하시겠습니까?' :
-                    actionConfirmType === 'restart' ? '기업 진행을 재시작하시겠습니까?' :
-                    actionConfirmType === 'delete' ? '이 기업을 삭제하시겠습니까?' :
-                    actionConfirmType === 'approve' ? '기업을 승인하시겠습니까?' :
-                    actionConfirmType === 'reject' ? '기업을 반려하시겠습니까?' :
-                    actionConfirmType === 'revision' ? '기업 보완을 요청하시겠습니까?' :
-                    actionConfirmType === 'submit' ? '기업을 제출하시겠습니까?' :
-                    '기업을 초기화하시겠습니까?\n(대기 상태로 돌아갑니다)'
-                }
+                message={(() => {
+                    const adminData = getAdminData();
+                    const userLevel = adminData?.position?.level;
+                    const isManager = userLevel === 2;
+                    const isManagerAssigning = isManager && documentData?.progress_details === '대표실무자';
+
+                    if (actionConfirmType === 'start') return '기업 진행을 시작하시겠습니까?';
+                    if (actionConfirmType === 'stop') return '기업 진행을 중지하시겠습니까?';
+                    if (actionConfirmType === 'restart') return '기업 진행을 재시작하시겠습니까?';
+                    if (actionConfirmType === 'delete') return '이 기업을 삭제하시겠습니까?';
+                    if (actionConfirmType === 'approve') return isManagerAssigning ? '기업을 배정하시겠습니까?' : '기업을 승인하시겠습니까?';
+                    if (actionConfirmType === 'reject') return '기업을 반려하시겠습니까?';
+                    if (actionConfirmType === 'revision') return '기업 보완을 요청하시겠습니까?';
+                    if (actionConfirmType === 'submit') return '기업을 제출하시겠습니까?';
+                    return '기업을 초기화하시겠습니까?\n(대기 상태로 돌아갑니다)';
+                })()}
                 onConfirm={handleConfirmAction}
                 onCancel={() => setActionConfirmModalOpen(false)}
                 confirmButtonText="확인"

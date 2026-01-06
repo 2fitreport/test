@@ -1,0 +1,110 @@
+import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+// 뷰 페이지용 통합 API - 한 번의 호출로 모든 필요한 데이터 반환
+export async function GET(
+    request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { id } = await params;
+        const docId = parseInt(id);
+
+        // 인증 확인
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (!authToken) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+        }
+
+        let tokenData;
+        try {
+            const decodedToken = Buffer.from(authToken, 'base64').toString('utf-8');
+            tokenData = JSON.parse(decodedToken);
+        } catch {
+            return NextResponse.json({ error: '유효하지 않은 토큰입니다.' }, { status: 401 });
+        }
+
+        const userId = tokenData.user_id;
+
+        // 병렬로 모든 데이터 조회
+        const [
+            { data: currentUser },
+            { data: document },
+            { data: users }
+        ] = await Promise.all([
+            supabase.from('users').select('*, position(level)').eq('user_id', userId).single(),
+            supabase.from('documents').select('*').eq('id', docId).single(),
+            supabase.from('users').select('id, user_id, name, position_id, position(id, name, level), company_name, supervisor_id')
+        ]);
+
+        if (!currentUser) {
+            return NextResponse.json({ error: '사용자 정보를 찾을 수 없습니다.' }, { status: 404 });
+        }
+
+        if (!document) {
+            return NextResponse.json({ error: '문서를 찾을 수 없습니다.' }, { status: 404 });
+        }
+
+        const userLevel = currentUser.position?.level;
+        const userIdNumber = currentUser.id;
+
+        // 권한 확인
+        // 영업자(level=4)는 자신이 작성한 문서만
+        if (userLevel === 4 && userId !== document.user_id) {
+            return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+        }
+
+        // 검수자(level=6) 권한 확인
+        let inspectorAffiliations: string[] = [];
+        if (userLevel === 6) {
+            const { data: affiliationsData } = await supabase
+                .from('inspector_affiliations')
+                .select('affiliation_name')
+                .eq('inspector_id', userIdNumber);
+
+            inspectorAffiliations = affiliationsData?.map((a: any) => a.affiliation_name) || [];
+
+            // 문서 작성자의 소속 확인
+            const documentAuthor = users?.find((u: any) => u.user_id === document.user_id);
+            const authorCompanyName = documentAuthor?.company_name || '';
+
+            const isAffiliatedDocument = inspectorAffiliations.includes(authorCompanyName);
+            const isPastInspector = document.inspector_id === userId;
+
+            if (!isAffiliatedDocument && !isPastInspector) {
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
+        }
+
+        // 담당검수자 정보 조회
+        let supervisorInfo = null;
+        const documentOwner = users?.find((u: any) => u.user_id === document.user_id);
+        if (documentOwner?.supervisor_id) {
+            const supervisor = users?.find((u: any) => u.id === documentOwner.supervisor_id);
+            if (supervisor) {
+                supervisorInfo = { name: supervisor.name, user_id: supervisor.user_id };
+            }
+        }
+
+        return NextResponse.json({
+            document,
+            users: users || [],
+            currentUser: {
+                id: currentUser.id,
+                user_id: currentUser.user_id,
+                name: currentUser.name,
+                level: userLevel
+            },
+            supervisorInfo,
+            inspectorAffiliations
+        });
+    } catch (error) {
+        console.error('뷰 데이터 조회 실패:', error);
+        return NextResponse.json({ error: '데이터 조회 실패' }, { status: 500 });
+    }
+}
