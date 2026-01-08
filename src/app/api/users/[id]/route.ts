@@ -160,6 +160,44 @@ export async function DELETE(
     const { id } = await params;
     const userId = parseInt(id, 10);
 
+    // 사용자 정보 조회
+    const { data: userData } = await supabase
+      .from('users')
+      .select('user_id')
+      .eq('id', userId)
+      .single();
+
+    if (!userData) {
+      return NextResponse.json(
+        { message: '사용자를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 해당 사용자가 작성한 문서 삭제
+    await supabase
+      .from('documents')
+      .delete()
+      .eq('user_id', userData.user_id);
+
+    // 해당 사용자가 담당자로 배정된 문서의 manager_id를 null로 변경
+    await supabase
+      .from('documents')
+      .update({ manager_id: null })
+      .eq('manager_id', userData.user_id);
+
+    // 해당 사용자가 검수자로 배정된 문서의 inspector_id를 null로 변경
+    await supabase
+      .from('documents')
+      .update({ inspector_id: null })
+      .eq('inspector_id', userData.user_id);
+
+    // 검수자 소속 정보 삭제
+    await supabase
+      .from('inspector_affiliations')
+      .delete()
+      .eq('inspector_id', userId);
+
     const { data, error } = await supabase
       .from('users')
       .delete()
@@ -172,10 +210,10 @@ export async function DELETE(
       { message: '사용자가 삭제되었습니다', data },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('사용자 삭제 실패:', error);
     return NextResponse.json(
-      { message: '사용자 삭제 실패' },
+      { message: error?.message || '사용자 삭제 실패' },
       { status: 500 }
     );
   }

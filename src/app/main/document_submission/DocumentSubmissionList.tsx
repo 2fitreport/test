@@ -279,10 +279,12 @@ export default function DocumentSubmissionList() {
 
             let updatedDoc: Document;
             let message = '';
+            const adminData = getAdminData();
+            const currentUserId = adminData?.user_id;
 
             if (doc.progress_details === '검수자') {
-                // 검수자 → 대표실무자로 변경
-                updatedDoc = { ...doc, progress_details: '대표실무자' };
+                // 검수자 → 대표실무자로 변경 (inspector_id는 기존 값 유지, 없을 때만 현재 사용자 저장)
+                updatedDoc = { ...doc, progress_details: '대표실무자', inspector_id: doc.inspector_id || currentUserId };
                 message = '대표실무자로 진행합니다.';
             } else if (doc.progress_details === '대표실무자') {
                 // 대표실무자 → 실무자로 변경
@@ -651,14 +653,7 @@ export default function DocumentSubmissionList() {
         const userId = adminData?.user_id;
 
         const filtered = documents.filter(doc => {
-            // 영업자(level=4)는 자신이 올린 문서만 보기
-            if (userLevel === 4 && doc.user_id !== userId) {
-                return false;
-            }
-            // 검수자는 자신의 담당 영업자 문서('검수자' 진행상태) + 자신이 승인한 문서(inspector_id) 모두 볼 수 있어야함
-            if (userLevel === 6 && doc.progress_details !== '검수자' && doc.inspector_id !== userId) {
-                return false;
-            }
+            // API에서 이미 역할별 필터링을 완료했으므로, 여기서는 상태 필터와 검색만 적용
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
                 return false;
             }

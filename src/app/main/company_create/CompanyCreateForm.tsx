@@ -81,6 +81,7 @@ export default function CompanyCreateForm() {
     const [downloadError, setDownloadError] = useState('');
     const [error, setError] = useState('');
     const [errorModalOpen, setErrorModalOpen] = useState(false);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -115,6 +116,7 @@ export default function CompanyCreateForm() {
     const [isResizing, setIsResizing] = useState(false);
     const [imageRotation, setImageRotation] = useState(0);
     const [cretopUploading, setCretopUploading] = useState(false);
+    const [cretopDragOver, setCretopDragOver] = useState(false);
     const cretopInputRef = useRef<HTMLInputElement>(null);
 
     // 모바일 감지
@@ -168,8 +170,8 @@ export default function CompanyCreateForm() {
             if (!response.ok) {
                 const errorData = await response.json();
                 if (response.status === 403) {
-                    setError('접근 권한이 없습니다.');
-                    setErrorModalOpen(true);
+                    setIsLoading(false);
+                    setAccessDenied(true);
                     return;
                 }
                 throw new Error(errorData.error || '문서 조회 실패');
@@ -810,6 +812,91 @@ export default function CompanyCreateForm() {
         }
     };
 
+    // 크레탑 드래그 앤 드롭 핸들러
+    const handleCretopDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCretopDragOver(true);
+    };
+
+    const handleCretopDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCretopDragOver(false);
+    };
+
+    const handleCretopDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setCretopDragOver(false);
+
+        if (!documentData || cretopUploading) return;
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            // 파일 타입 확인
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+            if (!allowedTypes.includes(file.type)) {
+                setError('PDF, JPG, PNG, GIF 파일만 업로드 가능합니다.');
+                setErrorModalOpen(true);
+                return;
+            }
+
+            setCretopUploading(true);
+
+            try {
+                const fileName = `cretop_${documentData.id}_${Date.now()}_${file.name}`;
+                const filePath = `cretop/${fileName}`;
+
+                const signedUrlResponse = await fetch('/api/upload/signed-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: filePath, contentType: file.type }),
+                });
+
+                if (!signedUrlResponse.ok) {
+                    const errorData = await signedUrlResponse.json();
+                    throw new Error(errorData.error || 'Signed URL 생성 실패');
+                }
+
+                const { signedUrl, fullPath } = await signedUrlResponse.json();
+
+                const uploadResponse = await fetch(signedUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type },
+                    body: file,
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error('파일 업로드 실패');
+                }
+
+                const cretopFile = {
+                    name: file.name,
+                    path: filePath,
+                    url: fullPath
+                };
+
+                const updated = {
+                    ...documentData,
+                    cretop_file: cretopFile,
+                    cretop_none: false
+                };
+
+                await saveDocumentToDatabase(updated);
+                setDocumentData(updated);
+                setSuccessMessage('크레탑 파일이 업로드되었습니다.');
+            } catch (err: any) {
+                console.error('크레탑 파일 업로드 실패:', err);
+                setError(err.message || '크레탑 파일 업로드에 실패했습니다.');
+                setErrorModalOpen(true);
+            } finally {
+                setCretopUploading(false);
+            }
+        }
+    };
+
     // 기업정보없음 설정
     const handleCretopNone = async () => {
         if (!documentData) return;
@@ -1330,6 +1417,29 @@ export default function CompanyCreateForm() {
 
     const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자' : '법인사업자';
 
+    // 잘못된 접근 모달
+    if (accessDenied) {
+        return (
+            <>
+                <div className={styles.formContainer}>
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                        접근 권한 확인 중...
+                    </div>
+                </div>
+                <Modal
+                    isOpen={true}
+                    message="잘못된 접근입니다."
+                    type="error"
+                    onClose={() => {
+                        router.push('/main/document_submission');
+                    }}
+                    confirmText="확인"
+                    showConfirmButton={false}
+                />
+            </>
+        );
+    }
+
     // 뷰페이지 로딩 중이면 로딩 메시지 표시
     if (isViewMode && isLoading) {
         return (
@@ -1730,49 +1840,74 @@ export default function CompanyCreateForm() {
                                         </>
                                     )}
                                     {!documentData?.cretop_file && !documentData?.cretop_none && (
-                                        <>
-                                            <input
-                                                type="file"
-                                                ref={cretopInputRef}
-                                                onChange={handleCretopUpload}
-                                                style={{ display: 'none' }}
-                                                accept=".pdf,.jpg,.jpeg,.png,.gif"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => cretopInputRef.current?.click()}
-                                                disabled={cretopUploading}
-                                                style={{
-                                                    padding: '12px 24px',
-                                                    fontSize: '15px',
-                                                    backgroundColor: '#2196f3',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '8px',
-                                                    cursor: cretopUploading ? 'not-allowed' : 'pointer',
-                                                    opacity: cretopUploading ? 0.6 : 1,
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                {cretopUploading ? '업로드 중...' : '파일 업로드'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={handleCretopNone}
-                                                style={{
-                                                    padding: '12px 24px',
-                                                    fontSize: '15px',
-                                                    backgroundColor: '#78909c',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '8px',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                기업정보없음
-                                            </button>
-                                        </>
+                                        <div
+                                            onDragOver={handleCretopDragOver}
+                                            onDragLeave={handleCretopDragLeave}
+                                            onDrop={handleCretopDrop}
+                                            style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                gap: '12px',
+                                                padding: '24px',
+                                                border: cretopDragOver ? '2px dashed #2196f3' : '2px dashed #dee2e6',
+                                                borderRadius: '8px',
+                                                backgroundColor: cretopDragOver ? '#e3f2fd' : '#f8f9fa',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            <p style={{
+                                                margin: 0,
+                                                color: '#666',
+                                                fontSize: '14px',
+                                                textAlign: 'center'
+                                            }}>
+                                                {cretopDragOver ? '파일을 놓아주세요' : '파일을 드래그하거나 버튼을 클릭하세요'}
+                                            </p>
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <input
+                                                    type="file"
+                                                    ref={cretopInputRef}
+                                                    onChange={handleCretopUpload}
+                                                    style={{ display: 'none' }}
+                                                    accept=".pdf,.jpg,.jpeg,.png,.gif"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => cretopInputRef.current?.click()}
+                                                    disabled={cretopUploading}
+                                                    style={{
+                                                        padding: '12px 24px',
+                                                        fontSize: '15px',
+                                                        backgroundColor: '#2196f3',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        cursor: cretopUploading ? 'not-allowed' : 'pointer',
+                                                        opacity: cretopUploading ? 0.6 : 1,
+                                                        fontWeight: '600'
+                                                    }}
+                                                >
+                                                    {cretopUploading ? '업로드 중...' : '파일 업로드'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCretopNone}
+                                                    style={{
+                                                        padding: '12px 24px',
+                                                        fontSize: '15px',
+                                                        backgroundColor: '#78909c',
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '8px',
+                                                        cursor: 'pointer',
+                                                        fontWeight: '600'
+                                                    }}
+                                                >
+                                                    기업정보없음
+                                                </button>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             )}
@@ -2078,13 +2213,20 @@ export default function CompanyCreateForm() {
                 type="error"
                 onClose={() => {
                     setErrorModalOpen(false);
-                    // 권한 거부 에러인 경우 문서 목록으로 이동
-                    if (error === '접근 권한이 없습니다.') {
+                    // 잘못된 접근인 경우 문서 목록으로 이동
+                    if (error === '잘못된 접근입니다.') {
+                        router.push('/main/document_submission');
+                    }
+                }}
+                onConfirm={() => {
+                    setErrorModalOpen(false);
+                    // 잘못된 접근인 경우 문서 목록으로 이동
+                    if (error === '잘못된 접근입니다.') {
                         router.push('/main/document_submission');
                     }
                 }}
                 confirmText="확인"
-                showConfirmButton={false}
+                showConfirmButton={true}
             />
 
             {/* 확인 모달 - 폼 등록/저장 시에만 표시 */}

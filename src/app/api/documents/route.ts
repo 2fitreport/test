@@ -88,9 +88,9 @@ export async function GET(request: NextRequest) {
 
                 if (!usersError && usersData) {
                     const assignedUserIds = usersData.map((u: any) => u.user_id);
-                    // 담당 소속의 영업자가 올린 문서 중 진행상태가 '검수자'인 문서 OR 과거에 승인했던 문서 (하지만 '영업자' 상태로 돌아간 것은 제외)
+                    // 담당 소속의 영업자가 올린 문서 (영업자 상태 제외) OR 과거에 승인했던 문서 (영업자 상태 제외)
                     filteredDocuments = data.filter((doc: any) =>
-                        (assignedUserIds.includes(doc.user_id) && doc.progress_details === '검수자') ||
+                        (assignedUserIds.includes(doc.user_id) && doc.progress_details !== '영업자') ||
                         (doc.inspector_id === userId && doc.progress_details !== '영업자')
                     );
                 }
