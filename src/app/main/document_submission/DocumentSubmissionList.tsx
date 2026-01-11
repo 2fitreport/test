@@ -33,6 +33,7 @@ interface Document {
     stopped_time?: string;
     reason?: string;
     reason_read: boolean;
+    created_at?: string;
 }
 
 interface Worker {
@@ -60,7 +61,7 @@ export default function DocumentSubmissionList() {
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [confirmMessage, setConfirmMessage] = useState('');
-    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset' } | null>(null);
+    const [pendingAction, setPendingAction] = useState<{ id: number; action: 'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset'; reason?: string } | null>(null);
     const [reasonModalOpen, setReasonModalOpen] = useState(false);
     const [selectedReason, setSelectedReason] = useState<{ id: number; reason: string; status?: string } | null>(null);
     const [selectedDocuments, setSelectedDocuments] = useState<Set<number>>(new Set());

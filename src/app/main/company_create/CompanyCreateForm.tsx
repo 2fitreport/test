@@ -49,6 +49,7 @@ interface Document {
     memos?: DocumentMemo[];
     cretop_file?: { name: string; path: string; url: string } | null;
     cretop_none?: boolean;
+    created_at?: string;
 }
 
 interface Worker {
