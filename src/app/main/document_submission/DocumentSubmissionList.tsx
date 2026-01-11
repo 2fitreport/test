@@ -43,14 +43,14 @@ interface Worker {
     company_name?: string;
 }
 
-type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date';
+type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export default function DocumentSubmissionList() {
     const router = useRouter();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
-    const [sortColumn, setSortColumn] = useState<SortColumn>('submitted_date');
+    const [sortColumn, setSortColumn] = useState<SortColumn>('created_at');
     const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -327,7 +327,8 @@ export default function DocumentSubmissionList() {
                 });
 
                 // 기존 사유가 있으면 새로운 사유 추가, 없으면 새로 생성
-                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const reasonText = (pendingAction as any)?.reason || reasonInput || '사유 없음';
+                const newReason = `[${timeStr}] [반려] ${reasonText}`;
                 const combinedReason = doc.reason ? `${doc.reason}\n${newReason}` : newReason;
 
                 const rejectedDoc = {
@@ -367,7 +368,8 @@ export default function DocumentSubmissionList() {
                 });
 
                 // 기존 사유가 있으면 새로운 사유 추가, 없으면 새로 생성
-                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const reasonText = (pendingAction as any)?.reason || reasonInput || '사유 없음';
+                const newReason = `[${timeStr}] [보완] ${reasonText}`;
                 const combinedReason = doc.reason ? `${doc.reason}\n${newReason}` : newReason;
 
                 const revisionDoc = {
@@ -590,6 +592,13 @@ export default function DocumentSubmissionList() {
 
             // API에서 이미 역할별 필터링을 완료했으므로, 클라이언트 사이드 필터링 불필요
             // (API에서: Level 4는 자신의 문서만, Level 6은 담당 영업자 + 과거 승인한 문서, Level 1/2는 모든 문서)
+
+            // 최근에 등록된 것이 맨 위에 오도록 created_at 기준 내림차순 정렬
+            data.sort((a: Document, b: Document) => {
+                const dateA = new Date(a.created_at || 0).getTime();
+                const dateB = new Date(b.created_at || 0).getTime();
+                return dateB - dateA; // 내림차순
+            });
 
             setDocuments(data);
         } catch (error) {
@@ -1322,8 +1331,12 @@ export default function DocumentSubmissionList() {
                                 <button
                                     className={styles.reasonConfirmButton}
                                     onClick={() => {
-                                        if (pendingReasonAction) {
-                                            setPendingAction({ id: pendingReasonAction.id, action: pendingReasonAction.action });
+                                        if (pendingReasonAction && reasonInput.trim()) {
+                                            setPendingAction({
+                                                id: pendingReasonAction.id,
+                                                action: pendingReasonAction.action,
+                                                reason: reasonInput
+                                            });
                                             setConfirmMessage(
                                                 pendingReasonAction.action === 'reject'
                                                     ? '기업을 반려하시겠습니까?'
@@ -1331,7 +1344,6 @@ export default function DocumentSubmissionList() {
                                             );
                                             setConfirmModalOpen(true);
                                             setReasonInputModalOpen(false);
-                                            setPendingReasonAction(null);
                                         }
                                     }}
                                 >
@@ -1370,10 +1382,10 @@ export default function DocumentSubmissionList() {
                                         <div>
                                             {(() => {
                                                 const revisionItems = selectedReason.reason.split('\n').filter((line: string) => {
-                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*)/);
                                                     if (timeMatch) {
-                                                        const message = timeMatch[2];
-                                                        return message.includes('보완');
+                                                        const actionType = timeMatch[2];
+                                                        return actionType === '보완';
                                                     }
                                                     return false;
                                                 });
@@ -1383,10 +1395,10 @@ export default function DocumentSubmissionList() {
                                                 }
 
                                                 return revisionItems.reverse().map((line: string, index: number) => {
-                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*)/);
                                                     if (timeMatch) {
                                                         const time = timeMatch[1];
-                                                        const message = timeMatch[2];
+                                                        const message = timeMatch[3];
                                                         return (
                                                             <div key={index} style={{ marginBottom: '12px', paddingLeft: '12px', borderLeft: '3px solid #ff9800' }}>
                                                                 <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>
@@ -1412,10 +1424,10 @@ export default function DocumentSubmissionList() {
                                         <div>
                                             {(() => {
                                                 const rejectionItems = selectedReason.reason.split('\n').filter((line: string) => {
-                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*)/);
                                                     if (timeMatch) {
-                                                        const message = timeMatch[2];
-                                                        return message.includes('반려');
+                                                        const actionType = timeMatch[2];
+                                                        return actionType === '반려';
                                                     }
                                                     return false;
                                                 });
@@ -1425,10 +1437,10 @@ export default function DocumentSubmissionList() {
                                                 }
 
                                                 return rejectionItems.reverse().map((line: string, index: number) => {
-                                                    const timeMatch = line.match(/^\[(.*?)\]\s*(.*)/);
+                                                    const timeMatch = line.match(/^\[(.*?)\]\s*\[(.*?)\]\s*(.*)/);
                                                     if (timeMatch) {
                                                         const time = timeMatch[1];
-                                                        const message = timeMatch[2];
+                                                        const message = timeMatch[3];
                                                         return (
                                                             <div key={index} style={{ marginBottom: '12px', paddingLeft: '12px', borderLeft: '3px solid #dc3545' }}>
                                                                 <p style={{ margin: '0 0 4px 0', color: '#666', fontSize: '13px' }}>

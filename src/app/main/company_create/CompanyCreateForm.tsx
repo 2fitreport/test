@@ -117,6 +117,7 @@ export default function CompanyCreateForm() {
     const [imageRotation, setImageRotation] = useState(0);
     const [cretopUploading, setCretopUploading] = useState(false);
     const [cretopDragOver, setCretopDragOver] = useState(false);
+    const [selectedCretopFile, setSelectedCretopFile] = useState<File | null>(null);
     const cretopInputRef = useRef<HTMLInputElement>(null);
 
     // 모바일 감지
@@ -294,7 +295,23 @@ export default function CompanyCreateForm() {
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setSelectedFiles(Array.from(e.target.files));
+            const files = Array.from(e.target.files);
+            const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'hwp', 'jpg', 'jpeg', 'png', 'zip'];
+
+            // 지원되지 않는 파일 검사
+            const unsupportedFiles = files.filter(file => {
+                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+                return !allowedExtensions.includes(fileExt);
+            });
+
+            if (unsupportedFiles.length > 0) {
+                setError(`지원되지 않는 파일: ${unsupportedFiles.map(f => f.name).join(', ')}\n\n지원되는 형식: PDF, DOC, DOCX, XLS, XLSX, HWP, JPG, JPEG, PNG, ZIP`);
+                setErrorModalOpen(true);
+                e.target.value = ''; // 파일 입력 초기화
+                return;
+            }
+
+            setSelectedFiles(files);
         }
     };
 
@@ -313,7 +330,22 @@ export default function CompanyCreateForm() {
         e.stopPropagation();
 
         if (e.dataTransfer.files) {
-            setSelectedFiles(Array.from(e.dataTransfer.files));
+            const files = Array.from(e.dataTransfer.files);
+            const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'hwp', 'jpg', 'jpeg', 'png', 'zip'];
+
+            // 지원되지 않는 파일 검사
+            const unsupportedFiles = files.filter(file => {
+                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+                return !allowedExtensions.includes(fileExt);
+            });
+
+            if (unsupportedFiles.length > 0) {
+                setError(`지원되지 않는 파일: ${unsupportedFiles.map(f => f.name).join(', ')}\n\n지원되는 형식: PDF, DOC, DOCX, XLS, XLSX, HWP, JPG, JPEG, PNG, ZIP`);
+                setErrorModalOpen(true);
+                return;
+            }
+
+            setSelectedFiles(files);
         }
     };
 
@@ -335,6 +367,39 @@ export default function CompanyCreateForm() {
         } catch (err) {
             console.error('파일 삭제 중 오류:', err);
             setError('파일 삭제 중 오류가 발생했습니다.');
+            setErrorModalOpen(true);
+        }
+    };
+
+    const handleRemoveCretopFile = () => {
+        setSelectedCretopFile(null);
+        if (cretopInputRef.current) {
+            cretopInputRef.current.value = '';
+        }
+    };
+
+    const handleRemoveExistingCretop = async () => {
+        if (!documentData?.cretop_file) return;
+
+        try {
+            // 스토리지에서 파일 삭제
+            await fetch(`/api/upload?path=${encodeURIComponent(documentData.cretop_file.path)}`, {
+                method: 'DELETE',
+            });
+
+            // 데이터베이스 업데이트
+            const updated = {
+                ...documentData,
+                cretop_file: null,
+                cretop_none: false
+            };
+
+            await saveDocumentToDatabase(updated);
+            setDocumentData(updated);
+            setSuccessMessage('크레탑 파일이 삭제되었습니다.');
+        } catch (err) {
+            console.error('크레탑 파일 삭제 중 오류:', err);
+            setError('크레탑 파일 삭제 중 오류가 발생했습니다.');
             setErrorModalOpen(true);
         }
     };
@@ -474,26 +539,15 @@ export default function CompanyCreateForm() {
             return false;
         }
 
-        // 파일 검증 (보기 모드에서는 스킵)
-        // 생성 모드: 새 파일 필수
-        // 수정 모드: 기존 파일 또는 새 파일 중 최소 1개 필수
+        // 파일 검증 (생성 모드에서만)
+        // 생성 모드: 새 파일 필수 (1개 이상)
         if (!isViewMode && !isEditMode && selectedFiles.length === 0) {
-            setErrorMessage('파일을 최소 1개 이상 업로드해주세요.');
+            setError('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
         }
 
-        if (!isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
-            setErrorMessage('파일을 최소 1개 이상 업로드해주세요.');
-            setErrorModalOpen(true);
-            return false;
-        }
-
-        if (isViewMode && isEditMode && existingFiles.length === 0 && selectedFiles.length === 0) {
-            setErrorMessage('파일을 최소 1개 이상 보유해야 합니다.');
-            setErrorModalOpen(true);
-            return false;
-        }
+        // 수정 모드는 handleConfirmSubmit에서 검증
 
         return true;
     };
@@ -521,12 +575,35 @@ export default function CompanyCreateForm() {
                 return;
             }
 
+            // 수정 모드: 파일 및 크레탑 검증
+            if (isViewMode && isEditMode) {
+                // 파일 검증: 1개 이상 필수
+                const totalFiles = existingFiles.length + selectedFiles.length;
+                if (totalFiles === 0) {
+                    setError('파일을 최소 1개 이상 보유해야 합니다.');
+                    setErrorModalOpen(true);
+                    setLoading(false);
+                    return;
+                }
+
+                // 크레탑 검증: 파일 또는 기업정보없음 중 하나 필수
+                const hasCretopFile = documentData?.cretop_file || selectedCretopFile;
+                const hasCretopNone = documentData?.cretop_none;
+                if (!hasCretopFile && !hasCretopNone) {
+                    setError('크레탑 파일을 업로드하거나 기업정보없음을 선택해야 합니다.');
+                    setErrorModalOpen(true);
+                    setLoading(false);
+                    return;
+                }
+            }
+
             let uploadedFiles: Array<{ name: string; path: string; size: number }> = [];
 
             // 새로운 파일 업로드 (Signed URL 사용 - 대용량 파일 지원)
             if (selectedFiles.length > 0) {
                 for (const file of selectedFiles) {
                     try {
+                        console.log(`파일 업로드 시작: ${file.name}, 크기: ${file.size} bytes, 타입: ${file.type}`);
 
                         const fileExt = file.name.split('.').pop();
                         const timestamp = Date.now();
@@ -538,28 +615,62 @@ export default function CompanyCreateForm() {
                         const filePath = `companies/${businessTypeFolder}/${fileName}`;
 
                         // 1. Signed URL 요청
+                        console.log(`Signed URL 요청 중: ${filePath}`);
                         const signedUrlResponse = await fetch('/api/upload/signed-url', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ path: filePath, contentType: file.type }),
+                            body: JSON.stringify({ path: filePath, contentType: file.type || 'application/octet-stream' }),
                         });
 
                         if (!signedUrlResponse.ok) {
-                            const errorData = await signedUrlResponse.json();
-                            throw new Error(errorData.error || `Signed URL 생성 실패: ${file.name}`);
+                            const errorData = await signedUrlResponse.json().catch(() => ({}));
+                            console.error('Signed URL 생성 실패:', errorData);
+                            throw new Error(errorData.error || `Signed URL 생성 실패: ${file.name} (${signedUrlResponse.status})`);
                         }
 
-                        const { signedUrl } = await signedUrlResponse.json();
+                        const signedUrlData = await signedUrlResponse.json();
+                        const { signedUrl } = signedUrlData;
+                        console.log(`Signed URL 생성 완료: ${file.name}`);
 
-                        // 2. Signed URL로 직접 파일 업로드 (Vercel 함수 우회)
-                        const uploadResponse = await fetch(signedUrl, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': file.type },
-                            body: file,
-                        });
+                        // 2. 재시도 로직과 함께 파일 업로드
+                        let uploadSuccess = false;
+                        let lastError: Error | null = null;
+                        const maxRetries = 3;
+                        const retryDelay = 1000; // 1초
 
-                        if (!uploadResponse.ok) {
-                            throw new Error(`파일 업로드 실패: ${file.name}`);
+                        for (let attempt = 0; attempt < maxRetries; attempt++) {
+                            try {
+                                console.log(`파일 업로드 시도 ${attempt + 1}/${maxRetries}: ${file.name}`);
+                                const uploadResponse = await fetch(signedUrl, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+                                    body: file,
+                                    signal: AbortSignal.timeout(120000), // 120초 타임아웃
+                                });
+
+                                if (!uploadResponse.ok) {
+                                    const responseText = await uploadResponse.text().catch(() => '');
+                                    console.error(`업로드 실패 (${uploadResponse.status}): ${responseText}`);
+                                    throw new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}${responseText ? ' - ' + responseText : ''}`);
+                                }
+
+                                console.log(`✓ 파일 업로드 성공: ${file.name}`);
+                                uploadSuccess = true;
+                                break;
+                            } catch (err) {
+                                lastError = err instanceof Error ? err : new Error(String(err));
+                                console.warn(`파일 업로드 실패: ${lastError.message}`);
+                                if (attempt < maxRetries - 1) {
+                                    console.log(`재시도 ${attempt + 1}/${maxRetries - 1}: 1초 대기 후 재시도`);
+                                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                                }
+                            }
+                        }
+
+                        if (!uploadSuccess) {
+                            const errorMsg = `파일 업로드 실패 (${maxRetries}회 시도): ${file.name} - ${lastError?.message}`;
+                            console.error(errorMsg);
+                            throw new Error(errorMsg);
                         }
 
                         uploadedFiles.push({
@@ -568,8 +679,88 @@ export default function CompanyCreateForm() {
                             size: file.size,
                         });
                     } catch (err) {
-                        throw new Error(`파일 업로드 중 오류 발생: ${err instanceof Error ? err.message : '알 수 없는 오류'}`);
+                        const errorMsg = err instanceof Error ? err.message : '알 수 없는 오류';
+                        console.error(`파일 업로드 중 오류: ${errorMsg}`);
+                        throw new Error(`파일 업로드 중 오류 발생: ${errorMsg}`);
                     }
+                }
+            }
+
+            // 크레탑 파일 업로드는 수정 모드일 때만 여기서 처리
+            // 생성 모드일 때는 문서 생성 후에 처리
+            let cretopFileData: { name: string; path: string; url: string; size: number } | null = null;
+            if (selectedCretopFile && isViewMode && isEditMode) {
+                try {
+                    console.log(`크레탑 파일 업로드 시작: ${selectedCretopFile.name}, 크기: ${selectedCretopFile.size} bytes`);
+
+                    const fileExt = selectedCretopFile.name.split('.').pop() || 'bin';
+                    const fileName = `cretop_${viewId}_${Date.now()}.${fileExt}`;
+                    const filePath = `cretop/${fileName}`;
+
+                    // 1. Signed URL 요청
+                    console.log(`Signed URL 요청 중: ${filePath}`);
+                    const signedUrlResponse = await fetch('/api/upload/signed-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ path: filePath, contentType: selectedCretopFile.type || 'application/octet-stream' }),
+                    });
+
+                    if (!signedUrlResponse.ok) {
+                        const errorData = await signedUrlResponse.json().catch(() => ({}));
+                        throw new Error(errorData.error || `Signed URL 생성 실패: ${selectedCretopFile.name}`);
+                    }
+
+                    const signedUrlData = await signedUrlResponse.json();
+                    const { signedUrl, fullPath } = signedUrlData;
+                    console.log(`Signed URL 생성 완료: ${selectedCretopFile.name}`);
+
+                    // 2. 재시도 로직과 함께 파일 업로드
+                    let uploadSuccess = false;
+                    let lastError: Error | null = null;
+                    const maxRetries = 3;
+                    const retryDelay = 1000; // 1초
+
+                    for (let attempt = 0; attempt < maxRetries; attempt++) {
+                        try {
+                            console.log(`크레탑 파일 업로드 시도 ${attempt + 1}/${maxRetries}: ${selectedCretopFile.name}`);
+                            const uploadResponse = await fetch(signedUrl, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': selectedCretopFile.type || 'application/octet-stream' },
+                                body: selectedCretopFile,
+                                signal: AbortSignal.timeout(120000), // 120초 타임아웃
+                            });
+
+                            if (!uploadResponse.ok) {
+                                throw new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}`);
+                            }
+
+                            console.log(`✓ 크레탑 파일 업로드 성공: ${selectedCretopFile.name}`);
+                            uploadSuccess = true;
+                            break;
+                        } catch (err) {
+                            lastError = err instanceof Error ? err : new Error(String(err));
+                            console.warn(`크레탑 파일 업로드 실패: ${lastError.message}`);
+                            if (attempt < maxRetries - 1) {
+                                console.log(`재시도 ${attempt + 1}/${maxRetries - 1}: 1초 대기 후 재시도`);
+                                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                            }
+                        }
+                    }
+
+                    if (!uploadSuccess) {
+                        throw new Error(`크레탑 파일 업로드 실패 (${maxRetries}회 시도): ${selectedCretopFile.name}`);
+                    }
+
+                    cretopFileData = {
+                        name: selectedCretopFile.name,
+                        path: filePath,
+                        url: fullPath,
+                        size: selectedCretopFile.size
+                    };
+                } catch (err) {
+                    const errorMsg = err instanceof Error ? err.message : '알 수 없는 오류';
+                    console.error(`크레탑 파일 업로드 중 오류: ${errorMsg}`);
+                    throw new Error(`크레탑 파일 업로드 중 오류 발생: ${errorMsg}`);
                 }
             }
 
@@ -590,10 +781,15 @@ export default function CompanyCreateForm() {
 
             if (isViewMode && isEditMode) {
                 // 수정 모드: PUT 요청 (보기 모드에서 수정)
-                const editBody = {
+                const editBody: any = {
                     ...requestBody,
                     files: uploadedFiles,
                 };
+
+                // 크레탑 파일 추가 (있으면)
+                if (cretopFileData) {
+                    editBody.cretop_file = cretopFileData;
+                }
 
                 const response = await fetch(`/api/documents/${viewId}`, {
                     method: 'PUT',
@@ -627,7 +823,7 @@ export default function CompanyCreateForm() {
                     });
                 }
 
-                const createBody = {
+                const createBody: any = {
                     ...requestBody,
                     user_id: adminData.user_id,
                     user_name: adminData.name || adminData.user_id,
@@ -641,6 +837,11 @@ export default function CompanyCreateForm() {
                     files: uploadedFiles,
                     memos: initialMemos,
                 };
+
+                // 크레탑 파일 추가 (있으면)
+                if (cretopFileData) {
+                    createBody.cretop_file = cretopFileData;
+                }
 
                 const response = await fetch('/api/documents', {
                     method: 'POST',
@@ -667,6 +868,12 @@ export default function CompanyCreateForm() {
 
             setLoading(false);
             setSuccessModalOpen(true);
+            
+            // 크레탑 파일 선택 상태 초기화
+            setSelectedCretopFile(null);
+            if (cretopInputRef.current) {
+                cretopInputRef.current.value = '';
+            }
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.';
             setError(errorMessage);
@@ -749,63 +956,35 @@ export default function CompanyCreateForm() {
         });
     };
 
-    // 크레탑 파일 업로드 (Signed URL 사용 - 대용량 파일 지원)
+    // 크레탑 파일 선택
     const handleCretopUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files || !e.target.files[0] || !documentData) return;
+        if (!e.target.files || !e.target.files[0]) return;
 
         const file = e.target.files[0];
-        setCretopUploading(true);
 
         try {
-            const fileName = `cretop_${documentData.id}_${Date.now()}_${file.name}`;
-            const filePath = `cretop/${fileName}`;
+            // 파일 타입 검증
+            const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'zip'];
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
 
-            // 1. Signed URL 요청
-            const signedUrlResponse = await fetch('/api/upload/signed-url', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: filePath, contentType: file.type }),
-            });
+            const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
-            if (!signedUrlResponse.ok) {
-                const errorData = await signedUrlResponse.json();
-                throw new Error(errorData.error || 'Signed URL 생성 실패');
+            if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+                throw new Error('지원하지 않는 파일 형식입니다. (PDF, JPG, PNG, GIF, ZIP만 가능)');
             }
 
-            const { signedUrl, fullPath } = await signedUrlResponse.json();
-
-            // 2. Signed URL로 직접 파일 업로드 (Vercel 함수 우회)
-            const uploadResponse = await fetch(signedUrl, {
-                method: 'PUT',
-                headers: { 'Content-Type': file.type },
-                body: file,
-            });
-
-            if (!uploadResponse.ok) {
-                throw new Error('파일 업로드 실패');
+            // 파일 크기 검증 (5GB 제한)
+            const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+            if (file.size > maxSize) {
+                throw new Error(`파일 크기가 너무 큽니다. (최대 5GB, 현재 ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB)`);
             }
 
-            const cretopFile = {
-                name: file.name,
-                path: filePath,
-                url: fullPath
-            };
-
-            const updated = {
-                ...documentData,
-                cretop_file: cretopFile,
-                cretop_none: false
-            };
-
-            await saveDocumentToDatabase(updated);
-            setDocumentData(updated);
-            setSuccessMessage('크레탑 파일이 업로드되었습니다.');
+            // 선택된 파일 상태에 저장
+            setSelectedCretopFile(file);
+            setSuccessMessage('크레탑 파일이 선택되었습니다.');
         } catch (err: any) {
-            console.error('크레탑 파일 업로드 실패:', err);
-            setError(err.message || '크레탑 파일 업로드에 실패했습니다.');
+            setError(err.message || '파일 선택 중 오류가 발생했습니다.');
             setErrorModalOpen(true);
-        } finally {
-            setCretopUploading(false);
             if (cretopInputRef.current) {
                 cretopInputRef.current.value = '';
             }
@@ -825,74 +1004,38 @@ export default function CompanyCreateForm() {
         setCretopDragOver(false);
     };
 
-    const handleCretopDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    const handleCretopDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         e.stopPropagation();
         setCretopDragOver(false);
 
-        if (!documentData || cretopUploading) return;
-
         const files = e.dataTransfer.files;
         if (files && files.length > 0) {
             const file = files[0];
-            // 파일 타입 확인
-            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(file.type)) {
-                setError('PDF, JPG, PNG, GIF 파일만 업로드 가능합니다.');
-                setErrorModalOpen(true);
-                return;
-            }
-
-            setCretopUploading(true);
 
             try {
-                const fileName = `cretop_${documentData.id}_${Date.now()}_${file.name}`;
-                const filePath = `cretop/${fileName}`;
+                // 파일 타입 검증
+                const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'zip'];
+                const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'application/zip', 'application/x-zip-compressed', 'application/octet-stream'];
 
-                const signedUrlResponse = await fetch('/api/upload/signed-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: filePath, contentType: file.type }),
-                });
+                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
-                if (!signedUrlResponse.ok) {
-                    const errorData = await signedUrlResponse.json();
-                    throw new Error(errorData.error || 'Signed URL 생성 실패');
+                if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+                    throw new Error('지원하지 않는 파일 형식입니다. (PDF, JPG, PNG, GIF, ZIP만 가능)');
                 }
 
-                const { signedUrl, fullPath } = await signedUrlResponse.json();
-
-                const uploadResponse = await fetch(signedUrl, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': file.type },
-                    body: file,
-                });
-
-                if (!uploadResponse.ok) {
-                    throw new Error('파일 업로드 실패');
+                // 파일 크기 검증 (5GB 제한)
+                const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+                if (file.size > maxSize) {
+                    throw new Error(`파일 크기가 너무 큽니다. (최대 5GB, 현재 ${(file.size / 1024 / 1024 / 1024).toFixed(2)}GB)`);
                 }
 
-                const cretopFile = {
-                    name: file.name,
-                    path: filePath,
-                    url: fullPath
-                };
-
-                const updated = {
-                    ...documentData,
-                    cretop_file: cretopFile,
-                    cretop_none: false
-                };
-
-                await saveDocumentToDatabase(updated);
-                setDocumentData(updated);
-                setSuccessMessage('크레탑 파일이 업로드되었습니다.');
+                // 선택된 파일 상태에 저장
+                setSelectedCretopFile(file);
+                setSuccessMessage('크레탑 파일이 선택되었습니다.');
             } catch (err: any) {
-                console.error('크레탑 파일 업로드 실패:', err);
-                setError(err.message || '크레탑 파일 업로드에 실패했습니다.');
+                setError(err.message || '파일 선택 중 오류가 발생했습니다.');
                 setErrorModalOpen(true);
-            } finally {
-                setCretopUploading(false);
             }
         }
     };
@@ -993,13 +1136,16 @@ export default function CompanyCreateForm() {
             });
 
             if (!response.ok) {
-                throw new Error('파일 조회 실패');
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || '파일 조회 실패');
             }
 
             const data = await response.json();
             setFileViewUrl(data.url);
         } catch (error) {
             console.error('파일 조회 오류:', error);
+            setError(error instanceof Error ? error.message : '파일을 조회할 수 없습니다.');
+            setErrorModalOpen(true);
             setFileViewUrl('');
         }
     };
@@ -1043,9 +1189,16 @@ export default function CompanyCreateForm() {
     };
 
     const handleProgressStart = (id: number) => {
-        // 진행 조건 확인
+        // 검수자 또는 대표실무자 상태에서는 진행할 수 없음
+        if (documentData?.progress_details === '검수자' || documentData?.progress_details === '대표실무자') {
+            setError('실무자가 배정되어있지 않으면<br>진행할수없습니다.');
+            setErrorModalOpen(true);
+            return;
+        }
+
+        // 진행 조건 확인: 실무자 배정 필수 & 상태가 대기
         if (!documentData?.manager_id || documentData?.status !== 'waiting') {
-            setErrorMessage('실무자가 배정되어 있고<br>상태가 대기일 때만 진행할 수 있습니다.');
+            setError('실무자가 배정되어있지 않으면<br>진행할수없습니다.');
             setErrorModalOpen(true);
             return;
         }
@@ -1058,13 +1211,11 @@ export default function CompanyCreateForm() {
     const handleApprove = (id: number) => {
         const doc = documentData;
 
-        // 검수자 상태에서 크레탑 기업정보 선택 필수 확인
-        if (doc && doc.progress_details === '검수자') {
-            if (!doc.cretop_file && !doc.cretop_none) {
-                setErrorMessage('크레탑 기업정보를 선택해야 합니다.');
-                setErrorModalOpen(true);
-                return;
-            }
+        // 승인 시 크레탑 기업정보 선택 필수 확인 (모든 권한)
+        if (doc && !doc.cretop_file && !doc.cretop_none) {
+            setError('승인하려면 크레탑 파일을 업로드하거나<br>기업정보없음을 선택해주세요.');
+            setErrorModalOpen(true);
+            return;
         }
 
         if (doc && doc.progress_details === '대표실무자') {
@@ -1134,10 +1285,12 @@ export default function CompanyCreateForm() {
     };
 
     const handleConfirmAction = async () => {
+        console.log('handleConfirmAction 호출:', { pendingAction, pendingReasonAction });
         if (!pendingAction && !pendingReasonAction) return;
 
         const id = pendingAction?.id || pendingReasonAction?.id || documentData?.id;
         const action = pendingAction?.action || pendingReasonAction?.action;
+        console.log('액션 처리:', { id, action });
 
         if (!id) return;
 
@@ -1170,13 +1323,17 @@ export default function CompanyCreateForm() {
                 const currentUserId = adminData?.user_id;
                 const userLevel = adminData?.position?.level;
 
-                if (documentData.progress_details === '검수자') {
-                    // 검수자 상태에서 승인 시 크레탑 파일 업로드 또는 기업정보없음 선택 필수
-                    if (!documentData.cretop_file && !documentData.cretop_none) {
-                        setError('승인하려면 크레탑 파일을 업로드하거나 기업정보없음을 선택해주세요.');
+                // 승인 시 크레탑 파일 업로드 또는 기업정보없음 선택 필수 (모든 권한)
+                if (!documentData.cretop_file && !documentData.cretop_none) {
+                    setActionConfirmModalOpen(false);
+                    setTimeout(() => {
+                        setError('승인하려면 크레탑 파일을 업로드하거나<br>기업정보없음을 선택해주세요.');
                         setErrorModalOpen(true);
-                        return;
-                    }
+                    }, 100);
+                    return;
+                }
+
+                if (documentData.progress_details === '검수자') {
                     // 검수자가 승인할 때 inspector_id 저장
                     updated = {
                         ...documentData,
@@ -1214,7 +1371,7 @@ export default function CompanyCreateForm() {
                     hour12: false
                 });
 
-                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const newReason = `[${timeStr}] [반려] ${reasonInput || '사유 없음'}`;
                 const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
 
                 const updated = {
@@ -1243,7 +1400,7 @@ export default function CompanyCreateForm() {
                     hour12: false
                 });
 
-                const newReason = `[${timeStr}] ${reasonInput || '사유 없음'}`;
+                const newReason = `[${timeStr}] [보완] ${reasonInput || '사유 없음'}`;
                 const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
 
                 const updated = {
@@ -1635,7 +1792,7 @@ export default function CompanyCreateForm() {
                             <div className={styles.uploadIcon}>📎</div>
                             <div className={styles.uploadText}>
                                 <p className={styles.uploadMain}>파일을 선택하거나 드래그하여 업로드</p>
-                                <p className={styles.uploadSub}>최대 50MB까지 업로드 가능합니다.</p>
+                                <p className={styles.uploadSub}>대용량 파일 업로드 지원 (최대 5GB)</p>
                             </div>
                         </label>
                         <input
@@ -1644,7 +1801,7 @@ export default function CompanyCreateForm() {
                             onChange={handleFileSelect}
                             multiple
                             className={styles.fileInput}
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.jpg,.jpeg,.png"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.jpg,.jpeg,.png,.zip"
                             disabled={isViewMode && !isEditMode}
                         />
                     </div>
@@ -1735,21 +1892,43 @@ export default function CompanyCreateForm() {
                 {(() => {
                     const adminData = getAdminData();
                     const userLevel = adminData?.position?.level;
-                    // 크레탑 수정 가능: 검수자(6)이고 progress_details가 '검수자'이거나, 대표자(1) 또는 대표실무자(2)는 수정 모드일 때
-                    const canEditCretop = isEditMode && (
-                        (userLevel === 6 && documentData?.progress_details === '검수자') ||
-                        userLevel === 1 ||
-                        userLevel === 2
-                    );
-                    // 크레탑 섹션 표시 조건: 파일이 있거나 none이 true이거나, 대표자/대표실무자거나, 검수자이고 progress_details='검수자'이거나, 수정 가능한 경우
-                    const showCretopSection = (documentData?.cretop_file || documentData?.cretop_none || canEditCretop || userLevel === 1 || userLevel === 2 || (userLevel === 6 && documentData?.progress_details === '검수자'));
+                    // 크레탑 수정 가능: 대표자(1), 대표실무자(2), 또는 검수자(6)이고 progress_details가 '검수자'일 때
+                    const canEditCretop = isEditMode && (userLevel === 1 || userLevel === 2 || (userLevel === 6 && documentData?.progress_details === '검수자'));
+                    // 크레탑 섹션 표시: 보기 모드일 때 항상 표시, 수정 가능할 때도 표시
+                    const showCretopSection = isViewMode || canEditCretop;
 
                     return showCretopSection ? (
                         <div className={styles.fileSection}>
                             <label className={styles.sectionTitle}>
                                 크레탑 기업정보
                             </label>
-                            {documentData?.cretop_file ? (
+
+                            {/* 선택된 파일 표시 */}
+                            {selectedCretopFile && (
+                                <div className={styles.fileList} style={{ marginBottom: '16px' }}>
+                                    <p className={styles.fileListTitle}>선택된 파일 (1개)</p>
+                                    <ul className={styles.files}>
+                                        <li className={styles.fileItem}>
+                                            <span className={styles.fileName}>{selectedCretopFile.name}</span>
+                                            <span className={styles.fileSize}>
+                                                ({(selectedCretopFile.size / 1024 / 1024).toFixed(2)}MB)
+                                            </span>
+                                            {canEditCretop && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveCretopFile}
+                                                className={styles.removeButton}
+                                            >
+                                                ✕
+                                            </button>
+                                            )}
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* 기존 파일 표시 */}
+                            {isViewMode && documentData?.cretop_file && !selectedCretopFile && (
                                 <div className={styles.fileList} style={{ marginBottom: '16px' }}>
                                     <p className={styles.fileListTitle}>파일 (1개)</p>
                                     <ul className={styles.files}>
@@ -1759,30 +1938,113 @@ export default function CompanyCreateForm() {
                                                 onClick={() => handleViewFile({
                                                     name: documentData.cretop_file!.name,
                                                     path: documentData.cretop_file!.path,
-                                                    size: 0
+                                                    size: documentData.cretop_file!.size || 0
                                                 })}
                                                 className={styles.fileNameButton}
                                                 title="클릭하여 보기"
                                             >
                                                 {documentData.cretop_file.name}
                                             </button>
+                                            <span className={styles.fileSize}>
+                                                ({documentData.cretop_file.size ? (documentData.cretop_file.size / 1024 / 1024).toFixed(2) : '0.00'}MB)
+                                            </span>
+                                            {isEditMode && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveExistingCretop}
+                                                className={styles.removeButton}
+                                            >
+                                                ✕
+                                            </button>
+                                            )}
                                         </li>
                                     </ul>
                                 </div>
-                            ) : documentData?.cretop_none ? (
-                                <div style={{
-                                    backgroundColor: '#f8f9fa',
-                                    border: '2px dashed #dee2e6',
-                                    borderRadius: '8px',
-                                    padding: '32px 20px',
-                                    textAlign: 'center',
-                                    marginBottom: '16px'
-                                }}>
-                                    <p style={{ color: '#666', fontSize: '18px', fontWeight: '700', margin: '0' }}>
-                                        기업정보없음
+                            )}
+
+                            {/* 파일 업로드 영역 - 수정 모드일 때 항상 표시 */}
+                            {isEditMode && (
+                                <div
+                                    onDragOver={handleCretopDragOver}
+                                    onDragLeave={handleCretopDragLeave}
+                                    onDrop={handleCretopDrop}
+                                    className={`${styles.dropArea} ${cretopDragOver ? styles.dragOver : ''}`}
+                                >
+                                    <p style={{
+                                        margin: 0,
+                                        color: '#666',
+                                        fontSize: '14px',
+                                        textAlign: 'center'
+                                    }}>
+                                        {cretopDragOver ? '파일을 놓아주세요' : '파일을 드래그하거나 버튼을 클릭하세요'}
                                     </p>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <input
+                                            type="file"
+                                            ref={cretopInputRef}
+                                            onChange={handleCretopUpload}
+                                            style={{ display: 'none' }}
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.zip"
+                                            disabled={!canEditCretop}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => cretopInputRef.current?.click()}
+                                            disabled={cretopUploading || !canEditCretop}
+                                            style={{
+                                                padding: '12px 24px',
+                                                fontSize: '15px',
+                                                backgroundColor: canEditCretop ? '#2196f3' : '#ccc',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: (cretopUploading || !canEditCretop) ? 'not-allowed' : 'pointer',
+                                                opacity: (cretopUploading || !canEditCretop) ? 0.6 : 1,
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            {cretopUploading ? '업로드 중...' : '파일 업로드'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCretopNone}
+                                            disabled={!canEditCretop}
+                                            style={{
+                                                padding: '12px 24px',
+                                                fontSize: '15px',
+                                                backgroundColor: canEditCretop ? '#78909c' : '#ccc',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: !canEditCretop ? 'not-allowed' : 'pointer',
+                                                opacity: !canEditCretop ? 0.6 : 1,
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            기업정보없음
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : null}
+                            )}
+
+                            {/* 파일 상태 표시 (선택된 파일도 없고 기존 파일도 없을 때) */}
+                            {!selectedCretopFile && !documentData?.cretop_file && (
+                                <>
+                                    {documentData?.cretop_none ? (
+                                        <div className={styles.fileStatus}>
+                                            <p style={{ color: '#666', fontSize: '18px', fontWeight: '700', margin: '0' }}>
+                                                기업정보없음
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className={styles.fileStatus}>
+                                            <p style={{ color: '#999', fontSize: '16px', fontWeight: '500', margin: '0' }}>
+                                                선택되지 않음
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            )}
 
                             {/* ZIP 다운로드 버튼 */}
                             {(isViewMode && !isEditMode && documentData?.cretop_file) && (
@@ -1795,120 +2057,6 @@ export default function CompanyCreateForm() {
                                     >
                                         {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
                                     </button>
-                                </div>
-                            )}
-
-                            {/* 제어 버튼들 - 파일업로드, 기업정보없음, 삭제, 취소 */}
-                            {(canEditCretop || (userLevel === 6 && documentData?.progress_details === '검수자') || userLevel === 1 || userLevel === 2) && (
-                                <div style={{ display: 'flex', gap: '12px', marginTop: documentData?.cretop_file || documentData?.cretop_none ? '0' : '16px' }}>
-                                    {documentData?.cretop_file && (
-                                        <button
-                                            type="button"
-                                            onClick={handleCretopDelete}
-                                            style={{
-                                                padding: '8px 16px',
-                                                fontSize: '14px',
-                                                backgroundColor: '#dc3545',
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                cursor: 'pointer',
-                                                fontWeight: '600'
-                                            }}
-                                        >
-                                            삭제
-                                        </button>
-                                    )}
-                                    {documentData?.cretop_none && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                onClick={handleCretopDelete}
-                                                style={{
-                                                    padding: '8px 16px',
-                                                    fontSize: '14px',
-                                                    backgroundColor: '#6c757d',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer',
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                취소
-                                            </button>
-                                        </>
-                                    )}
-                                    {!documentData?.cretop_file && !documentData?.cretop_none && (
-                                        <div
-                                            onDragOver={handleCretopDragOver}
-                                            onDragLeave={handleCretopDragLeave}
-                                            onDrop={handleCretopDrop}
-                                            style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                gap: '12px',
-                                                padding: '24px',
-                                                border: cretopDragOver ? '2px dashed #2196f3' : '2px dashed #dee2e6',
-                                                borderRadius: '8px',
-                                                backgroundColor: cretopDragOver ? '#e3f2fd' : '#f8f9fa',
-                                                transition: 'all 0.2s ease'
-                                            }}
-                                        >
-                                            <p style={{
-                                                margin: 0,
-                                                color: '#666',
-                                                fontSize: '14px',
-                                                textAlign: 'center'
-                                            }}>
-                                                {cretopDragOver ? '파일을 놓아주세요' : '파일을 드래그하거나 버튼을 클릭하세요'}
-                                            </p>
-                                            <div style={{ display: 'flex', gap: '12px' }}>
-                                                <input
-                                                    type="file"
-                                                    ref={cretopInputRef}
-                                                    onChange={handleCretopUpload}
-                                                    style={{ display: 'none' }}
-                                                    accept=".pdf,.jpg,.jpeg,.png,.gif"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => cretopInputRef.current?.click()}
-                                                    disabled={cretopUploading}
-                                                    style={{
-                                                        padding: '12px 24px',
-                                                        fontSize: '15px',
-                                                        backgroundColor: '#2196f3',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        cursor: cretopUploading ? 'not-allowed' : 'pointer',
-                                                        opacity: cretopUploading ? 0.6 : 1,
-                                                        fontWeight: '600'
-                                                    }}
-                                                >
-                                                    {cretopUploading ? '업로드 중...' : '파일 업로드'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleCretopNone}
-                                                    style={{
-                                                        padding: '12px 24px',
-                                                        fontSize: '15px',
-                                                        backgroundColor: '#78909c',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontWeight: '600'
-                                                    }}
-                                                >
-                                                    기업정보없음
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -2218,15 +2366,8 @@ export default function CompanyCreateForm() {
                         router.push('/main/document_submission');
                     }
                 }}
-                onConfirm={() => {
-                    setErrorModalOpen(false);
-                    // 잘못된 접근인 경우 문서 목록으로 이동
-                    if (error === '잘못된 접근입니다.') {
-                        router.push('/main/document_submission');
-                    }
-                }}
                 confirmText="확인"
-                showConfirmButton={true}
+                showConfirmButton={false}
             />
 
             {/* 확인 모달 - 폼 등록/저장 시에만 표시 */}
@@ -2247,23 +2388,6 @@ export default function CompanyCreateForm() {
                 type="success"
                 onConfirm={handleSuccessClose}
                 onClose={handleSuccessClose}
-                confirmText="확인"
-                showConfirmButton={false}
-            />
-
-            {/* 에러 모달 */}
-            <Modal
-                isOpen={errorModalOpen}
-                message={errorMessage}
-                type="error"
-                onConfirm={() => {
-                    setErrorModalOpen(false);
-                    setErrorMessage('');
-                }}
-                onClose={() => {
-                    setErrorModalOpen(false);
-                    setErrorMessage('');
-                }}
                 confirmText="확인"
                 showConfirmButton={false}
             />
