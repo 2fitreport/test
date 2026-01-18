@@ -670,7 +670,9 @@ export default function DocumentSubmissionList() {
             const query = searchQuery.toLowerCase();
             return (
                 (doc.user_id || '').toLowerCase().includes(query) ||
-                (doc.user_name || '').toLowerCase().includes(query)
+                (doc.user_name || '').toLowerCase().includes(query) ||
+                (doc.company_name || '').toLowerCase().includes(query) ||
+                (doc.representative_name || '').toLowerCase().includes(query)
             );
         });
 

@@ -106,15 +106,22 @@ export default function Sidebar() {
     const handleLogout = () => {
         clearAuthToken();
         document.cookie = 'auth_token=; path=/; max-age=0';
-        router.replace('/login');
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('admin_data');
+        // 전체 페이지를 새로고침하면서 로그인 페이지로 이동
+        window.location.href = '/login';
     };
 
     return (
         <aside className={`${styles.sidebar} ${isMenuOpen ? styles.open : ''}`}>
             <div className={styles.headerWrapper}>
-                <div className={styles.logoWrapper}>
+                <button
+                    className={styles.logoWrapper}
+                    onClick={() => router.push('/main/document_submission')}
+                    aria-label="메인페이지로 이동"
+                >
                     <Image src="/logo.png" alt="로고" width={120} height={80} className={styles.logoImage} priority />
-                </div>
+                </button>
                 <div className={styles.headerUserName}>
                     <FiUser className={styles.headerUserIcon} />
                     <div className={styles.headerUserInfo}>

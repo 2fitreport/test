@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { QueryProvider } from '@/components/QueryProvider';
 
 import './globals.css';
 
@@ -24,7 +25,9 @@ export default function RootLayout({
                 />
                 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
             </head>
-            <body>{children}</body>
+            <body>
+                <QueryProvider>{children}</QueryProvider>
+            </body>
         </html>
     );
 }

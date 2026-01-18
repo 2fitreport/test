@@ -18,6 +18,7 @@ export default function LoginPage() {
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [rememberUserId, setRememberUserId] = useState(false);
     const [modal, setModal] = useState<ModalState>({
         isOpen: false,
         message: '',
@@ -29,6 +30,13 @@ export default function LoginPage() {
         const authToken = getAuthToken();
         if (authToken) {
             router.push('/main/document_submission');
+        }
+
+        // localStorage에서 저장된 아이디 불러오기
+        const savedUserId = localStorage.getItem('saved_user_id');
+        if (savedUserId) {
+            setUserId(savedUserId);
+            setRememberUserId(true);
         }
     }, [router]);
 
@@ -52,6 +60,13 @@ export default function LoginPage() {
             const data = await response.json();
 
             if (response.ok) {
+                // 아이디 저장 여부에 따라 처리
+                if (rememberUserId) {
+                    localStorage.setItem('saved_user_id', userId);
+                } else {
+                    localStorage.removeItem('saved_user_id');
+                }
+
                 // 쿠키에 토큰 저장 (미들웨어가 읽을 수 있도록)
                 document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 365}`;
                 // 로컬스토리지에도 저장 (클라이언트에서 사용)
@@ -103,6 +118,19 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isLoading}
                 />
+                <div className={styles.rememberWrapper}>
+                    <input
+                        className={styles.checkbox}
+                        type="checkbox"
+                        id="rememberUserId"
+                        checked={rememberUserId}
+                        onChange={(e) => setRememberUserId(e.target.checked)}
+                        disabled={isLoading}
+                    />
+                    <label htmlFor="rememberUserId" className={styles.checkboxLabel}>
+                        아이디 저장
+                    </label>
+                </div>
                 <button className={styles.button} type="submit" disabled={isLoading}>
                     {isLoading ? '로그인 중...' : '로그인'}
                 </button>

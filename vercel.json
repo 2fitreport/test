@@ -1,6 +1,9 @@
 {
   "functions": {
     "src/app/api/upload/route.ts": {
+      "maxDuration": 900
+    },
+    "src/app/api/upload/signed-url/route.ts": {
       "maxDuration": 60
     }
   }

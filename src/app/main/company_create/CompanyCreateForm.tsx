@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
 import { getAdminData } from '@/lib/auth';
 import { canEditDocument } from '@/lib/permissions';
 import Modal from '@/app/components/Modal/Modal';
@@ -101,11 +106,14 @@ export default function CompanyCreateForm() {
     const [successMessage, setSuccessMessage] = useState('');
     const [actionConfirmModalOpen, setActionConfirmModalOpen] = useState(false);
     const [actionConfirmType, setActionConfirmType] = useState<'start' | 'stop' | 'restart' | 'delete' | 'approve' | 'reject' | 'revision' | 'submit' | 'reset'>('start');
+    const [cancelConfirmModalOpen, setCancelConfirmModalOpen] = useState(false);
     const [memoInput, setMemoInput] = useState('');
     const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
     const [fileViewerOpen, setFileViewerOpen] = useState(false);
     const [selectedFile, setSelectedFile] = useState<{ name: string; path: string; size: number } | null>(null);
     const [fileViewUrl, setFileViewUrl] = useState('');
+    const [fileViewerType, setFileViewerType] = useState<'image' | 'pdf' | 'office365' | 'none'>('none');
+    const [fileUrlCache, setFileUrlCache] = useState<{ [key: string]: { url: string; type: 'image' | 'pdf' | 'office365' | 'none' } }>({});
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
     const [isLoading, setIsLoading] = useState(!!viewId);  // viewId가 있으면 true로 초기화 (로딩 상태로 시작)
     const [isMobile, setIsMobile] = useState(false);
@@ -119,7 +127,12 @@ export default function CompanyCreateForm() {
     const [cretopUploading, setCretopUploading] = useState(false);
     const [cretopDragOver, setCretopDragOver] = useState(false);
     const [selectedCretopFile, setSelectedCretopFile] = useState<File | null>(null);
+    const [currentFileIndex, setCurrentFileIndex] = useState(0);
     const cretopInputRef = useRef<HTMLInputElement>(null);
+    const initialFormDataRef = useRef<CompanyFormData | null>(null);
+    const initialSelectedFilesRef = useRef<File[]>([]);
+    const initialSelectedCretopFileRef = useRef<File | null>(null);
+    const initialExistingFilesRef = useRef<Array<{ name: string; path: string; size: number }>>([]);
 
     // 모바일 감지
     useEffect(() => {
@@ -156,8 +169,64 @@ export default function CompanyCreateForm() {
     useEffect(() => {
         if (viewId) {
             fetchDocumentData(parseInt(viewId));
+        } else {
+            // 새로 생성하는 경우 초기값 설정
+            if (!initialFormDataRef.current) {
+                initialFormDataRef.current = formData;
+                initialSelectedFilesRef.current = selectedFiles;
+                initialSelectedCretopFileRef.current = selectedCretopFile;
+                initialExistingFilesRef.current = existingFiles;
+            }
         }
     }, [viewId, editParam]);
+
+    // 이미지 파일 URL 자동 로드 (일반 파일 + CRETOP)
+    useEffect(() => {
+        // 일반 파일 이미지 로드
+        existingFiles.forEach((file) => {
+            const ext = file.name.split('.').pop()?.toLowerCase() || '';
+            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+
+            if (isImage && !fileUrlCache[file.path]) {
+                fetch('/api/file/view', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath: file.path }),
+                })
+                .then(res => res.json())
+                .then(data => {
+                    setFileUrlCache(prev => ({
+                        ...prev,
+                        [file.path]: { url: data.url, type: 'image' }
+                    }));
+                })
+                .catch(err => console.error('이미지 로드 실패:', err));
+            }
+        });
+
+        // CRETOP 파일 이미지 로드
+        const cretopFile = selectedCretopFile || documentData?.cretop_file;
+        if (cretopFile?.name && cretopFile?.path) {
+            const ext = cretopFile.name.split('.').pop()?.toLowerCase() || '';
+            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+
+            if (isImage && !fileUrlCache[cretopFile.path]) {
+                fetch('/api/file/view', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath: cretopFile.path }),
+                })
+                .then(res => res.json())
+                .then(data => {
+                    setFileUrlCache(prev => ({
+                        ...prev,
+                        [cretopFile.path]: { url: data.url, type: 'image' }
+                    }));
+                })
+                .catch(err => console.error('CRETOP 이미지 로드 실패:', err));
+            }
+        }
+    }, [existingFiles, selectedCretopFile, documentData?.cretop_file]);
 
     const fetchDocumentData = async (docId: number) => {
         setIsLoading(true);
@@ -202,17 +271,20 @@ export default function CompanyCreateForm() {
             // 권한이 확인되었으면 데이터 표시
             setDocumentData(data);
 
-            setFormData({
+            const newFormData = {
                 businessType: data.type || 'individual',
                 representative_name: data.representative_name || '',
                 company_name: data.company_name || '',
                 business_number: data.business_number || '',
                 phone: data.phone || '',
-            });
+            };
+            setFormData(newFormData);
+            initialFormDataRef.current = newFormData;
 
             // 파일 정보 로드
             if (data.files && Array.isArray(data.files)) {
                 setExistingFiles(data.files);
+                initialExistingFilesRef.current = data.files;
             }
 
             // 수정 권한 확인
@@ -242,6 +314,13 @@ export default function CompanyCreateForm() {
             } else {
                 // edit 파라미터가 없으면 뷰 모드로 설정
                 setIsEditMode(false);
+                // 보기 모드에서 첫 번째 파일 자동 미리보기
+                if (data.files && data.files.length > 0) {
+                    setTimeout(() => {
+                        handleViewFile(data.files[0]);
+                        setCurrentFileIndex(0);
+                    }, 300);
+                }
             }
         } catch (err) {
             console.error('문서 데이터 로드 실패:', err);
@@ -1120,12 +1199,23 @@ export default function CompanyCreateForm() {
         document.addEventListener('mouseup', handleMouseUp);
     };
 
-    const handleViewFile = async (file: { name: string; path: string; size: number }) => {
+    const handleViewFile = async (file: { name: string; path: string; size: number }, index?: number) => {
         setSelectedFile(file);
+        if (index !== undefined) {
+            setCurrentFileIndex(index);
+        }
         setFileViewerOpen(true);
         setImageZoom(1);
         setImagePosition({ x: 0, y: 0 });
         setImageRotation(0);
+
+        // 캐시된 URL이 있으면 바로 사용
+        if (fileUrlCache[file.path]) {
+            const cached = fileUrlCache[file.path];
+            setFileViewUrl(cached.url);
+            setFileViewerType(cached.type);
+            return;
+        }
 
         try {
             const response = await fetch('/api/file/view', {
@@ -1142,12 +1232,34 @@ export default function CompanyCreateForm() {
             }
 
             const data = await response.json();
+
+            // 파일 형식에 따라 뷰어 타입 결정
+            let viewerType: 'image' | 'pdf' | 'office365' | 'none' = 'none';
+            if (data.viewerType === 'office365') {
+                viewerType = 'office365';
+            } else if (data.viewerType === 'pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                viewerType = 'pdf';
+            } else {
+                const ext = getFileExtension(file.name);
+                if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+                    viewerType = 'image';
+                }
+            }
+
+            // 캐시에 저장
+            setFileUrlCache(prev => ({
+                ...prev,
+                [file.path]: { url: data.url, type: viewerType }
+            }));
+
             setFileViewUrl(data.url);
+            setFileViewerType(viewerType);
         } catch (error) {
             console.error('파일 조회 오류:', error);
             setError(error instanceof Error ? error.message : '파일을 조회할 수 없습니다.');
             setErrorModalOpen(true);
             setFileViewUrl('');
+            setFileViewerType('none');
         }
     };
 
@@ -1564,12 +1676,34 @@ export default function CompanyCreateForm() {
     };
 
     const handleCancel = () => {
+        // 변경 여부 확인
+        const isFormDataChanged = initialFormDataRef.current &&
+            JSON.stringify(formData) !== JSON.stringify(initialFormDataRef.current);
+        const isFilesChanged = selectedFiles.length > 0 ||
+            existingFiles.length !== (initialExistingFilesRef.current?.length || 0);
+        const isCretopChanged = selectedCretopFile !== initialSelectedCretopFileRef.current;
+
+        if (!isFormDataChanged && !isFilesChanged && !isCretopChanged) {
+            // 변경사항이 없으면 바로 이동
+            if (isViewMode && isEditMode) {
+                router.push(`/main/company_create?view=${viewId}`);
+            } else {
+                router.push('/main/document_submission');
+            }
+        } else {
+            // 변경사항이 있으면 모달 표시
+            setCancelConfirmModalOpen(true);
+        }
+    };
+
+    const handleCancelConfirm = () => {
+        setCancelConfirmModalOpen(false);
         if (isViewMode && isEditMode) {
             // 수정 취소: 보기 모드로 복귀
             router.push(`/main/company_create?view=${viewId}`);
         } else {
-            // 등록 취소: 뒤로가기
-            router.back();
+            // 등록 취소: 메인페이지로 이동
+            router.push('/main/document_submission');
         }
     };
 
@@ -1745,6 +1879,9 @@ export default function CompanyCreateForm() {
                     <div className={styles.formGroup}>
                         <label htmlFor="business_number" className={styles.label}>
                             사업자등록번호 <span className={styles.required}>*</span>
+                            <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px' }}>
+                                (- 제외한 숫자만 입력해주세요)
+                            </span>
                         </label>
                         <input
                             type="text"
@@ -1762,6 +1899,9 @@ export default function CompanyCreateForm() {
                     <div className={styles.formGroup}>
                         <label htmlFor="phone" className={styles.label}>
                             대표자 연락처 <span className={styles.required}>*</span>
+                            <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px' }}>
+                                (- 제외한 숫자만 입력해주세요)
+                            </span>
                         </label>
                         <input
                             type="tel"
@@ -1781,7 +1921,7 @@ export default function CompanyCreateForm() {
                 {(!isViewMode || isEditMode) && (
                 <div className={styles.fileUploadSection}>
                     <label className={styles.sectionTitle}>
-                        파일 업로드 ({fileTypeLabel})
+                        파일 업로드 ({fileTypeLabel}) <span className={styles.required}>*</span>
                     </label>
                     <div
                         className={styles.uploadArea}
@@ -1847,7 +1987,7 @@ export default function CompanyCreateForm() {
                                 <li key={index} className={styles.fileItem}>
                                     <button
                                         type="button"
-                                        onClick={() => handleViewFile(file)}
+                                        onClick={() => handleViewFile(file, index)}
                                         className={styles.fileNameButton}
                                         title="클릭하여 보기"
                                     >
@@ -1857,13 +1997,13 @@ export default function CompanyCreateForm() {
                                         ({(file.size / 1024 / 1024).toFixed(2)}MB)
                                     </span>
                                     {isEditMode && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleRemoveExistingFile(index)}
-                                        className={styles.removeButton}
-                                    >
-                                        ✕
-                                    </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveExistingFile(index)}
+                                            className={styles.removeButton}
+                                        >
+                                            ✕
+                                        </button>
                                     )}
                                 </li>
                             ))}
@@ -1901,7 +2041,10 @@ export default function CompanyCreateForm() {
                     return showCretopSection ? (
                         <div className={styles.fileSection}>
                             <label className={styles.sectionTitle}>
-                                크레탑 기업정보
+                                크레탑 기업정보 <span className={styles.required}>*</span>
+                                <span style={{ fontSize: '12px', color: '#d32f2f', marginLeft: '4px', fontWeight: 'normal' }}>
+                                    (파일 또는 기업정보없음 중 하나 필수)
+                                </span>
                             </label>
 
                             {/* 선택된 파일 표시 */}
@@ -2637,7 +2780,7 @@ export default function CompanyCreateForm() {
         </div>
 
             {/* PC: 사이드 패널 */}
-            {!isMobile && fileViewerOpen && selectedFile && (
+            {!isMobile && fileViewerOpen && (
                 <div className={styles.sidePanel} style={{ width: `${sidePanelWidth}px` }}>
                     {/* 리사이즈 핸들 */}
                     <div
@@ -2646,9 +2789,44 @@ export default function CompanyCreateForm() {
                     />
                     {/* 헤더 */}
                     <div className={styles.sidePanelHeader}>
-                        <h3 className={styles.sidePanelTitle}>
-                            {selectedFile.name}
-                        </h3>
+                        <div style={{ flex: 1 }}>
+                            {selectedFile ? (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            setFileViewUrl('');
+                                            setFileViewerType('none');
+                                        }}
+                                        style={{
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--main-color)',
+                                            cursor: 'pointer',
+                                            fontSize: '18px',
+                                            padding: '0 0 8px 0',
+                                            marginBottom: '8px',
+                                            fontWeight: '600'
+                                        }}
+                                        title="목록으로 돌아가기"
+                                    >
+                                        ← 돌아가기
+                                    </button>
+                                    <h3 className={styles.sidePanelTitle} style={{ marginTop: '0' }}>
+                                        {selectedFile.name}
+                                    </h3>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className={styles.sidePanelTitle}>
+                                        파일 미리보기
+                                    </h3>
+                                    <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                                        {existingFiles.length}개 파일
+                                    </div>
+                                </>
+                            )}
+                        </div>
                         <button
                             onClick={() => {
                                 setFileViewerOpen(false);
@@ -2662,77 +2840,405 @@ export default function CompanyCreateForm() {
                         </button>
                     </div>
 
-                    {/* 콘텐츠 */}
+                    {/* 상세 뷰어 (selectedFile이 있을 때만 표시) */}
+                    {selectedFile && fileViewUrl && (
+                        <div
+                            style={{
+                                flex: 1,
+                                borderBottom: '1px solid #e0e0e0',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'auto',
+                                backgroundColor: '#f5f5f5'
+                            }}
+                            onWheel={handleImageWheel}
+                        >
+                            {/* 이미지 미리보기 */}
+                            {fileViewerType === 'image' && (
+                                <img
+                                    src={fileViewUrl}
+                                    alt={selectedFile.name}
+                                    onMouseDown={handleImageMouseDown}
+                                    onMouseMove={handleImageMouseMove}
+                                    onMouseUp={handleImageMouseUp}
+                                    onMouseLeave={handleImageMouseUp}
+                                    draggable={false}
+                                    style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '100%',
+                                        objectFit: 'contain',
+                                        transform: `scale(${imageZoom}) translate(${imagePosition.x / imageZoom}px, ${imagePosition.y / imageZoom}px) rotate(${imageRotation}deg)`,
+                                        cursor: imageZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
+                                        userSelect: 'none'
+                                    }}
+                                />
+                            )}
+                            {/* PDF 미리보기 */}
+                            {fileViewerType === 'pdf' && (
+                                <iframe
+                                    src={fileViewUrl}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        border: 'none'
+                                    }}
+                                />
+                            )}
+                            {/* Office 365 Viewer */}
+                            {fileViewerType === 'office365' && (
+                                <iframe
+                                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileViewUrl)}`}
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        border: 'none'
+                                    }}
+                                />
+                            )}
+                            {/* 미리보기 불가능한 파일 */}
+                            {fileViewerType === 'none' && (
+                                <div style={{
+                                    textAlign: 'center',
+                                    color: '#666',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <p>이 파일은 웹에서 미리 볼 수 없습니다.</p>
+                                    <a
+                                        href={fileViewUrl}
+                                        download
+                                        style={{
+                                            color: 'var(--main-color)',
+                                            textDecoration: 'none',
+                                            fontWeight: '600',
+                                            marginTop: '12px'
+                                        }}
+                                    >
+                                        파일 다운로드
+                                    </a>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 콘텐츠 - 섹션 분리 (selectedFile이 없을 때만 표시) */}
+                    {!selectedFile && (
                     <div
                         className={styles.sidePanelContent}
-                        onWheel={handleImageWheel}
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflowY: 'auto',
+                            flex: 1,
+                            padding: '8px',
+                            gap: '12px',
+                            alignItems: 'flex-start',
+                            justifyContent: 'flex-start',
+                            width: '100%'
+                        }}
                     >
-                        {fileViewUrl ? (
-                            (() => {
-                                const ext = getFileExtension(selectedFile.name);
-                                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-                                const isPdf = ext === 'pdf';
+                        {/* 일반 파일 섹션 */}
+                        <div style={{ width: '100%' }}>
+                            <div style={{
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                marginBottom: '8px',
+                                color: '#333',
+                                paddingLeft: '4px'
+                            }}>
+                                일반 파일
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '8px',
+                                width: '100%'
+                            }}>
+                                {existingFiles.length > 0 ? (
+                                    existingFiles.map((file, index) => {
+                                        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                                        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
 
-                                return (
-                                    <>
-                                        {isImage && (
-                                            <img
-                                                src={fileViewUrl}
-                                                alt={selectedFile.name}
-                                                onMouseDown={handleImageMouseDown}
-                                                onMouseMove={handleImageMouseMove}
-                                                onMouseUp={handleImageMouseUp}
-                                                onMouseLeave={handleImageMouseUp}
-                                                draggable={false}
+                                        let icon = '📄';
+                                        if (isImage) icon = '📷';
+                                        else if (ext === 'pdf') icon = '📄';
+                                        else if (['doc', 'docx'].includes(ext)) icon = '📝';
+                                        else if (['xls', 'xlsx'].includes(ext)) icon = '📊';
+                                        else if (ext === 'hwp') icon = '📑';
+
+                                        return (
+                                            <div
+                                                key={index}
+                                                onClick={() => handleViewFile(file, index)}
                                                 style={{
-                                                    maxWidth: '100%',
-                                                    maxHeight: '100%',
-                                                    objectFit: 'contain',
-                                                    transform: `scale(${imageZoom}) translate(${imagePosition.x / imageZoom}px, ${imagePosition.y / imageZoom}px) rotate(${imageRotation}deg)`,
-                                                    cursor: imageZoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in',
-                                                    userSelect: 'none'
+                                                    height: '300px',
+                                                    border: currentFileIndex === index ? '3px solid var(--main-color)' : '1px solid #ddd',
+                                                    borderRadius: '4px',
+                                                    overflow: 'hidden',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: '#f9f9f9',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'flex-start',
+                                                    transition: 'all 0.2s',
+                                                    padding: '8px'
                                                 }}
-                                            />
-                                        )}
-                                        {isPdf && (
-                                            <iframe
-                                                src={fileViewUrl}
-                                                style={{
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1.02)';
+                                                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = 'scale(1)';
+                                                    e.currentTarget.style.boxShadow = 'none';
+                                                }}
+                                            >
+                                                <div style={{
                                                     width: '100%',
-                                                    height: '100%',
-                                                    border: 'none'
-                                                }}
-                                            />
-                                        )}
-                                        {!isImage && !isPdf && (
-                                            <div style={{
-                                                textAlign: 'center',
-                                                color: '#666'
-                                            }}>
-                                                <p>이 파일은 웹에서 미리 볼 수 없습니다.</p>
-                                                <a
-                                                    href={fileViewUrl}
-                                                    download
-                                                    style={{
-                                                        color: 'var(--main-color)',
-                                                        textDecoration: 'none',
-                                                        fontWeight: '600'
-                                                    }}
-                                                >
-                                                    파일 다운로드
-                                                </a>
-                                            </div>
-                                        )}
-                                    </>
-                                );
-                            })()
-                        ) : (
-                            <div style={{ color: '#999' }}>파일을 불러오는 중...</div>
-                        )}
-                    </div>
+                                                    height: '240px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    marginBottom: '6px',
+                                                    backgroundColor: !isImage ? '#f0f0f0' : 'transparent',
+                                                    borderRadius: '3px'
+                                                }}>
+                                                    {isImage && fileUrlCache[file.path]?.url ? (
+                                                        <img
+                                                            src={fileUrlCache[file.path].url}
+                                                            alt={file.name}
+                                                            style={{
+                                                                width: '100%',
+                                                                height: '100%',
+                                                                objectFit: 'fill',
+                                                                borderRadius: '3px'
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <div style={{ fontSize: '40px' }}>{icon}</div>
+                                                    )}
+                                                </div>
 
-                    {/* 푸터 */}
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    width: '100%',
+                                                    textAlign: 'center',
+                                                    color: '#666',
+                                                    fontWeight: '500'
+                                                }}>
+                                                    {file.name}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div style={{
+                                        height: '120px',
+                                        border: '1px dashed #ddd',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#f9f9f9',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#999',
+                                        fontSize: '12px',
+                                        gridColumn: 'span 3'
+                                    }}>
+                                        파일 없음
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* CRETOP 섹션 */}
+                        <div style={{ width: '100%' }}>
+                            <div style={{
+                                fontSize: '13px',
+                                fontWeight: 'bold',
+                                marginBottom: '8px',
+                                color: '#333',
+                                paddingLeft: '4px'
+                            }}>
+                                CRETOP
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '8px',
+                                width: '100%'
+                            }}>
+                                {(selectedCretopFile?.name || documentData?.cretop_file?.name) ? (
+                                    <div
+                                        onClick={() => {
+                                            const cretopFile = selectedCretopFile || documentData?.cretop_file;
+                                            const cretopFileObj = { name: cretopFile.name, path: cretopFile.path || 'cretop', size: cretopFile.size };
+                                            handleViewFile(cretopFileObj);
+                                        }}
+                                        style={{
+                                            height: '300px',
+                                            border: '3px solid var(--main-color)',
+                                            borderRadius: '4px',
+                                            overflow: 'hidden',
+                                            cursor: 'pointer',
+                                            backgroundColor: '#f9f9f9',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'flex-start',
+                                            transition: 'all 0.2s',
+                                            padding: '8px'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.transform = 'scale(1.02)';
+                                            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                            e.currentTarget.style.boxShadow = 'none';
+                                        }}
+                                    >
+                                        {(() => {
+                                            const cretopFile = selectedCretopFile || documentData?.cretop_file;
+                                            const ext = cretopFile?.name?.split('.').pop()?.toLowerCase() || '';
+                                            const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+                                            const cretopImageUrl = fileUrlCache[cretopFile?.path]?.url;
+
+                                            return (
+                                                <>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        height: '240px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        marginBottom: '6px',
+                                                        backgroundColor: !isImage ? '#f0f0f0' : 'transparent',
+                                                        borderRadius: '3px'
+                                                    }}>
+                                                        {isImage && cretopImageUrl ? (
+                                                            <img
+                                                                src={cretopImageUrl}
+                                                                alt="CRETOP"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    objectFit: 'fill',
+                                                                    borderRadius: '3px'
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                flex: 1,
+                                                                width: '100%'
+                                                            }}>
+                                                                <div style={{ fontSize: '32px', marginBottom: '2px' }}>📋</div>
+                                                                <div style={{
+                                                                    backgroundColor: 'var(--main-color)',
+                                                                    color: 'white',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '3px',
+                                                                    fontSize: '10px',
+                                                                    fontWeight: 'bold'
+                                                                }}>
+                                                                    CRETOP
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div style={{
+                                                        fontSize: '12px',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                        width: '100%',
+                                                        textAlign: 'center',
+                                                        color: '#666',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {cretopFile?.name}
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        height: '120px',
+                                        border: '1px dashed #ddd',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#f9f9f9',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#999',
+                                        fontSize: '12px',
+                                        gridColumn: 'span 3'
+                                    }}>
+                                        파일 없음
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    )}
+
+                    {/* 푸터 (selectedFile이 있을 때만 표시) */}
+                    {selectedFile && (
                     <div className={styles.sidePanelFooter}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button
+                                onClick={() => {
+                                    const prevIndex = currentFileIndex === 0 ? existingFiles.length - 1 : currentFileIndex - 1;
+                                    const prevFile = existingFiles[prevIndex];
+                                    handleViewFile(prevFile);
+                                    setCurrentFileIndex(prevIndex);
+                                }}
+                                disabled={existingFiles.length <= 1}
+                                style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    cursor: existingFiles.length <= 1 ? 'default' : 'pointer',
+                                    opacity: existingFiles.length <= 1 ? 0.5 : 1,
+                                    fontSize: '14px'
+                                }}
+                                title="이전 파일"
+                            >
+                                ←
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const nextIndex = currentFileIndex === existingFiles.length - 1 ? 0 : currentFileIndex + 1;
+                                    const nextFile = existingFiles[nextIndex];
+                                    handleViewFile(nextFile);
+                                    setCurrentFileIndex(nextIndex);
+                                }}
+                                disabled={existingFiles.length <= 1}
+                                style={{
+                                    padding: '6px 12px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    borderRadius: '4px',
+                                    cursor: existingFiles.length <= 1 ? 'default' : 'pointer',
+                                    opacity: existingFiles.length <= 1 ? 0.5 : 1,
+                                    fontSize: '14px'
+                                }}
+                                title="다음 파일"
+                            >
+                                →
+                            </button>
+                        </div>
                         <span style={{ fontSize: '12px', color: '#999' }}>
                             {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
                         </span>
@@ -2774,6 +3280,7 @@ export default function CompanyCreateForm() {
                             </a>
                         </div>
                     </div>
+                    )}
                 </div>
             )}
 
@@ -2800,9 +3307,14 @@ export default function CompanyCreateForm() {
                             padding: '16px 20px',
                             borderBottom: '1px solid #e0e0e0'
                         }}>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
-                                {selectedFile.name}
-                            </h3>
+                            <div style={{ flex: 1 }}>
+                                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>
+                                    {selectedFile.name}
+                                </h3>
+                                <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                                    {currentFileIndex + 1} / {existingFiles.length}
+                                </div>
+                            </div>
                             <button
                                 onClick={() => {
                                     setFileViewerOpen(false);
@@ -2833,13 +3345,10 @@ export default function CompanyCreateForm() {
                         }}>
                             {fileViewUrl ? (
                                 (() => {
-                                    const ext = getFileExtension(selectedFile.name);
-                                    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-                                    const isPdf = ext === 'pdf';
-
                                     return (
                                         <>
-                                            {isImage && (
+                                            {/* 이미지 미리보기 */}
+                                            {fileViewerType === 'image' && (
                                                 <img
                                                     src={fileViewUrl}
                                                     alt={selectedFile.name}
@@ -2850,7 +3359,8 @@ export default function CompanyCreateForm() {
                                                     }}
                                                 />
                                             )}
-                                            {isPdf && (
+                                            {/* PDF 미리보기 */}
+                                            {fileViewerType === 'pdf' && (
                                                 <iframe
                                                     src={fileViewUrl}
                                                     style={{
@@ -2860,7 +3370,19 @@ export default function CompanyCreateForm() {
                                                     }}
                                                 />
                                             )}
-                                            {!isImage && !isPdf && (
+                                            {/* Office 365 Viewer (Word, Excel, PowerPoint) */}
+                                            {fileViewerType === 'office365' && (
+                                                <iframe
+                                                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileViewUrl)}`}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        border: 'none'
+                                                    }}
+                                                />
+                                            )}
+                                            {/* 미리보기 불가능한 파일 */}
+                                            {fileViewerType === 'none' && (
                                                 <div style={{
                                                     textAlign: 'center',
                                                     color: '#666'
@@ -2893,8 +3415,54 @@ export default function CompanyCreateForm() {
                             borderTop: '1px solid #e0e0e0',
                             display: 'flex',
                             justifyContent: 'space-between',
-                            alignItems: 'center'
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '8px'
                         }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                    onClick={() => {
+                                        const prevIndex = currentFileIndex === 0 ? existingFiles.length - 1 : currentFileIndex - 1;
+                                        const prevFile = existingFiles[prevIndex];
+                                        handleViewFile(prevFile);
+                                        setCurrentFileIndex(prevIndex);
+                                    }}
+                                    disabled={existingFiles.length <= 1}
+                                    style={{
+                                        padding: '6px 12px',
+                                        backgroundColor: '#f5f5f5',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        cursor: existingFiles.length <= 1 ? 'default' : 'pointer',
+                                        opacity: existingFiles.length <= 1 ? 0.5 : 1,
+                                        fontSize: '14px'
+                                    }}
+                                    title="이전 파일"
+                                >
+                                    ←
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const nextIndex = currentFileIndex === existingFiles.length - 1 ? 0 : currentFileIndex + 1;
+                                        const nextFile = existingFiles[nextIndex];
+                                        handleViewFile(nextFile);
+                                        setCurrentFileIndex(nextIndex);
+                                    }}
+                                    disabled={existingFiles.length <= 1}
+                                    style={{
+                                        padding: '6px 12px',
+                                        backgroundColor: '#f5f5f5',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '4px',
+                                        cursor: existingFiles.length <= 1 ? 'default' : 'pointer',
+                                        opacity: existingFiles.length <= 1 ? 0.5 : 1,
+                                        fontSize: '14px'
+                                    }}
+                                    title="다음 파일"
+                                >
+                                    →
+                                </button>
+                            </div>
                             <span style={{ fontSize: '12px', color: '#999' }}>
                                 {(selectedFile.size / 1024 / 1024).toFixed(2)}MB
                             </span>
@@ -2919,6 +3487,19 @@ export default function CompanyCreateForm() {
                     </div>
                 </div>
             )}
+
+        {/* 취소 확인 모달 */}
+        {cancelConfirmModalOpen && (
+            <ConfirmModal
+                isOpen={true}
+                message="취소시 입력하신 내용은 삭제됩니다"
+                onConfirm={handleCancelConfirm}
+                onCancel={() => setCancelConfirmModalOpen(false)}
+                type="warning"
+                confirmButtonText="확인"
+                cancelButtonText="취소"
+            />
+        )}
         </div>
     );
 }
