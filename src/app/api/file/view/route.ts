@@ -74,7 +74,8 @@ export async function POST(request: NextRequest) {
                 const pdfPath = path.join(tempDir, `hwp_${Date.now()}_${pdfFileName}`);
 
                 // HWP 파일을 임시 경로에 저장
-                await fs.writeFile(hwpPath, Buffer.from(fileData));
+                const arrayBuffer = await fileData.arrayBuffer();
+                await fs.writeFile(hwpPath, Buffer.from(arrayBuffer));
 
                 // LibreOffice를 사용하여 PDF로 변환
                 try {

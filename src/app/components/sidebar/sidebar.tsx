@@ -26,25 +26,6 @@ export default function Sidebar() {
     const [notificationCount, setNotificationCount] = useState(0);
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
-    useEffect(() => {
-        const data = getAdminData();
-        setAdminData(data);
-        fetchNotificationCount();
-
-        // 영업자(Level 4)인 경우 담당검수자 정보 조회
-        if (data?.position?.level === 4 && data?.supervisor_id) {
-            fetchSupervisorInfo(data.supervisor_id);
-        }
-
-        // 알림 업데이트 이벤트 리스닝
-        const handleNotificationUpdate = () => {
-            fetchNotificationCount();
-        };
-
-        window.addEventListener('notificationUpdate', handleNotificationUpdate);
-        return () => window.removeEventListener('notificationUpdate', handleNotificationUpdate);
-    }, []);
-
     const fetchNotificationCount = async () => {
         try {
             const adminData = getAdminData();
@@ -83,6 +64,27 @@ export default function Sidebar() {
             console.error('검수자 정보 조회 실패:', error);
         }
     };
+
+    useEffect(() => {
+        const data = getAdminData();
+        if (data) {
+            setAdminData(data);
+        }
+        fetchNotificationCount();
+
+        // 영업자(Level 4)인 경우 담당검수자 정보 조회
+        if (data?.position?.level === 4 && data?.supervisor_id) {
+            fetchSupervisorInfo(data.supervisor_id);
+        }
+
+        // 알림 업데이트 이벤트 리스닝
+        const handleNotificationUpdate = () => {
+            fetchNotificationCount();
+        };
+
+        window.addEventListener('notificationUpdate', handleNotificationUpdate);
+        return () => window.removeEventListener('notificationUpdate', handleNotificationUpdate);
+    }, []);
 
     const handleMenuClick = (path: string) => {
         router.push(path);
