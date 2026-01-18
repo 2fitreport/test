@@ -106,7 +106,7 @@ export default function Sidebar() {
     const handleLogout = () => {
         clearAuthToken();
         document.cookie = 'auth_token=; path=/; max-age=0';
-        router.push('/login');
+        router.replace('/login');
     };
 
     return (
