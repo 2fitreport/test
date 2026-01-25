@@ -589,7 +589,7 @@ export default function DocumentSubmissionList() {
             if (!response.ok) {
                 throw new Error('기업 목록 조회 실패');
             }
-            let data = await response.json();
+            const data = await response.json();
 
             // API에서 이미 역할별 필터링을 완료했으므로, 클라이언트 사이드 필터링 불필요
             // (API에서: Level 4는 자신의 문서만, Level 6은 담당 영업자 + 과거 승인한 문서, Level 1/2는 모든 문서)

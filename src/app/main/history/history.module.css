@@ -36,11 +36,72 @@
     color: #dc3545;
 }
 
+.controlsWrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.itemsPerPageControl {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.itemsPerPageControl label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+}
+
+.itemsPerPageSelect {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.itemsPerPageSelect:hover {
+    border-color: #adb5bd;
+}
+
+.itemsPerPageSelect:focus {
+    outline: none;
+    border-color: #0f1a4d;
+    box-shadow: 0 0 0 3px rgba(15, 26, 77, 0.1);
+}
+
+.totalInfo {
+    font-size: 14px;
+    color: #666;
+    font-weight: 500;
+}
+
 .tableWrapper {
     background: white;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     overflow: hidden;
+}
+
+.paginationWrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-top: 16px;
 }
 
 .table {
@@ -316,6 +377,25 @@
         font-size: 20px;
     }
 
+    .controlsWrapper {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .itemsPerPageControl {
+        width: 100%;
+    }
+
+    .itemsPerPageSelect {
+        width: 100%;
+    }
+
+    .totalInfo {
+        width: 100%;
+        text-align: left;
+    }
+
     .tableWrapper {
         overflow-x: auto;
     }
@@ -324,6 +404,11 @@
     .table td {
         padding: 10px 12px;
         font-size: 13px;
+    }
+
+    .paginationWrapper {
+        padding: 16px;
+        overflow-x: auto;
     }
 
     .modal {

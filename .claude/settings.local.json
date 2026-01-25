@@ -73,7 +73,10 @@
       "Bash(timeout 60 npm run build:*)",
       "mcp__playwright__playwright_go_back",
       "Bash(git reset:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(npx next build:*)",
+      "Bash(set -x)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

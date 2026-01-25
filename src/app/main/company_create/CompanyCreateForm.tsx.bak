@@ -11,11 +11,10 @@ import { getAdminData } from '@/lib/auth';
 import { canEditDocument } from '@/lib/permissions';
 import Modal from '@/app/components/Modal/Modal';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
+import FileViewerPanel from './components/FileViewerPanel';
 import CretopSection from './components/CretopSection';
 import DocumentActions from './components/DocumentActions';
 import MemoSection from './components/MemoSection';
-import DocumentUploadSection from './components/DocumentUploadSection';
-import FileViewerPanel from './components/FileViewerPanel';
 import styles from './companyCreate.module.css';
 
 interface CompanyFormData {
@@ -78,7 +77,7 @@ export default function CompanyCreateForm() {
     const editParam = searchParams.get('edit');
 
     const [formData, setFormData] = useState<CompanyFormData>({
-        businessType: 'business',
+        businessType: 'individual',
         representative_name: '',
         company_name: '',
         business_number: '',
@@ -87,8 +86,6 @@ export default function CompanyCreateForm() {
 
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
-    const [selectedSupplementFiles, setSelectedSupplementFiles] = useState<File[]>([]);
-    const [existingSupplementFiles, setExistingSupplementFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
     const [loading, setLoading] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState('');
@@ -294,11 +291,6 @@ export default function CompanyCreateForm() {
                 initialExistingFilesRef.current = data.files;
             }
 
-            // 보완 파일 정보 로드
-            if (data.supplement_files && Array.isArray(data.supplement_files)) {
-                setExistingSupplementFiles(data.supplement_files);
-            }
-
             // 수정 권한 확인
             const hasEditPermission = canEditDocument(
                 userLevel,
@@ -352,7 +344,6 @@ export default function CompanyCreateForm() {
             phone: '',
         });
         setSelectedFiles([]);
-        setSelectedSupplementFiles([]);
         setExistingFiles([]);
     };
 
@@ -405,64 +396,6 @@ export default function CompanyCreateForm() {
             }
 
             setSelectedFiles(files);
-        }
-    };
-
-    const handleSupplementFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'hwp', 'jpg', 'jpeg', 'png', 'zip'];
-
-            const unsupportedFiles = files.filter(file => {
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
-                return !allowedExtensions.includes(fileExt);
-            });
-
-            if (unsupportedFiles.length > 0) {
-                setError(`지원되지 않는 파일: ${unsupportedFiles.map(f => f.name).join(', ')}\n\n지원되는 형식: PDF, DOC, DOCX, XLS, XLSX, HWP, JPG, JPEG, PNG, ZIP`);
-                setErrorModalOpen(true);
-                e.target.value = '';
-                return;
-            }
-
-            setSelectedSupplementFiles(files);
-        }
-    };
-
-    const handleRemoveSupplementFile = (index: number) => {
-        setSelectedSupplementFiles(selectedSupplementFiles.filter((_, i) => i !== index));
-    };
-
-    const handleSupplementDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const handleSupplementDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const handleSupplementDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.dataTransfer.files) {
-            const files = Array.from(e.dataTransfer.files);
-            const allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'hwp', 'jpg', 'jpeg', 'png', 'zip'];
-
-            const unsupportedFiles = files.filter(file => {
-                const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
-                return !allowedExtensions.includes(fileExt);
-            });
-
-            if (unsupportedFiles.length > 0) {
-                setError(`지원되지 않는 파일: ${unsupportedFiles.map(f => f.name).join(', ')}\n\n지원되는 형식: PDF, DOC, DOCX, XLS, XLSX, HWP, JPG, JPEG, PNG, ZIP`);
-                setErrorModalOpen(true);
-                return;
-            }
-
-            setSelectedSupplementFiles([...selectedSupplementFiles, ...files]);
         }
     };
 
@@ -693,10 +626,7 @@ export default function CompanyCreateForm() {
         // 파일 검증 (생성 모드에서만)
         // 생성 모드: 새 파일 필수 (1개 이상)
         if (!isViewMode && !isEditMode && selectedFiles.length === 0) {
-            const fileTypeMessage = formData.businessType === 'individual'
-                ? '사업자등록증 또는 사업자등록증명원을 업로드해주세요.'
-                : '국세/지방세 완납증명서를 업로드해주세요.';
-            setError(fileTypeMessage);
+            setError('파일을 최소 1개 이상 업로드해주세요.');
             setErrorModalOpen(true);
             return false;
         }
@@ -734,10 +664,7 @@ export default function CompanyCreateForm() {
                 // 파일 검증: 1개 이상 필수
                 const totalFiles = existingFiles.length + selectedFiles.length;
                 if (totalFiles === 0) {
-                    const fileTypeMessage = formData.businessType === 'individual'
-                        ? '사업자등록증 또는 사업자등록증명원을 업로드해주세요.'
-                        : '국세/지방세 완납증명서를 업로드해주세요.';
-                    setError(fileTypeMessage);
+                    setError('파일을 최소 1개 이상 보유해야 합니다.');
                     setErrorModalOpen(true);
                     setLoading(false);
                     return;
@@ -843,94 +770,6 @@ export default function CompanyCreateForm() {
                 }
             }
 
-            // 보완 파일 업로드 (선택사항)
-            let uploadedSupplementFiles: Array<{ name: string; path: string; size: number }> = [];
-            if (selectedSupplementFiles.length > 0) {
-                for (const file of selectedSupplementFiles) {
-                    try {
-                        console.log(`보완 파일 업로드 시작: ${file.name}, 크기: ${file.size} bytes`);
-
-                        const fileExt = file.name.split('.').pop();
-                        const timestamp = Date.now();
-                        const date = new Date(timestamp);
-                        const timeStr = `${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
-                        const randomStr = Math.random().toString(36).substring(2, 9);
-                        const fileName = `${timeStr}-${randomStr}.${fileExt}`;
-                        const businessTypeFolder = formData.businessType === 'individual' ? 'individual' : 'business';
-                        const filePath = `supplements/${businessTypeFolder}/${fileName}`;
-
-                        // 1. Signed URL 요청
-                        console.log(`보완 파일 Signed URL 요청 중: ${filePath}`);
-                        const signedUrlResponse = await fetch('/api/upload/signed-url', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ path: filePath, contentType: file.type || 'application/octet-stream' }),
-                        });
-
-                        if (!signedUrlResponse.ok) {
-                            const errorData = await signedUrlResponse.json().catch(() => ({}));
-                            console.error('보완 파일 Signed URL 생성 실패:', errorData);
-                            throw new Error(errorData.error || `Signed URL 생성 실패: ${file.name} (${signedUrlResponse.status})`);
-                        }
-
-                        const signedUrlData = await signedUrlResponse.json();
-                        const { signedUrl } = signedUrlData;
-                        console.log(`보완 파일 Signed URL 생성 완료: ${file.name}`);
-
-                        // 2. 재시도 로직과 함께 파일 업로드
-                        let uploadSuccess = false;
-                        let lastError: Error | null = null;
-                        const maxRetries = 3;
-                        const retryDelay = 1000;
-
-                        for (let attempt = 0; attempt < maxRetries; attempt++) {
-                            try {
-                                console.log(`보완 파일 업로드 시도 ${attempt + 1}/${maxRetries}: ${file.name}`);
-                                const uploadResponse = await fetch(signedUrl, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': file.type || 'application/octet-stream' },
-                                    body: file,
-                                    signal: AbortSignal.timeout(120000),
-                                });
-
-                                if (!uploadResponse.ok) {
-                                    const responseText = await uploadResponse.text().catch(() => '');
-                                    console.error(`보완 파일 업로드 실패 (${uploadResponse.status}): ${responseText}`);
-                                    throw new Error(`HTTP ${uploadResponse.status}: ${uploadResponse.statusText}${responseText ? ' - ' + responseText : ''}`);
-                                }
-
-                                console.log(`✓ 보완 파일 업로드 성공: ${file.name}`);
-                                uploadSuccess = true;
-                                break;
-                            } catch (err) {
-                                lastError = err instanceof Error ? err : new Error(String(err));
-                                console.warn(`보완 파일 업로드 실패: ${lastError.message}`);
-                                if (attempt < maxRetries - 1) {
-                                    console.log(`재시도 ${attempt + 1}/${maxRetries - 1}: 1초 대기 후 재시도`);
-                                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                                }
-                            }
-                        }
-
-                        if (!uploadSuccess) {
-                            const errorMsg = `보완 파일 업로드 실패 (${maxRetries}회 시도): ${file.name} - ${lastError?.message}`;
-                            console.error(errorMsg);
-                            throw new Error(errorMsg);
-                        }
-
-                        uploadedSupplementFiles.push({
-                            name: file.name,
-                            path: filePath,
-                            size: file.size,
-                        });
-                    } catch (err) {
-                        const errorMsg = err instanceof Error ? err.message : '알 수 없는 오류';
-                        console.error(`보완 파일 업로드 중 오류: ${errorMsg}`);
-                        throw new Error(`보완 파일 업로드 중 오류 발생: ${errorMsg}`);
-                    }
-                }
-            }
-
             // 크레탑 파일 업로드는 수정 모드일 때만 여기서 처리
             // 생성 모드일 때는 문서 생성 후에 처리
             let cretopFileData: { name: string; path: string; url: string; size: number } | null = null;
@@ -1012,7 +851,6 @@ export default function CompanyCreateForm() {
             // 수정 모드: 기존 파일과 새 파일 합치기
             if (isEditMode) {
                 uploadedFiles = [...existingFiles, ...uploadedFiles];
-                uploadedSupplementFiles = [...existingSupplementFiles, ...uploadedSupplementFiles];
             }
 
             // 기업 정보 저장/수정
@@ -1030,7 +868,6 @@ export default function CompanyCreateForm() {
                 const editBody: any = {
                     ...requestBody,
                     files: uploadedFiles,
-                    supplement_files: uploadedSupplementFiles,
                 };
 
                 // 크레탑 파일 추가 (있으면)
@@ -1082,7 +919,6 @@ export default function CompanyCreateForm() {
                     progress_status: 'not_started',
                     submitted_date: now.toLocaleString('ko-KR'),
                     files: uploadedFiles,
-                    supplement_files: uploadedSupplementFiles,
                     memos: initialMemos,
                 };
 
@@ -1117,17 +953,11 @@ export default function CompanyCreateForm() {
             setLoading(false);
             setSuccessModalOpen(true);
             
-            // 필수 파일 선택 상태 초기화
-            setSelectedFiles([]);
-
             // 크레탑 파일 선택 상태 초기화
             setSelectedCretopFile(null);
             if (cretopInputRef.current) {
                 cretopInputRef.current.value = '';
             }
-
-            // 보완 파일 선택 상태 초기화
-            setSelectedSupplementFiles([]);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : '오류가 발생했습니다.';
             setError(errorMessage);
@@ -1298,16 +1128,15 @@ export default function CompanyCreateForm() {
     const handleCretopNone = async () => {
         if (!documentData) return;
 
-        const isCurrentlyNone = documentData.cretop_none;
         const updated = {
             ...documentData,
             cretop_file: null,
-            cretop_none: !isCurrentlyNone
+            cretop_none: true
         };
 
         await saveDocumentToDatabase(updated);
         setDocumentData(updated);
-        setSuccessMessage(isCurrentlyNone ? '기업정보없음이 해제되었습니다.' : '기업정보없음으로 설정되었습니다.');
+        setSuccessMessage('기업정보없음으로 설정되었습니다.');
     };
 
     // 크레탑 파일 삭제
@@ -1884,13 +1713,6 @@ export default function CompanyCreateForm() {
 
     const fileTypeLabel = formData.businessType === 'individual' ? '개인사업자' : '법인사업자';
 
-    // 개인/법인별 필수 파일 목록
-    const requiredFiles = formData.businessType === 'individual' ? [
-        { id: 1, title: '사업자등록증 또는 사업자등록증명원' }
-    ] : [
-        { id: 1, title: '국세/지방세 완납증명서' }
-    ];
-
     // 잘못된 접근 모달
     if (accessDenied) {
         return (
@@ -1995,20 +1817,6 @@ export default function CompanyCreateForm() {
                             <div className={styles.radioOption}>
                                 <input
                                     type="radio"
-                                    id="business"
-                                    name="businessType"
-                                    value="business"
-                                    checked={formData.businessType === 'business'}
-                                    onChange={() => handleBusinessTypeChange('business')}
-                                    className={styles.radioInput}
-                                />
-                                <label htmlFor="business" className={styles.radioLabel}>
-                                    법인사업자
-                                </label>
-                            </div>
-                            <div className={styles.radioOption}>
-                                <input
-                                    type="radio"
                                     id="individual"
                                     name="businessType"
                                     value="individual"
@@ -2018,6 +1826,20 @@ export default function CompanyCreateForm() {
                                 />
                                 <label htmlFor="individual" className={styles.radioLabel}>
                                     개인사업자
+                                </label>
+                            </div>
+                            <div className={styles.radioOption}>
+                                <input
+                                    type="radio"
+                                    id="business"
+                                    name="businessType"
+                                    value="business"
+                                    checked={formData.businessType === 'business'}
+                                    onChange={() => handleBusinessTypeChange('business')}
+                                    className={styles.radioInput}
+                                />
+                                <label htmlFor="business" className={styles.radioLabel}>
+                                    법인사업자
                                 </label>
                             </div>
                         </div>
@@ -2099,78 +1921,23 @@ export default function CompanyCreateForm() {
                     </div>
                 </div>
 
-                {/* 파일 업로드 섹션 */}
+                {/* 파일 업로드 - 보기 전용 모드에서 숨김 */}
+                {(!isViewMode || isEditMode) && (
                 <div className={styles.fileUploadSection}>
                     <label className={styles.sectionTitle}>
-                        필수 파일 업로드 ({fileTypeLabel}) <span className={styles.required}>*</span>
+                        파일 업로드 ({fileTypeLabel}) <span className={styles.required}>*</span>
                     </label>
-                    <p className={styles.fileDescription}>* 정확한 파일을 올리지 않을시 심사에 제한이 있을수 있습니다.</p>
-                    {requiredFiles.map((file) => (
                     <div
-                        key={file.id}
                         className={styles.uploadArea}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                     >
-                        <p className={styles.uploadMain}>
-                            {file.id}. {file.title}
-                        </p>
-                        {(selectedFiles.length > 0 || (isViewMode && existingFiles.length > 0)) && (
-                            <div className={styles.fileList}>
-                                <ul className={styles.files}>
-                                    {selectedFiles.map((file, index) => (
-                                        <li key={`selected-${index}`} className={styles.fileItem}>
-                                            <span className={styles.fileName}>{file.name}</span>
-                                            <span className={styles.fileSize}>
-                                                ({(file.size / 1024 / 1024).toFixed(2)}MB)
-                                            </span>
-                                            {(!isViewMode || isEditMode) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveFile(index)}
-                                                className={styles.removeButton}
-                                            >
-                                                ✕
-                                            </button>
-                                            )}
-                                        </li>
-                                    ))}
-                                    {isViewMode && existingFiles.map((file, index) => (
-                                        <li key={`existing-${index}`} className={styles.fileItem}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleViewFile(file, index)}
-                                                className={styles.fileNameButton}
-                                                title="클릭하여 보기"
-                                            >
-                                                {file.name}
-                                            </button>
-                                            <span className={styles.fileSize}>
-                                                ({(file.size / 1024 / 1024).toFixed(2)}MB)
-                                            </span>
-                                            {isEditMode && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveExistingFile(index)}
-                                                    className={styles.removeButton}
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                        <label htmlFor="fileInput" className={`${styles.uploadLabel} ${(selectedFiles.length > 0 || (isViewMode && existingFiles.length > 0)) ? styles.uploadLabelFlex : ''}`} style={isViewMode && !isEditMode ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
+                        <label htmlFor="fileInput" className={styles.uploadLabel} style={isViewMode && !isEditMode ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
+                            <div className={styles.uploadIcon}>📎</div>
                             <div className={styles.uploadText}>
-                                <div className={styles.uploadSubContainer}>
-                                    {selectedFiles.length === 0 && (!isViewMode || existingFiles.length === 0) && (
-                                        <p className={`${styles.uploadSub} ${styles.uploadSubError}`}>파일을 업로드해주세요.</p>
-                                    )}
-                                    <p className={styles.uploadbtn}>파일첨부</p>
-                                </div>
+                                <p className={styles.uploadMain}>파일을 선택하거나 드래그하여 업로드</p>
+                                <p className={styles.uploadSub}>대용량 파일 업로드 지원 (최대 5GB)</p>
                             </div>
                         </label>
                         <input
@@ -2183,166 +1950,258 @@ export default function CompanyCreateForm() {
                             disabled={isViewMode && !isEditMode}
                         />
                     </div>
-                    ))}
 
-                    {/* ZIP 다운로드 (보기 모드) */}
-                    {isViewMode && existingFiles.length > 0 && (
-                        <>
-                            {downloadError && (
-                                <div className={styles.errorMessage}>
-                                    {downloadError}
-                                </div>
-                            )}
-
-                            <div className={styles.downloadButtonContainer}>
-                                <button
-                                    type="button"
-                                    className={styles.downloadButton}
-                                    onClick={handleDownloadZip}
-                                    disabled={isDownloading}
-                                >
-                                    {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
-                                </button>
-                            </div>
-                        </>
+                    {selectedFiles.length > 0 && (
+                        <div className={styles.fileList}>
+                            <p className={styles.fileListTitle}>선택된 파일 ({selectedFiles.length}개)</p>
+                            <ul className={styles.files}>
+                                {selectedFiles.map((file, index) => (
+                                    <li key={index} className={styles.fileItem}>
+                                        <span className={styles.fileName}>{file.name}</span>
+                                        <span className={styles.fileSize}>
+                                            ({(file.size / 1024 / 1024).toFixed(2)}MB)
+                                        </span>
+                                        {(!isViewMode || isEditMode) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveFile(index)}
+                                            className={styles.removeButton}
+                                        >
+                                            ✕
+                                        </button>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
                     )}
                 </div>
+                )}
 
-                {/* 크레탑 정보 섹션 */}
+                {/* 기존 파일 목록 (보기/수정 모드) */}
+                {isViewMode && existingFiles.length > 0 && (
+                <div className={styles.fileUploadSection}>
+                    <label className={styles.sectionTitle}>
+                        등록된 파일
+                    </label>
+                    <div className={styles.fileList}>
+                        <p className={styles.fileListTitle}>파일 ({existingFiles.length}개)</p>
+                        <ul className={styles.files}>
+                            {existingFiles.map((file, index) => (
+                                <li key={index} className={styles.fileItem}>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleViewFile(file, index)}
+                                        className={styles.fileNameButton}
+                                        title="클릭하여 보기"
+                                    >
+                                        {file.name}
+                                    </button>
+                                    <span className={styles.fileSize}>
+                                        ({(file.size / 1024 / 1024).toFixed(2)}MB)
+                                    </span>
+                                    {isEditMode && (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveExistingFile(index)}
+                                            className={styles.removeButton}
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {downloadError && (
+                        <div className={styles.errorMessage}>
+                            {downloadError}
+                        </div>
+                    )}
+
+                    <div className={styles.downloadButtonContainer}>
+                        <button
+                            type="button"
+                            className={styles.downloadButton}
+                            onClick={handleDownloadZip}
+                            disabled={isDownloading}
+                        >
+                            {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
+                        </button>
+                    </div>
+                </div>
+                )}
+
+                {/* 크레탑 정보 섹션 - 보기/수정 모드에서 표시 */}
                 {(() => {
                     const adminData = getAdminData();
                     const userLevel = adminData?.position?.level;
+                    // 크레탑 수정 가능: 대표자(1), 대표실무자(2), 또는 검수자(6)이고 progress_details가 '검수자'일 때
                     const canEditCretop = isEditMode && (userLevel === 1 || userLevel === 2 || (userLevel === 6 && documentData?.progress_details === '검수자'));
+                    // 크레탑 섹션 표시: 보기 모드일 때 항상 표시, 수정 가능할 때도 표시
                     const showCretopSection = isViewMode || canEditCretop;
 
                     return showCretopSection ? (
-                        <div className={styles.fileUploadSection}>
+                        <div className={styles.fileSection}>
                             <label className={styles.sectionTitle}>
                                 크레탑 기업정보 <span className={styles.required}>*</span>
+                                <span style={{ fontSize: '12px', color: '#d32f2f', marginLeft: '4px', fontWeight: 'normal' }}>
+                                    (파일 또는 기업정보없음 중 하나 필수)
+                                </span>
                             </label>
-                            <p className={styles.fileDescription}>* 파일 또는 기업정보없음 중 하나 필수입니다.</p>
-                            {!documentData?.cretop_none && (
-                            <div className={styles.uploadArea}>
-                                <p className={styles.uploadMain}>크레탑 정보 파일</p>
-                                {(selectedCretopFile || (isViewMode && documentData?.cretop_file)) && (
-                                    <div className={styles.fileList}>
-                                        <ul className={styles.files}>
-                                            {selectedCretopFile && (
-                                                <li className={styles.fileItem}>
-                                                    <span className={styles.fileName}>{selectedCretopFile.name}</span>
-                                                    <span className={styles.fileSize}>
-                                                        ({(selectedCretopFile.size / 1024 / 1024).toFixed(2)}MB)
-                                                    </span>
-                                                    {canEditCretop && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleRemoveCretopFile}
-                                                            className={styles.removeButton}
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    )}
-                                                </li>
+
+                            {/* 선택된 파일 표시 */}
+                            {selectedCretopFile && (
+                                <div className={styles.fileList} style={{ marginBottom: '16px' }}>
+                                    <p className={styles.fileListTitle}>선택된 파일 (1개)</p>
+                                    <ul className={styles.files}>
+                                        <li className={styles.fileItem}>
+                                            <span className={styles.fileName}>{selectedCretopFile.name}</span>
+                                            <span className={styles.fileSize}>
+                                                ({(selectedCretopFile.size / 1024 / 1024).toFixed(2)}MB)
+                                            </span>
+                                            {canEditCretop && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveCretopFile}
+                                                className={styles.removeButton}
+                                            >
+                                                ✕
+                                            </button>
                                             )}
-                                            {isViewMode && documentData?.cretop_file && !selectedCretopFile && (
-                                                <li className={styles.fileItem}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleViewFile({
-                                                            name: documentData.cretop_file!.name,
-                                                            path: documentData.cretop_file!.path,
-                                                            size: documentData.cretop_file!.size || 0
-                                                        })}
-                                                        className={styles.fileNameButton}
-                                                        title="클릭하여 보기"
-                                                    >
-                                                        {documentData.cretop_file.name}
-                                                    </button>
-                                                    <span className={styles.fileSize}>
-                                                        ({documentData.cretop_file.size ? (documentData.cretop_file.size / 1024 / 1024).toFixed(2) : '0.00'}MB)
-                                                    </span>
-                                                    {isEditMode && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={handleRemoveExistingCretop}
-                                                            className={styles.removeButton}
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    )}
-                                                </li>
-                                            )}
-                                        </ul>
-                                    </div>
-                                )}
-                                <label htmlFor="cretopFileInput" className={`${styles.uploadLabel} ${(selectedCretopFile || (isViewMode && documentData?.cretop_file)) ? styles.uploadLabelFlex : ''}`} style={!canEditCretop ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
-                                    <div className={styles.uploadText}>
-                                        <div className={styles.uploadSubContainer}>
-                                            {!selectedCretopFile && !documentData?.cretop_file && (
-                                                <p className={`${styles.uploadSub} ${styles.uploadSubError}`}>파일을 업로드해주세요.</p>
-                                            )}
-                                            <p className={styles.uploadbtn}>파일첨부</p>
-                                        </div>
-                                    </div>
-                                </label>
-                                <input
-                                    type="file"
-                                    id="cretopFileInput"
-                                    ref={cretopInputRef}
-                                    onChange={handleCretopUpload}
-                                    multiple={false}
-                                    className={styles.fileInput}
-                                    accept=".pdf,.jpg,.jpeg,.png,.gif,.zip"
-                                    disabled={!canEditCretop}
-                                />
-                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
                             )}
 
-                            {/* 기업정보없음 */}
-                            {documentData?.cretop_none && (
-                                <div className={styles.cretopNoneStatus}>
-                                    <p className={styles.cretopNoneStatusText}>
-                                        ✓ 기업정보없음
+                            {/* 기존 파일 표시 */}
+                            {isViewMode && documentData?.cretop_file && !selectedCretopFile && (
+                                <div className={styles.fileList} style={{ marginBottom: '16px' }}>
+                                    <p className={styles.fileListTitle}>파일 (1개)</p>
+                                    <ul className={styles.files}>
+                                        <li className={styles.fileItem}>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewFile({
+                                                    name: documentData.cretop_file!.name,
+                                                    path: documentData.cretop_file!.path,
+                                                    size: documentData.cretop_file!.size || 0
+                                                })}
+                                                className={styles.fileNameButton}
+                                                title="클릭하여 보기"
+                                            >
+                                                {documentData.cretop_file.name}
+                                            </button>
+                                            <span className={styles.fileSize}>
+                                                ({documentData.cretop_file.size ? (documentData.cretop_file.size / 1024 / 1024).toFixed(2) : '0.00'}MB)
+                                            </span>
+                                            {isEditMode && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveExistingCretop}
+                                                className={styles.removeButton}
+                                            >
+                                                ✕
+                                            </button>
+                                            )}
+                                        </li>
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* 파일 업로드 영역 - 수정 모드일 때 항상 표시 */}
+                            {isEditMode && (
+                                <div
+                                    onDragOver={handleCretopDragOver}
+                                    onDragLeave={handleCretopDragLeave}
+                                    onDrop={handleCretopDrop}
+                                    className={`${styles.dropArea} ${cretopDragOver ? styles.dragOver : ''}`}
+                                >
+                                    <p style={{
+                                        margin: 0,
+                                        color: '#666',
+                                        fontSize: '14px',
+                                        textAlign: 'center'
+                                    }}>
+                                        {cretopDragOver ? '파일을 놓아주세요' : '파일을 드래그하거나 버튼을 클릭하세요'}
                                     </p>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <input
+                                            type="file"
+                                            ref={cretopInputRef}
+                                            onChange={handleCretopUpload}
+                                            style={{ display: 'none' }}
+                                            accept=".pdf,.jpg,.jpeg,.png,.gif,.zip"
+                                            disabled={!canEditCretop}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => cretopInputRef.current?.click()}
+                                            disabled={cretopUploading || !canEditCretop}
+                                            style={{
+                                                padding: '12px 24px',
+                                                fontSize: '15px',
+                                                backgroundColor: canEditCretop ? '#2196f3' : '#ccc',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: (cretopUploading || !canEditCretop) ? 'not-allowed' : 'pointer',
+                                                opacity: (cretopUploading || !canEditCretop) ? 0.6 : 1,
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            {cretopUploading ? '업로드 중...' : '파일 업로드'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCretopNone}
+                                            disabled={!canEditCretop}
+                                            style={{
+                                                padding: '12px 24px',
+                                                fontSize: '15px',
+                                                backgroundColor: canEditCretop ? '#78909c' : '#ccc',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                cursor: !canEditCretop ? 'not-allowed' : 'pointer',
+                                                opacity: !canEditCretop ? 0.6 : 1,
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            기업정보없음
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
-                            {/* 기업정보없음 버튼 - 수정 모드 */}
-                            {isEditMode && !documentData?.cretop_none && (
-                                <div className={styles.cretopNoneButtonContainer}>
-                                    <button
-                                        type="button"
-                                        onClick={handleCretopNone}
-                                        disabled={!canEditCretop}
-                                        className={styles.cretopNoneButton}
-                                    >
-                                        기업정보없음
-                                    </button>
-                                </div>
+                            {/* 파일 상태 표시 (선택된 파일도 없고 기존 파일도 없을 때) */}
+                            {!selectedCretopFile && !documentData?.cretop_file && (
+                                <>
+                                    {documentData?.cretop_none ? (
+                                        <div className={styles.fileStatus}>
+                                            <p style={{ color: '#666', fontSize: '18px', fontWeight: '700', margin: '0' }}>
+                                                기업정보없음
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className={styles.fileStatus}>
+                                            <p style={{ color: '#999', fontSize: '16px', fontWeight: '500', margin: '0' }}>
+                                                선택되지 않음
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
                             )}
 
-                            {/* 기업정보없음 해제 버튼 - 수정 모드 */}
-                            {isEditMode && documentData?.cretop_none && (
-                                <div className={styles.cretopNoneButtonContainer}>
+                            {/* ZIP 다운로드 버튼 */}
+                            {(isViewMode && !isEditMode && documentData?.cretop_file) && (
+                                <div className={styles.downloadButtonContainer} style={{ marginBottom: '16px' }}>
                                     <button
                                         type="button"
-                                        onClick={handleCretopNone}
-                                        disabled={!canEditCretop}
-                                        className={styles.cretopNoneButton}
-                                    >
-                                        ✓ 기업정보없음 (클릭하여 변경)
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* ZIP 다운로드 */}
-                            {isViewMode && documentData?.cretop_file && (
-                                <div className={styles.downloadButtonContainer}>
-                                    <button
-                                        type="button"
-                                        className={styles.downloadButton}
                                         onClick={handleDownloadCretopZip}
                                         disabled={isDownloading}
+                                        className={styles.downloadButton}
                                     >
                                         {isDownloading ? '다운로드 중...' : 'ZIP 다운로드'}
                                     </button>
@@ -2351,88 +2210,6 @@ export default function CompanyCreateForm() {
                         </div>
                     ) : null;
                 })()}
-
-                {/* 보완 자료 첨부 섹션 */}
-                <div className={styles.fileUploadSection}>
-                    <label className={styles.sectionTitle}>
-                        보완 자료 첨부(선택사항)
-                    </label>
-                    <p className={styles.fileDescription}>* 보완 파일 또는 추가 심사에 필요한 서류가 있을시에 첨부해주세요.</p>
-                    <div
-                        className={styles.uploadArea}
-                        onDragOver={handleSupplementDragOver}
-                        onDragLeave={handleSupplementDragLeave}
-                        onDrop={handleSupplementDrop}
-                    >
-                        <p className={styles.uploadMain}>보완 자료</p>
-                        {(selectedSupplementFiles.length > 0 || (isViewMode && existingSupplementFiles.length > 0)) && (
-                            <div className={styles.fileList}>
-                                <ul className={styles.files}>
-                                    {selectedSupplementFiles.map((file, index) => (
-                                        <li key={`selected-${index}`} className={styles.fileItem}>
-                                            <span className={styles.fileName}>{file.name}</span>
-                                            <span className={styles.fileSize}>
-                                                ({(file.size / 1024 / 1024).toFixed(2)}MB)
-                                            </span>
-                                            {(!isViewMode || isEditMode) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemoveSupplementFile(index)}
-                                                className={styles.removeButton}
-                                            >
-                                                ✕
-                                            </button>
-                                            )}
-                                        </li>
-                                    ))}
-                                    {isViewMode && existingSupplementFiles.map((file, index) => (
-                                        <li key={`existing-${index}`} className={styles.fileItem}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleViewFile(file, index)}
-                                                className={styles.fileNameButton}
-                                                title="클릭하여 보기"
-                                            >
-                                                {file.name}
-                                            </button>
-                                            <span className={styles.fileSize}>
-                                                ({(file.size / 1024 / 1024).toFixed(2)}MB)
-                                            </span>
-                                            {isEditMode && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setExistingSupplementFiles(existingSupplementFiles.filter((_, i) => i !== index))}
-                                                    className={styles.removeButton}
-                                                >
-                                                    ✕
-                                                </button>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                        <label htmlFor="supplementFileInput" className={`${styles.uploadLabel} ${(selectedSupplementFiles.length > 0 || (isViewMode && existingSupplementFiles.length > 0)) ? styles.uploadLabelFlex : ''}`} style={isViewMode && !isEditMode ? { opacity: 0.5, pointerEvents: 'none' } : {}}>
-                            <div className={styles.uploadText}>
-                                <div className={styles.uploadSubContainer}>
-                                    {selectedSupplementFiles.length === 0 && (!isViewMode || existingSupplementFiles.length === 0) && (
-                                        <p className={`${styles.uploadSub} ${styles.uploadSubError}`}>파일을 업로드해주세요.</p>
-                                    )}
-                                    <p className={styles.uploadbtn}>파일첨부</p>
-                                </div>
-                            </div>
-                        </label>
-                        <input
-                            type="file"
-                            id="supplementFileInput"
-                            onChange={handleSupplementFileSelect}
-                            multiple
-                            className={styles.fileInput}
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.hwp,.jpg,.jpeg,.png,.zip"
-                            disabled={isViewMode && !isEditMode}
-                        />
-                    </div>
-                </div>
 
                 {/* 메모 섹션 */}
                 {(isViewMode || !isViewMode) && (
@@ -3006,14 +2783,38 @@ export default function CompanyCreateForm() {
 
         </div>
 
-            {/* PC: 사이드 패널 */}
-            {!isMobile && fileViewerOpen && (
-                <div className={styles.sidePanel} style={{ width: `${sidePanelWidth}px` }}>
-                    {/* 리사이즈 핸들 */}
-                    <div
-                        className={`${styles.sidePanelResizeHandle} ${isResizing ? styles.active : ''}`}
-                        onMouseDown={handleResizeStart}
-                    />
+            {/* FileViewerPanel 컴포넌트 */}
+            <FileViewerPanel
+                fileViewerOpen={fileViewerOpen}
+                setFileViewerOpen={setFileViewerOpen}
+                selectedFile={selectedFile}
+                setSelectedFile={setSelectedFile}
+                fileViewUrl={fileViewUrl}
+                setFileViewUrl={setFileViewUrl}
+                fileViewerType={fileViewerType}
+                imageZoom={imageZoom}
+                setImageZoom={setImageZoom}
+                imagePosition={imagePosition}
+                setImagePosition={setImagePosition}
+                imageRotation={imageRotation}
+                setImageRotation={setImageRotation}
+                isDragging={isDragging}
+                setIsDragging={setIsDragging}
+                dragStart={dragStart}
+                setDragStart={setDragStart}
+                isMobile={isMobile}
+                existingFiles={existingFiles}
+                currentFileIndex={currentFileIndex}
+                setCurrentFileIndex={setCurrentFileIndex}
+                handleViewFile={handleViewFile}
+                isResizing={isResizing}
+                sidePanelWidth={sidePanelWidth}
+                setSidePanelWidth={setSidePanelWidth}
+                setIsResizing={setIsResizing}
+                handleResizeStart={handleResizeStart}
+            />
+
+            {/* 취소 (기존 코드는 여기 아래에 있습니다) */}
                     {/* 헤더 */}
                     <div className={styles.sidePanelHeader}>
                         <div style={{ flex: 1 }}>
@@ -3416,124 +3217,6 @@ export default function CompanyCreateForm() {
                                 )}
                             </div>
                         </div>
-
-                        {/* 보완 자료 섹션 */}
-                        <div style={{ width: '100%' }}>
-                            <div style={{
-                                fontSize: '13px',
-                                fontWeight: 'bold',
-                                marginBottom: '8px',
-                                color: '#333',
-                                paddingLeft: '4px'
-                            }}>
-                                보완 자료
-                            </div>
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(3, 1fr)',
-                                gap: '8px',
-                                width: '100%'
-                            }}>
-                                {existingSupplementFiles.length > 0 ? (
-                                    existingSupplementFiles.map((file, index) => {
-                                        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-                                        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
-
-                                        let icon = '📄';
-                                        if (isImage) icon = '📷';
-                                        else if (ext === 'pdf') icon = '📄';
-                                        else if (['doc', 'docx'].includes(ext)) icon = '📝';
-                                        else if (['xls', 'xlsx'].includes(ext)) icon = '📊';
-                                        else if (ext === 'hwp') icon = '📑';
-
-                                        return (
-                                            <div
-                                                key={index}
-                                                onClick={() => handleViewFile(file, index)}
-                                                style={{
-                                                    height: '300px',
-                                                    border: currentFileIndex === index ? '3px solid var(--main-color)' : '1px solid #ddd',
-                                                    borderRadius: '4px',
-                                                    overflow: 'hidden',
-                                                    cursor: 'pointer',
-                                                    backgroundColor: '#f9f9f9',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'flex-start',
-                                                    transition: 'all 0.2s',
-                                                    padding: '8px'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1.02)';
-                                                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.transform = 'scale(1)';
-                                                    e.currentTarget.style.boxShadow = 'none';
-                                                }}
-                                            >
-                                                <div style={{
-                                                    width: '100%',
-                                                    height: '240px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    marginBottom: '6px',
-                                                    backgroundColor: !isImage ? '#f0f0f0' : 'transparent',
-                                                    borderRadius: '3px'
-                                                }}>
-                                                    {isImage && fileUrlCache[file.path]?.url ? (
-                                                        <img
-                                                            src={fileUrlCache[file.path].url}
-                                                            alt={file.name}
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '100%',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '3px'
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div style={{
-                                                            fontSize: '40px'
-                                                        }}>{icon}</div>
-                                                    )}
-                                                </div>
-
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                    width: '100%',
-                                                    textAlign: 'center',
-                                                    color: '#666',
-                                                    fontWeight: '500'
-                                                }}>
-                                                    {file.name}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div style={{
-                                        height: '120px',
-                                        border: '1px dashed #ddd',
-                                        borderRadius: '4px',
-                                        backgroundColor: '#f9f9f9',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        color: '#999',
-                                        fontSize: '12px',
-                                        gridColumn: 'span 3'
-                                    }}>
-                                        파일 없음
-                                    </div>
-                                )}
-                            </div>
-                        </div>
                     </div>
                     )}
 
@@ -3641,7 +3324,7 @@ export default function CompanyCreateForm() {
                     display: 'flex',
                     justifyContent: 'center',
                     alignItems: 'center',
-                    zIndex: 1002
+                    zIndex: 2000
                 }}>
                     <div className={styles.fileViewerModal}>
                         {/* 헤더 */}

@@ -67,9 +67,9 @@ export default function LoginPage() {
                     localStorage.removeItem('saved_user_id');
                 }
 
-                // 쿠키에 토큰 저장 (미들웨어가 읽을 수 있도록)
-                document.cookie = `auth_token=${data.token}; path=/; max-age=${60 * 60 * 24 * 365}`;
-                // 로컬스토리지에도 저장 (클라이언트에서 사용)
+                // 쿠키에 토큰 저장 (브라우저 종료 시 자동 삭제)
+                document.cookie = `auth_token=${data.token}; path=/`;
+                // 세션스토리지에 저장 (브라우저 종료 시 자동 삭제)
                 setAuthToken(data.token, data.admin);
                 // 문서 제출 페이지로 이동
                 router.push('/main/document_submission');

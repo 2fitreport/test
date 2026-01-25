@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const userIdNumber = currentUser.id;
 
     // 사용자 조회
-    let query = supabase
+    const query = supabase
       .from('users')
       .select(`
         id,

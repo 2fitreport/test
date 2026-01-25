@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
+import Pagination from '@/app/components/Pagination/Pagination';
 import styles from './history.module.css';
 
 interface HistoryDocument {
@@ -47,6 +48,8 @@ export default function HistoryPage() {
     const [error, setError] = useState<string | null>(null);
     const [selectedHistory, setSelectedHistory] = useState<HistoryDocument | null>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
 
     useEffect(() => {
         const adminData = getAdminData();
@@ -109,6 +112,21 @@ export default function HistoryPage() {
         setDetailModalOpen(true);
     };
 
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        window.scrollTo(0, 0);
+    };
+
+    const handleItemsPerPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setItemsPerPage(Number(e.target.value));
+        setCurrentPage(1);
+    };
+
+    // 페이지네이션 계산
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    const currentItems = historyData.slice(indexOfFirstItem, indexOfLastItem);
+
     if (loading) {
         return (
             <div className={styles.container}>
@@ -137,48 +155,78 @@ export default function HistoryPage() {
                     <p>삭제된 기업 데이터가 없습니다.</p>
                 </div>
             ) : (
-                <div className={styles.tableWrapper}>
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>기업명</th>
-                                <th>대표자명</th>
-                                <th>사업자유형</th>
-                                <th>진행상황</th>
-                                <th>상태</th>
-                                <th>작성자</th>
-                                <th>삭제자</th>
-                                <th>삭제일시</th>
-                                <th>상세</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {historyData.map((history) => (
-                                <tr key={history.id}>
-                                    <td className={styles.companyName}>{history.company_name}</td>
-                                    <td>{history.representative_name}</td>
-                                    <td>{getTypeLabel(history.type)}</td>
-                                    <td>{history.progress_details || '-'}</td>
-                                    <td>
-                                        <span className={`${styles.statusBadge} ${styles[`status-${history.status}`]}`}>
-                                            {getStatusLabel(history.status)}
-                                        </span>
-                                    </td>
-                                    <td>{history.user_name}</td>
-                                    <td className={styles.deletedBy}>{history.deleted_by_name}</td>
-                                    <td>{formatDate(history.deleted_at)}</td>
-                                    <td>
-                                        <button
-                                            className={styles.detailButton}
-                                            onClick={() => openDetailModal(history)}
-                                        >
-                                            보기
-                                        </button>
-                                    </td>
+                <div>
+                    <div className={styles.controlsWrapper}>
+                        <div className={styles.itemsPerPageControl}>
+                            <label htmlFor="itemsPerPage">페이지당 행 수:</label>
+                            <select
+                                id="itemsPerPage"
+                                value={itemsPerPage}
+                                onChange={handleItemsPerPageChange}
+                                className={styles.itemsPerPageSelect}
+                            >
+                                <option value={10}>10개</option>
+                                <option value={20}>20개</option>
+                                <option value={50}>50개</option>
+                            </select>
+                        </div>
+                        <div className={styles.totalInfo}>
+                            총 {historyData.length}개
+                        </div>
+                    </div>
+
+                    <div className={styles.tableWrapper}>
+                        <table className={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th>기업명</th>
+                                    <th>대표자명</th>
+                                    <th>사업자유형</th>
+                                    <th>진행상황</th>
+                                    <th>상태</th>
+                                    <th>작성자</th>
+                                    <th>삭제자</th>
+                                    <th>삭제일시</th>
+                                    <th>상세</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {currentItems.map((history) => (
+                                    <tr key={history.id}>
+                                        <td className={styles.companyName}>{history.company_name}</td>
+                                        <td>{history.representative_name}</td>
+                                        <td>{getTypeLabel(history.type)}</td>
+                                        <td>{history.progress_details || '-'}</td>
+                                        <td>
+                                            <span className={`${styles.statusBadge} ${styles[`status-${history.status}`]}`}>
+                                                {getStatusLabel(history.status)}
+                                            </span>
+                                        </td>
+                                        <td>{history.user_name}</td>
+                                        <td className={styles.deletedBy}>{history.deleted_by_name}</td>
+                                        <td>{formatDate(history.deleted_at)}</td>
+                                        <td>
+                                            <button
+                                                className={styles.detailButton}
+                                                onClick={() => openDetailModal(history)}
+                                            >
+                                                보기
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className={styles.paginationWrapper}>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalItems={historyData.length}
+                            itemsPerPage={itemsPerPage}
+                            onPageChange={handlePageChange}
+                        />
+                    </div>
                 </div>
             )}
 

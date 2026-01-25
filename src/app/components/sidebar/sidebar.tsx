@@ -110,7 +110,11 @@ export default function Sidebar() {
         document.cookie = 'auth_token=; path=/; max-age=0';
         localStorage.removeItem('auth_token');
         localStorage.removeItem('admin_data');
-        // 전체 페이지를 새로고침하면서 로그인 페이지로 이동
+        // 뒤로가기 비활성화 (로그인 페이지에서 뒤로갈 수 없게)
+        window.history.pushState(null, '', '/login');
+        window.addEventListener('popstate', function(e) {
+            window.history.pushState(null, '', '/login');
+        });
         window.location.href = '/login';
     };
 

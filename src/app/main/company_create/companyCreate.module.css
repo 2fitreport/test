@@ -97,7 +97,11 @@
     font-size: 15px;
     font-weight: 600;
     color: var(--black-color);
-    margin-bottom: 16px;
+    margin-bottom: 10px;
+}
+
+.sectionTitleMargin {
+    margin-top: 20px;
 }
 
 /* 공통 입력 폼 */
@@ -131,20 +135,31 @@
 }
 
 .input {
-    padding: 10px 0;
+    padding: 10px 0 10px 10px;
     border: none !important;
     border-bottom: 1px solid #ddd !important;
     border-radius: 0;
     font-size: 14px;
     color: var(--black-color);
     transition: border-color 0.2s ease;
-    background-color: transparent;
+    background-color: transparent !important;
 }
 
 .input:focus {
     outline: none !important;
     border-bottom-color: var(--main-color) !important;
     box-shadow: none !important;
+    background-color: transparent !important;
+}
+
+.input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    background-color: transparent !important;
+}
+
+.input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+    background-color: transparent !important;
 }
 
 .input::placeholder {
@@ -174,8 +189,17 @@
     border-radius: 0;
     padding: 0;
     background-color: transparent;
+    padding: 30px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 10px;
 }
-
+.fileDescription {
+    color: blue;
+    font-weight: 700;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
 /* 드래그 업로드 영역 - 크레탑과 기본 파일 업로드에서 공통 사용 */
 .dropArea {
     display: flex;
@@ -211,27 +235,26 @@
 
 .uploadArea {
     position: relative;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    padding: 30px 20px;
-    text-align: center;
-    transition: all 0.2s ease;
     margin-bottom: 16px;
-    background-color: #fafafa;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 20px;
 }
 
-.uploadArea:hover {
-    border-color: var(--main-color);
-    background-color: #f5f5f5;
-}
 
 .uploadLabel {
     cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
     outline: none;
+    width: 100%;
+}
+
+.uploadLabelFlex {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+    width: auto;
 }
 
 .uploadLabel:focus {
@@ -249,16 +272,45 @@
 }
 
 .uploadMain {
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
     color: var(--black-color);
     margin: 0;
+    flex-basis: 100%;
+}
+
+.uploadSubContainer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+}
+
+.uploadbtn {
+    background-color: var(--main-color);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 5px;
+    font-size: 14px;
+    height: 30px;
+    white-space: nowrap;
 }
 
 .uploadSub {
-    font-size: 12px;
+    font-size: 14px;
     color: #999;
     margin: 0;
+    border-bottom: 1px solid #ddd;
+    height: 30px;
+    width: 100%;
+    line-height: 30px;
+}
+
+.uploadSubError {
+    color: #e74c3c;
+    font-size: 14px;
+    font-weight: 700;
 }
 
 .fileInput {
@@ -269,6 +321,7 @@
     padding: 0;
     background-color: transparent;
     border-radius: 0;
+    flex-grow: 1;
 }
 
 .fileListTitle {
@@ -468,6 +521,46 @@
 }
 
 .downloadButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cretopNoneStatus {
+    padding: 16px;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.cretopNoneStatusText {
+    color: #666;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.cretopNoneButtonContainer {
+    margin-top: 12px;
+}
+
+.cretopNoneButton {
+    padding: 10px 24px;
+    background-color: #78909c;
+    border: 1px solid #78909c;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.cretopNoneButton:hover {
+    opacity: 0.9;
+}
+
+.cretopNoneButton:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -845,10 +938,8 @@
 }
 
 .pageWrapper.withSidePanel .formContainer {
-    flex: 1;
     width: 50%;
     max-width: none;
-    margin-right: 520px;
     margin-left: 260px;
 }
 
@@ -857,7 +948,7 @@
     position: fixed;
     top: 0;
     right: 0;
-    width: 700px;
+    width: 1200px;
     min-width: 400px;
     max-width: 80vw;
     height: 100vh;
@@ -964,4 +1055,507 @@
     .sidePanel {
         display: none;
     }
+}
+
+/* FileViewerPanel 스타일 */
+.fileGridContainer {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 8px;
+    width: 100%;
+}
+
+.fileGridItem {
+    cursor: pointer;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    background-color: #f9f9f9;
+    transition: all 0.2s ease;
+}
+
+.fileGridItem:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.fileGridThumbnail {
+    height: 80px;
+    background-color: #f5f5f5;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.fileGridThumbnailImg {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: cover;
+}
+
+.fileGridName {
+    padding: 4px 6px;
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sidePanelHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fff;
+}
+
+.sidePanelBackButton {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: #333;
+    font-weight: 600;
+}
+
+.sidePanelTitle {
+    margin: 0;
+    font-size: 14px;
+    flex: 1;
+    text-align: center;
+    color: #666;
+}
+
+.imageControlButtons {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #e0e0e0;
+    background-color: #fff;
+    justify-content: center;
+}
+
+.imageControlButton {
+    padding: 6px 12px;
+    font-size: 12px;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.imageControlButton:hover {
+    background-color: #e0e0e0;
+}
+
+.resizeHandle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    cursor: col-resize;
+    background-color: transparent;
+    transition: background-color 0.2s ease;
+    z-index: 1000;
+}
+
+.resizeHandle.active {
+    background-color: #2196F3;
+}
+
+/* CretopSection 스타일 */
+.dragDropZone {
+    padding: 16px;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.dragDropZone.dragOver {
+    border-color: var(--main-color);
+    background-color: #f0f7ff;
+}
+
+.uploadButton {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: var(--main-color);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.uploadButton:hover {
+    opacity: 0.9;
+}
+
+.deleteButton {
+    padding: 6px 12px;
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: opacity 0.2s ease;
+}
+
+.deleteButton:hover {
+    opacity: 0.8;
+}
+
+.secondaryButton {
+    padding: 6px 12px;
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.secondaryButton:hover {
+    background-color: #e0e0e0;
+}
+
+/* DocumentActions 스타일 */
+.actionButtonsContainer {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.primaryButton {
+    padding: 8px 16px;
+    background-color: var(--main-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity 0.2s ease;
+}
+
+.primaryButton:hover {
+    opacity: 0.9;
+}
+
+.warningButton {
+    padding: 8px 16px;
+    background-color: #ff9800;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity 0.2s ease;
+}
+
+.warningButton:hover {
+    opacity: 0.9;
+}
+
+.dangerButton {
+    padding: 8px 16px;
+    background-color: #d32f2f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: opacity 0.2s ease;
+}
+
+.dangerButton:hover {
+    opacity: 0.9;
+}
+
+.statusInfo {
+    padding: 12px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #666;
+}
+
+.statusInfoRow {
+    margin: 0 0 4px 0;
+}
+
+.statusInfoRowLast {
+    margin: 0;
+}
+
+/* MemoSection 스타일 */
+.memoInputArea {
+    width: 100%;
+    min-height: 80px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.memoList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.memoItem {
+    padding: 12px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    position: relative;
+}
+
+.memoHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.memoUserInfo {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.memoTimestamp {
+    margin: 2px 0 0 0;
+    font-size: 11px;
+    color: #999;
+}
+
+.memoDeleteButton {
+    background: none;
+    border: none;
+    color: #d32f2f;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+    transition: opacity 0.2s ease;
+}
+
+.memoDeleteButton:hover {
+    opacity: 0.8;
+}
+
+.memoContent {
+    margin: 0;
+    font-size: 13px;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.memoEmpty {
+    margin: 0;
+    font-size: 13px;
+    color: #999;
+    text-align: center;
+    padding: 12px;
+}
+
+/* 모바일 모달 스타일 */
+.mobileModalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+}
+
+.mobileModalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.mobileModalTitle {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.mobileModalCloseButton {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    color: #666;
+}
+
+.mobileModalContent {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mobileModalImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.mobileModalIframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+/* 파일 뷰어 컨테이너 */
+.fileViewerContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.fileViewerImageContainer {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f5f5f5;
+}
+
+.fileViewerImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+}
+
+.fileViewerImageZoomable {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+}
+
+.fileViewerIframe {
+    flex: 1;
+    border: none;
+    width: 100%;
+}
+
+.imagePercentage {
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.zoomText {
+    font-size: 12px;
+    color: #999;
+    margin: '12px 0 0 0';
+}
+
+.cretopText {
+    margin: 0;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.cretopFileName {
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.cretopViewBox {
+    padding: 16px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+.cretopViewFileName {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+}
+
+.cretopViewEmpty {
+    margin: 0;
+    font-size: 14px;
+    color: #999;
+}
+
+.dragDropZoneDescription {
+    margin: 0;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.dragDropZoneHint {
+    margin: '12px 0 0 0';
+    font-size: 12px;
+    color: #999;
+}
+
+.actionStatusInfo {
+    margin-top: 24px;
+}
+
+.memoSectionWrapper {
+    margin-top: 24px;
+}
+
+.actionStatusInfoBox {
+    padding: 12px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #666;
+}
+
+.memoInputContainer {
+    margin-bottom: 16px;
+}
+
+.memoButtonMargin {
+    margin-top: 8px;
+}
+
+.memoItemWrapper {
+    padding: 12px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    position: relative;
 }
