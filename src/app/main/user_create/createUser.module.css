@@ -1,0 +1,232 @@
+.formContainer {
+    background-color: #fff;
+    border-radius: 0;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+@media (min-width: 1081px) {
+    .formContainer {
+        left: 240px;
+    }
+}
+
+.formTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 0;
+    padding: 32px 32px 24px 32px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.formContent {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    padding: 32px;
+}
+
+.formContent .formGroup {
+    width: 50%;
+}
+
+@media (max-width: 768px) {
+    .formContainer {
+        width: 100%;
+        border-radius: 0;
+    }
+
+    .formContent {
+        padding: 24px 16px;
+    }
+
+    .formTitle {
+        padding: 24px 16px;
+    }
+}
+
+.formGroup {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.label .required {
+    color: #d32f2f;
+}
+
+.input,
+.select {
+    padding: 10px 12px !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    color: #333 !important;
+    background-color: #ffffff !important;
+    transition: border-color 0.2s !important;
+}
+
+.input:focus,
+.select:focus {
+    outline: none !important;
+    border-color: var(--main-color) !important;
+}
+
+.select {
+    appearance: none;
+    padding-right: 32px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+}
+
+.errorMessage {
+    display: block;
+    color: #d32f2f;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+/* 페이지 레이아웃 */
+.pageContainer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    z-index: 999;
+}
+
+@media (min-width: 1081px) {
+    .pageContainer {
+        left: 240px;
+    }
+}
+
+.pageHeader {
+    display: none;
+}
+
+.pageTitle {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 0;
+}
+
+.buttonGroup {
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
+    padding: 24px 32px;
+    border-top: 1px solid #e5e7eb;
+    background-color: #fff;
+}
+
+@media (max-width: 768px) {
+    .buttonGroup {
+        padding: 16px;
+    }
+}
+
+.cancelButton,
+.submitButton {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cancelButton {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #e5e7eb;
+}
+
+@media (min-width: 769px) {
+    .cancelButton:hover {
+        background-color: #efefef;
+    }
+}
+
+.submitButton {
+    background-color: var(--main-color);
+    color: #ffffff;
+}
+
+@media (min-width: 769px) {
+    .submitButton:hover {
+        opacity: 0.9;
+    }
+}
+
+.loadingContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+}
+
+@media (min-width: 1081px) {
+    .loadingContainer {
+        left: 240px;
+    }
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e5e7eb;
+    border-top: 4px solid var(--main-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loadingText {
+    margin-top: 16px;
+    color: #666;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .pageContainer {
+        padding: 16px;
+    }
+}

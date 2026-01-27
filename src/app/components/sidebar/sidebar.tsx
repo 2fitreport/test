@@ -160,7 +160,8 @@ export default function Sidebar() {
                         }
 
                         const isActive = pathname === item.path ||
-                            (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create'));
+                            (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create')) ||
+                            (item.path === '/main/user_management' && pathname.startsWith('/main/user_create'));
 
                         return (
                             <li key={item.path} className={styles.menuItemWrapper}>

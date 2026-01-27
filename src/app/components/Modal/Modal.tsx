@@ -53,9 +53,11 @@ export default function Modal({
         <div className={styles.footer}>
           {showConfirmButton ? (
             <>
-              <button className={styles.cancelButton} onClick={onClose}>
-                닫기
-              </button>
+              {type !== 'success' && (
+                <button className={styles.cancelButton} onClick={onClose}>
+                  닫기
+                </button>
+              )}
               <button className={styles.confirmButton} onClick={handleConfirm}>
                 {confirmText}
               </button>

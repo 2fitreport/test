@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import Modal from '@/app/components/Modal/Modal';
 import Pagination from '@/app/components/Pagination/Pagination';
-import CreateUserModal from './CreateUserModal';
 import styles from './userList.module.css';
 import modalStyles from '@/app/components/Modal/Modal.module.css';
 
@@ -34,26 +34,13 @@ interface Position {
     level: number;
 }
 
-interface CreateUserForm {
-    user_id: string;
-    name: string;
-    position_id: number;
-    password: string;
-    phone: string;
-    email_display: string;
-    address: string;
-    address_detail: string;
-    company_name: string;
-    status: 'active' | 'inactive';
-    supervisor_id?: number | null;
-    affiliations?: string[];
-}
 
 interface UserListHandle {
     openCreateModal: () => void;
 }
 
 const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
+    const router = useRouter();
     const [users, setUsers] = useState<User[]>([]);
     const [positions, setPositions] = useState<Position[]>([]);
     const [supervisors, setSupervisors] = useState<Array<{ id: number; name: string; user_id: string }>>([]);
@@ -78,112 +65,14 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     const [pendingStatusChangeInModal, setPendingStatusChangeInModal] = useState(false);
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [positionFilter, setPositionFilter] = useState<number | 'all'>('all');
-    const [createModalOpen, setCreateModalOpen] = useState(false);
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [editingUserId, setEditingUserId] = useState<number | null>(null);
-    const [originalUserId, setOriginalUserId] = useState<string>('');
-    const [createFormData, setCreateFormData] = useState<CreateUserForm>({
-        user_id: '',
-        name: '',
-        position_id: 0,
-        password: '',
-        phone: '',
-        email_display: '',
-        address: '',
-        address_detail: '',
-        company_name: '',
-        status: 'active',
-        supervisor_id: null,
-        affiliations: [],
-    });
-    const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [validationErrorModalOpen, setValidationErrorModalOpen] = useState(false);
-    const [validationErrorMessage, setValidationErrorMessage] = useState('');
     const [showRepresentativeWarning, setShowRepresentativeWarning] = useState(false);
-    const [duplicateUserIdModalOpen, setDuplicateUserIdModalOpen] = useState(false);
-    const userIdRef = useRef<HTMLInputElement>(null);
-    const passwordRef = useRef<HTMLInputElement>(null);
-    const nameRef = useRef<HTMLInputElement>(null);
-    const positionRef = useRef<HTMLSelectElement>(null);
-    const emailRef = useRef<HTMLInputElement>(null);
 
     useImperativeHandle(ref, () => ({
         openCreateModal: () => {
-            // 소속 데이터 새로 불러오기 (새 영업자의 소속이 반영되도록)
-            fetchAffiliationsData();
-            setCreateModalOpen(true);
-            setErrors({});
-            // 모달 스크롤을 맨 위로
-            setTimeout(() => {
-                const modalOverlay = document.querySelector(`.${styles.createModalOverlay}`) as HTMLElement;
-                if (modalOverlay) {
-                    modalOverlay.scrollTop = 0;
-                }
-                const confirmButton = document.querySelector(`.${styles.createSubmitButton}`) as HTMLButtonElement;
-                confirmButton?.focus();
-            }, 0);
+            router.push('/main/user_create');
         },
     }));
 
-    const validateField = (fieldName: string, value: string | number): string => {
-        switch (fieldName) {
-            case 'user_id':
-                if (!value) return '사용자 ID를 입력해주세요.';
-                if (String(value).length < 5) {
-                    return '5글자 이상으로 입력해주세요.';
-                }
-                if (String(value).length > 10) {
-                    return '10글자 이하로 입력해주세요.';
-                }
-                if (!/^[a-zA-Z0-9_-]+$/.test(String(value))) {
-                    return '영문, 숫자, 밑줄, 하이픈만 허용됩니다.';
-                }
-                const hasLetter = /[a-zA-Z]/.test(String(value));
-                const hasNumber = /[0-9]/.test(String(value));
-                if (!hasLetter || !hasNumber) {
-                    return '영문과 숫자를 함께 포함해야 합니다.';
-                }
-                return '';
-            case 'password':
-                if (!value) return '비밀번호를 입력해주세요.';
-                return '';
-            case 'name':
-                if (!value) return '이름을 입력해주세요.';
-                if (String(value).length > 6) {
-                    return '6글자 이하로 입력해주세요.';
-                }
-                return '';
-            case 'position_id':
-                if (!value) return '직급을 선택해주세요.';
-                return '';
-            case 'phone':
-                if (!value) return '전화번호를 입력해주세요.';
-                return '';
-            case 'email_display':
-                if (!value) return '이메일을 입력해주세요.';
-                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value))) {
-                    return '유효한 이메일 형식이 아닙니다.';
-                }
-                return '';
-            case 'company_name':
-                if (!value) return '소속을 입력해주세요.';
-                if (String(value).length > 10) {
-                    return '10글자 이하로 입력해주세요.';
-                }
-                return '';
-            default:
-                return '';
-        }
-    };
-
-    const handleFieldBlur = (fieldName: string) => {
-        const value = createFormData[fieldName as keyof CreateUserForm];
-        const error = validateField(fieldName, Array.isArray(value) ? value.join(',') : value);
-        setErrors(prev => ({
-            ...prev,
-            [fieldName]: error,
-        }));
-    };
 
     useEffect(() => {
         fetchUsers();
@@ -191,18 +80,6 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         fetchSupervisors();
         fetchAffiliationsData();
     }, []);
-
-    useEffect(() => {
-        if (validationErrorModalOpen) {
-            // 유효성 검사 에러 모달이 열렸을 때 확인 버튼에 포커스
-            setTimeout(() => {
-                const confirmButton = document.querySelector('button[type="button"]') as HTMLButtonElement;
-                if (confirmButton && confirmButton.textContent?.includes('확인')) {
-                    confirmButton.focus();
-                }
-            }, 100);
-        }
-    }, [validationErrorModalOpen]);
 
     const fetchUsers = async () => {
         try {
@@ -259,28 +136,6 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         }
     };
 
-    const fetchUserAffiliations = async (inspectorId: number): Promise<string[]> => {
-        try {
-            const response = await fetch(`/api/affiliations?inspector_id=${inspectorId}`);
-            if (!response.ok) throw new Error('검수자 소속 조회 실패');
-            const data = await response.json();
-            return data.affiliations || [];
-        } catch (error) {
-            console.error('검수자 소속 조회 실패:', error);
-            return [];
-        }
-    };
-
-    const handleCheckDuplicateUserId = async (userId: string): Promise<boolean> => {
-        try {
-            const response = await fetch(`/api/users/check-duplicate?user_id=${encodeURIComponent(userId)}`);
-            const data = await response.json();
-            return data.exists || false;
-        } catch (error) {
-            console.error('중복확인 실패:', error);
-            return false;
-        }
-    };
 
     const handleSort = (column: SortColumn) => {
         if (sortColumn === column) {
@@ -403,35 +258,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
         setViewModalOpen(true);
     };
 
-    const handleEditUser = async (user: User) => {
-        setIsEditMode(true);
-        setEditingUserId(user.id);
-        setOriginalUserId(user.user_id);
-
-        // 검수자(Level 6)인 경우 소속 데이터 가져오기
-        let userAffiliations: string[] = [];
-        if (user.position?.level === 6) {
-            userAffiliations = await fetchUserAffiliations(user.id);
-            // 현재 검수자를 제외한 소속 데이터 가져오기
-            await fetchAffiliationsData(user.id);
-        }
-
-        setCreateFormData({
-            user_id: user.user_id,
-            name: user.name,
-            position_id: user.position?.id || 0,
-            password: user.password || '',
-            phone: user.phone || '',
-            email_display: user.email_display || '',
-            address: user.address || '',
-            address_detail: user.address_detail || '',
-            company_name: user.company_name || '',
-            status: user.status as 'active' | 'inactive',
-            supervisor_id: user.supervisor_id || null,
-            affiliations: userAffiliations,
-        });
-        setErrors({});
-        setCreateModalOpen(true);
+    const handleEditUser = (user: User) => {
+        router.push(`/main/user_create?mode=edit&id=${user.id}`);
     };
 
     const handleToggleStatusInModal = () => {
@@ -655,13 +483,6 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 isOpen={showRepresentativeWarning}
                 message="대표는 삭제할 수 없습니다."
                 onClose={() => setShowRepresentativeWarning(false)}
-                type="error"
-                showConfirmButton={false}
-            />
-            <Modal
-                isOpen={duplicateUserIdModalOpen}
-                message="이미 존재하는 사용자 ID입니다."
-                onClose={() => setDuplicateUserIdModalOpen(false)}
                 type="error"
                 showConfirmButton={false}
             />
@@ -1007,15 +828,6 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 showConfirmButton={false}
             />
 
-            <Modal
-                isOpen={validationErrorModalOpen}
-                message={validationErrorMessage}
-                onClose={() => setValidationErrorModalOpen(false)}
-                type="error"
-                confirmText="확인"
-                showConfirmButton={false}
-            />
-
             {successModalOpen && (
                 <div className={modalStyles.overlay} onClick={() => {
                     setSuccessModalOpen(false);
@@ -1135,236 +947,6 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 </div>
             )}
 
-            <CreateUserModal
-                isOpen={createModalOpen}
-                isEditMode={isEditMode}
-                createFormData={createFormData}
-                setCreateFormData={setCreateFormData}
-                errors={errors}
-                setErrors={setErrors}
-                onClose={() => {
-                    setCreateModalOpen(false);
-                    setIsEditMode(false);
-                    setEditingUserId(null);
-                    setOriginalUserId('');
-                    setCreateFormData({
-                        user_id: '',
-                        name: '',
-                        position_id: 0,
-                        password: '',
-                        phone: '',
-                        email_display: '',
-                        address: '',
-                        address_detail: '',
-                        company_name: '',
-                        status: 'active',
-                        supervisor_id: null,
-                        affiliations: [],
-                    });
-                    setErrors({});
-                    fetchAffiliationsData(); // 소속 데이터 새로고침
-                }}
-                onSubmit={async (isDuplicateUserIdChecked: boolean, isDuplicateUserIdExists: boolean) => {
-                    // ID가 변경되었거나 새로 생성할 때 중복확인 검사
-                    const userIdChanged = isEditMode && createFormData.user_id !== originalUserId;
-                    const needsDuplicateCheck = !isEditMode || userIdChanged;
-
-                    if (needsDuplicateCheck) {
-                        if (!isDuplicateUserIdChecked) {
-                            setValidationErrorMessage('ID 중복확인을 해주세요.');
-                            setValidationErrorModalOpen(true);
-                            return;
-                        }
-
-                        if (isDuplicateUserIdExists) {
-                            setValidationErrorMessage('이미 존재하는 사용자 ID입니다.');
-                            setValidationErrorModalOpen(true);
-                            return;
-                        }
-                    }
-
-                    // 각 필드별 유효성 검사
-                    const newErrors: { [key: string]: string } = {};
-                    let firstErrorField: string | null = null;
-                    let firstErrorMessage: string = '';
-
-                    if (!createFormData.user_id) {
-                        newErrors.user_id = '사용자 ID를 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'user_id';
-                            firstErrorMessage = '사용자 ID를 입력해주세요.<br>(영문과 숫자 결합, 5~10글자)';
-                        }
-                    } else if (createFormData.user_id.length < 5) {
-                        newErrors.user_id = '5글자 이상으로 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'user_id';
-                            firstErrorMessage = '사용자 ID는<br>5글자 이상이어야 합니다.';
-                        }
-                    } else if (createFormData.user_id.length > 10) {
-                        newErrors.user_id = '10글자 이하로 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'user_id';
-                            firstErrorMessage = '사용자 ID는<br>10글자 이하여야 합니다.';
-                        }
-                    } else if (!/^[a-zA-Z0-9_-]+$/.test(createFormData.user_id)) {
-                        newErrors.user_id = '영문, 숫자, 밑줄, 하이픈만 허용됩니다.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'user_id';
-                            firstErrorMessage = '사용자 ID는<br>영문, 숫자, 밑줄, 하이픈만 허용됩니다.';
-                        }
-                    } else {
-                        const hasLetter = /[a-zA-Z]/.test(createFormData.user_id);
-                        const hasNumber = /[0-9]/.test(createFormData.user_id);
-                        if (!hasLetter || !hasNumber) {
-                            newErrors.user_id = '영문과 숫자를 함께 포함해야 합니다.';
-                            if (!firstErrorField) {
-                                firstErrorField = 'user_id';
-                                firstErrorMessage = '사용자 ID는<br>영문과 숫자를 함께 포함해야 합니다.';
-                            }
-                        }
-                    }
-                    if (!createFormData.password) {
-                        newErrors.password = '비밀번호를 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'password';
-                            firstErrorMessage = '비밀번호를 입력해주세요.';
-                        }
-                    }
-                    if (!createFormData.name) {
-                        newErrors.name = '이름을 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'name';
-                            firstErrorMessage = '이름을 입력해주세요. (6글자 이하)';
-                        }
-                    } else if (createFormData.name.length > 6) {
-                        newErrors.name = '6글자 이하로 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'name';
-                            firstErrorMessage = '이름은 6글자 이하여야 합니다.';
-                        }
-                    }
-                    if (!createFormData.position_id) {
-                        newErrors.position_id = '직급을 선택해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'position_id';
-                            firstErrorMessage = '직급을 선택해주세요.';
-                        }
-                    }
-                    if (!createFormData.phone) {
-                        newErrors.phone = '전화번호를 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'phone';
-                            firstErrorMessage = '전화번호를 입력해주세요.<br> (010-XXXX-XXXX 형식)';
-                        }
-                    }
-                    if (!createFormData.email_display) {
-                        newErrors.email_display = '이메일을 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'email_display';
-                            firstErrorMessage = '이메일을 입력해주세요.<br> (예: example@domain.com)';
-                        }
-                    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(createFormData.email_display)) {
-                        newErrors.email_display = '유효한 이메일 형식이 아닙니다.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'email_display';
-                            firstErrorMessage = '유효한 이메일 형식이 아닙니다.<br> (예: example@domain.com)';
-                        }
-                    }
-                    if (!createFormData.company_name) {
-                        newErrors.company_name = '소속을 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'company_name';
-                            firstErrorMessage = '소속을 입력해주세요. (10글자 이하)';
-                        }
-                    } else if (createFormData.company_name.length > 10) {
-                        newErrors.company_name = '10글자 이하로 입력해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'company_name';
-                            firstErrorMessage = '소속은 10글자 이하여야 합니다.';
-                        }
-                    }
-
-                    // 검수자(Level 6)인 경우 담당 소속 필수 확인
-                    const selectedPosition = positions.find(p => p.id === createFormData.position_id);
-                    if (selectedPosition?.level === 6 && (!createFormData.affiliations || createFormData.affiliations.length === 0)) {
-                        newErrors.affiliations = '담당 소속을 선택해주세요.';
-                        if (!firstErrorField) {
-                            firstErrorField = 'affiliations';
-                            firstErrorMessage = '검수자는 최소 1개 이상의<br>담당 소속을 선택해야 합니다.';
-                        }
-                    }
-
-                    if (Object.keys(newErrors).length > 0) {
-                        setErrors(newErrors);
-                        setValidationErrorMessage(firstErrorMessage);
-                        setValidationErrorModalOpen(true);
-                        // 첫 번째 에러 필드에 포커스
-                        if (firstErrorField === 'user_id') userIdRef.current?.focus();
-                        else if (firstErrorField === 'password') passwordRef.current?.focus();
-                        else if (firstErrorField === 'name') nameRef.current?.focus();
-                        else if (firstErrorField === 'position_id') positionRef.current?.focus();
-                        else if (firstErrorField === 'email_display') emailRef.current?.focus();
-                        return;
-                    }
-
-                    try {
-                        const url = isEditMode ? `/api/users/${editingUserId}` : '/api/users';
-                        const method = isEditMode ? 'PATCH' : 'POST';
-                        const response = await fetch(url, {
-                            method,
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(createFormData),
-                        });
-
-                        if (!response.ok) {
-                            const data = await response.json();
-                            throw new Error(data.message || (isEditMode ? '사용자 수정 실패' : '사용자 생성 실패'));
-                        }
-
-                        setCreateModalOpen(false);
-                        setIsEditMode(false);
-                        setEditingUserId(null);
-                        setCreateFormData({
-                            user_id: '',
-                            name: '',
-                            position_id: 0,
-                            password: '',
-                            phone: '',
-                            email_display: '',
-                            address: '',
-                            address_detail: '',
-                            company_name: '',
-                            status: 'active',
-                            supervisor_id: null,
-                            affiliations: [],
-                        });
-                        fetchUsers();
-                        fetchAffiliationsData(); // 소속 데이터 새로고침
-                        setSuccessMessage(isEditMode ? '사용자가 수정되었습니다.' : '사용자가 생성되었습니다.');
-                        setSuccessModalOpen(true);
-                    } catch (error) {
-                        const errorMessage = error instanceof Error ? error.message : '사용자 생성 실패';
-                        if (errorMessage.includes('이미 존재') || errorMessage.includes('duplicate') || errorMessage.includes('Duplicate')) {
-                            setDuplicateUserIdModalOpen(true);
-                        } else {
-                            setErrorMessage(errorMessage);
-                            setErrorModalOpen(true);
-                        }
-                    }
-                }}
-                positions={positions}
-                supervisors={supervisors}
-                userIdRef={userIdRef}
-                passwordRef={passwordRef}
-                nameRef={nameRef}
-                positionRef={positionRef}
-                emailRef={emailRef}
-                handleFieldBlur={handleFieldBlur}
-                onCheckDuplicateUserId={handleCheckDuplicateUserId}
-                allAffiliations={allAffiliations}
-                takenAffiliations={takenAffiliations}
-                editingUserId={editingUserId}
-            />
         </div>
         </>
     );
