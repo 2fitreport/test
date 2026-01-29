@@ -21,6 +21,9 @@ interface CreateUserFormProps {
         company_name: string;
         status: 'active' | 'inactive';
         affiliations?: string[];
+        bank_name: string;
+        account_holder: string;
+        account_number: string;
     };
     errors: { [key: string]: string };
     isDuplicateUserIdChecked: boolean;
@@ -30,7 +33,6 @@ interface CreateUserFormProps {
     userIdRef: React.Ref<HTMLInputElement>;
     passwordRef: React.Ref<HTMLInputElement>;
     nameRef: React.Ref<HTMLInputElement>;
-    positionRef: React.Ref<HTMLSelectElement>;
     emailRef: React.Ref<HTMLInputElement>;
     onUpdateUserId: (value: string, showWarningCallback?: () => void) => void;
     onUpdatePassword: (value: string) => void;
@@ -46,6 +48,7 @@ interface CreateUserFormProps {
     onFieldBlur: (fieldName: string) => void;
     onCheckDuplicate: (userId: string) => Promise<boolean>;
     onStatusChange: (status: 'active' | 'inactive') => void;
+    onUpdateField: (fieldName: string, value: any) => void;
 }
 
 export default function CreateUserForm({
@@ -62,7 +65,6 @@ export default function CreateUserForm({
     userIdRef,
     passwordRef,
     nameRef,
-    positionRef,
     emailRef,
     onUpdateUserId,
     onUpdatePassword,
@@ -78,6 +80,7 @@ export default function CreateUserForm({
     onFieldBlur,
     onCheckDuplicate,
     onStatusChange,
+    onUpdateField,
 }: CreateUserFormProps) {
     const [showKoreanWarning, setShowKoreanWarning] = useState(false);
     const [showAddressLoadingError, setShowAddressLoadingError] = useState(false);
@@ -237,23 +240,48 @@ export default function CreateUserForm({
                     {!(isEditMode && positions.find(p => p.id === formData.position_id)?.level === 1) && (
                         <div className={styles.formGroup}>
                             <label className={styles.label}>직급 <span className={styles.required}>*</span></label>
-                            <select
-                                ref={positionRef}
-                                className={styles.select}
-                                value={formData.position_id || ''}
-                                onChange={(e) => onUpdatePosition(e.target.value ? Number(e.target.value) : 0)}
-                                onBlur={() => onFieldBlur('position_id')}
-                                style={{
-                                    borderColor: errors.position_id ? '#d32f2f' : undefined,
-                                }}
-                            >
-                                <option value="" disabled hidden>직급을 선택해주세요</option>
+                            <div style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: '8px',
+                            }}>
                                 {positions.filter(position => position.level !== 1).map(position => (
-                                    <option key={position.id} value={position.id}>
-                                        {position.name}
-                                    </option>
+                                    <label
+                                        key={position.id}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            padding: '10px 16px',
+                                            borderRadius: '6px',
+                                            border: `1px solid ${formData.position_id === position.id ? 'var(--main-color)' : '#e5e7eb'}`,
+                                            backgroundColor: formData.position_id === position.id ? 'var(--main-color)' : '#ffffff',
+                                            color: formData.position_id === position.id ? '#ffffff' : '#333',
+                                            cursor: isEditMode ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.2s ease',
+                                            fontWeight: formData.position_id === position.id ? '600' : '500',
+                                            fontSize: '14px',
+                                            opacity: isEditMode ? 0.6 : 1,
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="position"
+                                            value={position.id}
+                                            checked={formData.position_id === position.id}
+                                            onChange={() => !isEditMode && onUpdatePosition(position.id)}
+                                            onBlur={() => onFieldBlur('position_id')}
+                                            disabled={isEditMode}
+                                            style={{
+                                                display: 'none',
+                                                cursor: isEditMode ? 'not-allowed' : 'pointer',
+                                                accentColor: 'var(--main-color)',
+                                            }}
+                                        />
+                                        <span style={{ cursor: isEditMode ? 'not-allowed' : 'pointer' }}>{position.name}</span>
+                                    </label>
                                 ))}
-                            </select>
+                            </div>
                             {errors.position_id && <span className={styles.errorMessage}>{errors.position_id}</span>}
                         </div>
                     )}
@@ -445,6 +473,42 @@ export default function CreateUserForm({
                             <option value="active">활성</option>
                             <option value="inactive">비활성</option>
                         </select>
+                    </div>
+
+                    {/* 은행명 */}
+                    <div className={styles.formGroup}>
+                        <label className={styles.label}>은행명</label>
+                        <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="은행명을 입력하세요"
+                            value={formData.bank_name}
+                            onChange={(e) => onUpdateField('bank_name', e.target.value)}
+                        />
+                    </div>
+
+                    {/* 예금주 */}
+                    <div className={styles.formGroup}>
+                        <label className={styles.label}>예금주</label>
+                        <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="예금주를 입력하세요"
+                            value={formData.account_holder}
+                            onChange={(e) => onUpdateField('account_holder', e.target.value)}
+                        />
+                    </div>
+
+                    {/* 계좌번호 */}
+                    <div className={styles.formGroup}>
+                        <label className={styles.label}>계좌번호</label>
+                        <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="계좌번호를 입력하세요"
+                            value={formData.account_number}
+                            onChange={(e) => onUpdateField('account_number', e.target.value)}
+                        />
                     </div>
                 </div>
         </>

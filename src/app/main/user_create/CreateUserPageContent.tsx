@@ -106,7 +106,6 @@ export default function CreateUserPageContent() {
             if (firstErrorField === 'user_id') form.userIdRef.current?.focus();
             else if (firstErrorField === 'password') form.passwordRef.current?.focus();
             else if (firstErrorField === 'name') form.nameRef.current?.focus();
-            else if (firstErrorField === 'position_id') form.positionRef.current?.focus();
             else if (firstErrorField === 'email_display') form.emailRef.current?.focus();
 
             return;
@@ -211,7 +210,6 @@ export default function CreateUserPageContent() {
                 userIdRef={form.userIdRef}
                 passwordRef={form.passwordRef}
                 nameRef={form.nameRef}
-                positionRef={form.positionRef}
                 emailRef={form.emailRef}
                 onUpdateUserId={form.updateUserId}
                 onUpdatePassword={form.updatePassword}
@@ -227,6 +225,7 @@ export default function CreateUserPageContent() {
                 onFieldBlur={form.handleFieldBlur}
                 onCheckDuplicate={form.checkDuplicateUserId}
                 onStatusChange={(status) => form.updateField('status', status)}
+                onUpdateField={form.updateField}
             />
                 <div className={styles.buttonGroup}>
                     <button

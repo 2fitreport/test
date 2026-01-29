@@ -17,6 +17,9 @@ export interface CreateUserFormData {
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
     affiliations?: string[];
+    bank_name: string;
+    account_holder: string;
+    account_number: string;
 }
 
 interface Position {
@@ -39,6 +42,9 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
         status: 'active',
         supervisor_id: null,
         affiliations: [],
+        bank_name: '',
+        account_holder: '',
+        account_number: '',
     });
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -51,7 +57,6 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
     const userIdRef = useRef<HTMLInputElement>(null);
     const passwordRef = useRef<HTMLInputElement>(null);
     const nameRef = useRef<HTMLInputElement>(null);
-    const positionRef = useRef<HTMLSelectElement>(null);
     const emailRef = useRef<HTMLInputElement>(null);
 
     /**
@@ -312,6 +317,9 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
             status: 'active',
             supervisor_id: null,
             affiliations: [],
+            bank_name: '',
+            account_holder: '',
+            account_number: '',
         });
         setErrors({});
         setIsDuplicateUserIdChecked(false);
@@ -369,7 +377,6 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
         userIdRef,
         passwordRef,
         nameRef,
-        positionRef,
         emailRef,
     };
 };

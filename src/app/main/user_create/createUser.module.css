@@ -4,7 +4,8 @@
     border: none;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     position: fixed;
     top: 0;
     bottom: 0;
@@ -30,8 +31,6 @@
 }
 
 .formContent {
-    overflow-y: auto;
-    overflow-x: hidden;
     flex: 1;
     padding: 32px;
 }
