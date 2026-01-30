@@ -37,6 +37,9 @@ export async function PATCH(
           company_name,
           password,
           supervisor_id,
+          bank_name,
+          account_holder,
+          account_number,
           created_at
         `)
         .single();
@@ -50,7 +53,7 @@ export async function PATCH(
     }
 
     // 전체 정보 수정
-    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations } = body;
+    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, bank_name, account_holder, account_number } = body;
 
     const updateData: Record<string, unknown> = {};
     // user_id는 수정 불가 (documents 테이블에서 참조됨)
@@ -63,6 +66,9 @@ export async function PATCH(
     if (address_detail !== undefined) updateData.address_detail = address_detail;
     if (company_name !== undefined) updateData.company_name = company_name;
     if (status !== undefined) updateData.status = status;
+    if (bank_name !== undefined) updateData.bank_name = bank_name;
+    if (account_holder !== undefined) updateData.account_holder = account_holder;
+    if (account_number !== undefined) updateData.account_number = account_number;
 
     // position level 확인
     let isInspector = false;
@@ -100,6 +106,9 @@ export async function PATCH(
         address_detail,
         company_name,
         password,
+        bank_name,
+        account_holder,
+        account_number,
         created_at
       `)
       .single();
