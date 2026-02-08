@@ -40,10 +40,6 @@ export const validateField = (fieldName: string, value: string | number): string
                 return '유효한 이메일 형식이 아닙니다.';
             }
             return '';
-        case 'company_name':
-            if (!value) return '소속을 입력해주세요.';
-            if (String(value).length > 10) return '10글자 이하로 입력해주세요.';
-            return '';
         default:
             return '';
     }
@@ -135,21 +131,6 @@ export const validateFormData = (
         if (!firstErrorField) {
             firstErrorField = 'email_display';
             firstErrorMessage = '유효한 이메일 형식이 아닙니다.';
-        }
-    }
-
-    // company_name 검증
-    if (!formData.company_name) {
-        errors.company_name = '소속을 입력해주세요.';
-        if (!firstErrorField) {
-            firstErrorField = 'company_name';
-            firstErrorMessage = '소속을 입력해주세요. (10글자 이하)';
-        }
-    } else if (formData.company_name.length > 10) {
-        errors.company_name = '10글자 이하로 입력해주세요.';
-        if (!firstErrorField) {
-            firstErrorField = 'company_name';
-            firstErrorMessage = '소속은 10글자 이하여야 합니다.';
         }
     }
 

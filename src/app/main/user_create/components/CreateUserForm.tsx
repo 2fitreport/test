@@ -286,25 +286,11 @@ export default function CreateUserForm({
                         </div>
                     )}
 
-                    {/* 담당 소속 (검수자용) */}
+                    {/* 담당 소속 (영업자/검수자용) */}
                     {formData.position_id > 0 &&
-                     positions.find(p => p.id === formData.position_id)?.level === 6 && (
+                     [4, 6].includes(positions.find(p => p.id === formData.position_id)?.level || 0) && (
                         <div className={styles.formGroup}>
-                            <label className={styles.label}>담당 소속 <span className={styles.required}>*</span></label>
-                            <input
-                                type="text"
-                                placeholder="소속 검색..."
-                                value={affiliationSearch}
-                                onChange={(e) => onAffiliationSearchChange(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '6px 10px',
-                                    marginBottom: '8px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: '4px',
-                                    fontSize: '13px',
-                                }}
-                            />
+                            <label className={styles.label}>소속 <span className={styles.required}>*</span></label>
                             <div style={{
                                 display: 'flex',
                                 flexWrap: 'wrap',
@@ -313,15 +299,10 @@ export default function CreateUserForm({
                                 border: '1px solid #e0e0e0',
                                 borderRadius: '4px',
                                 backgroundColor: '#fafafa',
-                                maxHeight: '200px',
-                                overflowY: 'auto'
+                                minHeight: '44px',
                             }}>
-                                {allAffiliations
-                                    .filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase()))
-                                    .map(affName => {
+                                {allAffiliations.map(affName => {
                                     const isChecked = formData.affiliations?.includes(affName) || false;
-                                    const isTakenByOther = takenAffiliations.includes(affName) && !isChecked;
-
                                     return (
                                         <label
                                             key={affName}
@@ -329,32 +310,34 @@ export default function CreateUserForm({
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: '6px',
-                                                cursor: isTakenByOther ? 'not-allowed' : 'pointer',
-                                                opacity: isTakenByOther ? 0.5 : 1,
                                                 padding: '6px 12px',
                                                 borderRadius: '4px',
                                                 backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
                                                 color: isChecked ? '#fff' : '#333',
                                                 border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
-                                                transition: 'all 0.2s ease'
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease',
+                                                fontWeight: isChecked ? '500' : '400'
                                             }}
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={isChecked}
-                                                disabled={isTakenByOther}
                                                 onChange={() => onToggleAffiliation(affName)}
                                                 style={{ display: 'none' }}
                                             />
-                                            <span style={{ fontWeight: '500', cursor: 'pointer' }}>{affName}</span>
-                                            {isTakenByOther && <span style={{ fontSize: '11px', color: '#999' }}>(배정됨)</span>}
+                                            <span style={{ cursor: 'pointer' }}>
+                                                {affName}
+                                            </span>
                                         </label>
                                     );
                                 })}
-                                {allAffiliations.filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase())).length === 0 && (
-                                    <span style={{ color: '#999', fontSize: '13px' }}>검색 결과가 없습니다</span>
-                                )}
                             </div>
+                            {allAffiliations.length === 0 && (
+                                <p style={{ color: '#999', fontSize: '13px', margin: '12px 0 0 0' }}>
+                                    소속 관리에서 추가된 소속이 없습니다.
+                                </p>
+                            )}
                             {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
                         </div>
                     )}
@@ -443,23 +426,6 @@ export default function CreateUserForm({
                                 backgroundColor: formData.address ? '#ffffff' : '#f5f5f5',
                             }}
                         />
-                    </div>
-
-                    {/* 소속 (기업명) */}
-                    <div className={styles.formGroup}>
-                        <label className={styles.label}>소속 (기업명) <span className={styles.required}>*</span></label>
-                        <input
-                            type="text"
-                            className={styles.input}
-                            placeholder="소속을 입력하세요"
-                            value={formData.company_name}
-                            onChange={(e) => onUpdateCompanyName(e.target.value)}
-                            onBlur={() => onFieldBlur('company_name')}
-                            style={{
-                                borderColor: errors.company_name ? '#d32f2f' : undefined,
-                            }}
-                        />
-                        {errors.company_name && <span className={styles.errorMessage}>{errors.company_name}</span>}
                     </div>
 
                     {/* 상태 */}

@@ -143,13 +143,32 @@ export async function POST(request: NextRequest) {
       .single();
 
     const isInspector = positionData?.level === 6;
+    const isEmployee = positionData?.level === 4;
 
-    // 검수자인 경우 소속 필수 확인
-    if (isInspector && (!affiliations || affiliations.length === 0)) {
+    // 영업자/검수자인 경우 소속 필수 확인
+    if ((isEmployee || isInspector) && (!affiliations || affiliations.length === 0)) {
       return NextResponse.json(
-        { message: '검수자는 최소 1개 이상의 소속을 선택해야 합니다.' },
+        { message: '소속을 선택해주세요.' },
         { status: 400 }
       );
+    }
+
+    // 검수자인 경우 이미 사용 중인 소속 확인
+    if (isInspector && affiliations && affiliations.length > 0) {
+      const { data: takenData, error: takenError } = await supabase
+        .from('user_affiliations')
+        .select('affiliations(name)')
+        .in('affiliations.name', affiliations);
+
+      if (takenError) throw takenError;
+
+      const takenAffiliations = takenData?.map((item: any) => item.affiliations?.name).filter(Boolean) || [];
+      if (takenAffiliations.length > 0) {
+        return NextResponse.json(
+          { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
+          { status: 400 }
+        );
+      }
     }
 
     // 새 사용자 생성
@@ -193,28 +212,35 @@ export async function POST(request: NextRequest) {
 
     if (createError) throw createError;
 
-    // 검수자인 경우 소속 저장
-    if (isInspector && affiliations && affiliations.length > 0) {
-      const insertData = affiliations.map((affName: string) => ({
-        inspector_id: newUser.id,
-        affiliation_name: affName
-      }));
+    // 영업자/검수자인 경우 소속 저장
+    if ((isEmployee || isInspector) && affiliations && affiliations.length > 0) {
+      // affiliations 이름으로 id 조회
+      const { data: affData, error: affQueryError } = await supabase
+        .from('affiliations')
+        .select('id, name')
+        .in('name', affiliations);
 
-      const { error: affError } = await supabase
-        .from('inspector_affiliations')
-        .insert(insertData);
+      if (affQueryError) throw affQueryError;
 
-      if (affError) {
-        // 사용자 삭제 (롤백)
-        await supabase.from('users').delete().eq('id', newUser.id);
+      // affiliation_id 매핑
+      const affMap = new Map(affData?.map((a: any) => [a.name, a.id]) || []);
+      const insertData = affiliations
+        .map((affName: string) => ({
+          user_id: newUser.id,
+          affiliation_id: affMap.get(affName)
+        }))
+        .filter((item: any) => item.affiliation_id !== undefined);
 
-        if (affError.code === '23505') {
-          return NextResponse.json(
-            { message: '이미 다른 검수자에게 배정된 소속이 있습니다.' },
-            { status: 400 }
-          );
+      if (insertData.length > 0) {
+        const { error: affError } = await supabase
+          .from('user_affiliations')
+          .insert(insertData);
+
+        if (affError) {
+          // 사용자 삭제 (롤백)
+          await supabase.from('users').delete().eq('id', newUser.id);
+          throw affError;
         }
-        throw affError;
       }
     }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import CreateUserForm from './components/CreateUserForm';
+import AffiliationSection from './components/AffiliationSection';
 import { useCreateUserForm } from './hooks/useCreateUserForm';
 import Modal from '@/app/components/Modal/Modal';
 import styles from './createUser.module.css';
@@ -56,18 +57,18 @@ export default function CreateUserPageContent() {
                 if (!affiliationsRes.ok) throw new Error('소속 조회 실패');
                 const affiliationsData = await affiliationsRes.json();
                 setAllAffiliations(affiliationsData.allAffiliations || []);
-                setTakenAffiliations(affiliationsData.takenAffiliations || []);
+                setTakenAffiliations([]);
 
                 // 편집 모드인 경우 사용자 데이터 로드
                 if (isEditMode && userId) {
-                    const userRes = await fetch(`/api/users?id=${userId}`);
+                    const userRes = await fetch(`/api/users/${userId}`);
                     if (!userRes.ok) throw new Error('사용자 조회 실패');
                     const userData = await userRes.json();
 
                     // 검수자(Level 6)인 경우 소속 데이터 가져오기
                     let userAffiliations: string[] = [];
                     if (userData.position?.level === 6) {
-                        const userAffRes = await fetch(`/api/affiliations?inspector_id=${userId}`);
+                        const userAffRes = await fetch(`/api/affiliations?inspector_id=${userData.id}`);
                         if (userAffRes.ok) {
                             const affData = await userAffRes.json();
                             userAffiliations = affData.affiliations || [];
@@ -196,37 +197,49 @@ export default function CreateUserPageContent() {
             {/* 폼 */}
             <div className={styles.formContainer}>
                 <h1 className={styles.formTitle}>{isEditMode ? '사용자 수정' : '사용자 생성'}</h1>
-                <CreateUserForm
-                isEditMode={isEditMode}
-                positions={positions}
-                allAffiliations={allAffiliations}
-                takenAffiliations={takenAffiliations}
-                formData={form.formData}
-                errors={form.errors}
-                isDuplicateUserIdChecked={form.isDuplicateUserIdChecked}
-                isDuplicateUserIdExists={form.isDuplicateUserIdExists}
-                isCheckingDuplicate={form.isCheckingDuplicate}
-                affiliationSearch={form.affiliationSearch}
-                userIdRef={form.userIdRef}
-                passwordRef={form.passwordRef}
-                nameRef={form.nameRef}
-                emailRef={form.emailRef}
-                onUpdateUserId={form.updateUserId}
-                onUpdatePassword={form.updatePassword}
-                onUpdateName={form.updateName}
-                onUpdatePhone={form.updatePhone}
-                onUpdateEmail={form.updateEmail}
-                onUpdatePosition={form.updatePosition}
-                onUpdateCompanyName={form.updateCompanyName}
-                onUpdateAddress={form.updateAddress}
-                onUpdateAddressDetail={form.updateAddressDetail}
-                onToggleAffiliation={form.toggleAffiliation}
-                onAffiliationSearchChange={form.setAffiliationSearch}
-                onFieldBlur={form.handleFieldBlur}
-                onCheckDuplicate={form.checkDuplicateUserId}
-                onStatusChange={(status) => form.updateField('status', status)}
-                onUpdateField={form.updateField}
-            />
+
+                <div className={styles.contentWrapper}>
+                    <CreateUserForm
+                        isEditMode={isEditMode}
+                        positions={positions}
+                        allAffiliations={allAffiliations}
+                        takenAffiliations={takenAffiliations}
+                        formData={form.formData}
+                        errors={form.errors}
+                        isDuplicateUserIdChecked={form.isDuplicateUserIdChecked}
+                        isDuplicateUserIdExists={form.isDuplicateUserIdExists}
+                        isCheckingDuplicate={form.isCheckingDuplicate}
+                        affiliationSearch={form.affiliationSearch}
+                        userIdRef={form.userIdRef}
+                        passwordRef={form.passwordRef}
+                        nameRef={form.nameRef}
+                        emailRef={form.emailRef}
+                        onUpdateUserId={form.updateUserId}
+                        onUpdatePassword={form.updatePassword}
+                        onUpdateName={form.updateName}
+                        onUpdatePhone={form.updatePhone}
+                        onUpdateEmail={form.updateEmail}
+                        onUpdatePosition={form.updatePosition}
+                        onUpdateCompanyName={form.updateCompanyName}
+                        onUpdateAddress={form.updateAddress}
+                        onUpdateAddressDetail={form.updateAddressDetail}
+                        onToggleAffiliation={form.toggleAffiliation}
+                        onAffiliationSearchChange={form.setAffiliationSearch}
+                        onFieldBlur={form.handleFieldBlur}
+                        onCheckDuplicate={form.checkDuplicateUserId}
+                        onStatusChange={(status) => form.updateField('status', status)}
+                        onUpdateField={form.updateField}
+                    />
+
+                    <AffiliationSection
+                        allAffiliations={allAffiliations}
+                        takenAffiliations={takenAffiliations}
+                        affiliationSearch={form.affiliationSearch}
+                        onAffiliationSearchChange={form.setAffiliationSearch}
+                        onAffiliationsChange={setAllAffiliations}
+                    />
+                </div>
+
                 <div className={styles.buttonGroup}>
                     <button
                         className={styles.cancelButton}

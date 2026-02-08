@@ -6,6 +6,55 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const userId = parseInt(id, 10);
+
+    const { data, error } = await supabase
+      .from('users')
+      .select(`
+        id,
+        user_id,
+        name,
+        position_id,
+        position(id, name, level),
+        status,
+        phone,
+        email_display,
+        address,
+        address_detail,
+        company_name,
+        password,
+        supervisor_id,
+        bank_name,
+        account_holder,
+        account_number,
+        created_at
+      `)
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json(
+        { message: '사용자를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(data, { status: 200 });
+  } catch (error: any) {
+    console.error('사용자 조회 실패:', error);
+    return NextResponse.json(
+      { message: '사용자 조회 실패', error: error?.message || error },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -89,6 +138,25 @@ export async function PATCH(
       );
     }
 
+    // 검수자인 경우 이미 사용 중인 소속 확인 (자신의 소속 제외)
+    if (isInspector && affiliations !== undefined && affiliations.length > 0) {
+      const { data: takenData, error: takenError } = await supabase
+        .from('user_affiliations')
+        .select('affiliations(name), user_id')
+        .in('affiliations.name', affiliations)
+        .neq('user_id', userId);
+
+      if (takenError) throw takenError;
+
+      const takenAffiliations = takenData?.map((item: any) => item.affiliations?.name).filter(Boolean) || [];
+      if (takenAffiliations.length > 0) {
+        return NextResponse.json(
+          { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('users')
       .update(updateData)
@@ -115,35 +183,41 @@ export async function PATCH(
 
     if (error) throw error;
 
-    // 검수자인 경우 소속 업데이트
-    if (isInspector && affiliations !== undefined) {
+    // 영업자/검수자인 경우 소속 업데이트
+    if ((isInspector || position_id > 0 && (data?.position as any)?.level === 4) && affiliations !== undefined) {
       // 기존 소속 삭제
       const { error: deleteError } = await supabase
-        .from('inspector_affiliations')
+        .from('user_affiliations')
         .delete()
-        .eq('inspector_id', userId);
+        .eq('user_id', userId);
 
       if (deleteError) throw deleteError;
 
       // 새 소속 추가
       if (affiliations.length > 0) {
-        const insertData = affiliations.map((affName: string) => ({
-          inspector_id: userId,
-          affiliation_name: affName
-        }));
+        // affiliations 이름으로 id 조회
+        const { data: affData, error: affQueryError } = await supabase
+          .from('affiliations')
+          .select('id, name')
+          .in('name', affiliations);
 
-        const { error: affError } = await supabase
-          .from('inspector_affiliations')
-          .insert(insertData);
+        if (affQueryError) throw affQueryError;
 
-        if (affError) {
-          if (affError.code === '23505') {
-            return NextResponse.json(
-              { message: '이미 다른 검수자에게 배정된 소속이 있습니다.' },
-              { status: 400 }
-            );
-          }
-          throw affError;
+        // affiliation_id 매핑
+        const affMap = new Map(affData?.map((a: any) => [a.name, a.id]) || []);
+        const insertData = affiliations
+          .map((affName: string) => ({
+            user_id: userId,
+            affiliation_id: affMap.get(affName)
+          }))
+          .filter((item: any) => item.affiliation_id !== undefined);
+
+        if (insertData.length > 0) {
+          const { error: affError } = await supabase
+            .from('user_affiliations')
+            .insert(insertData);
+
+          if (affError) throw affError;
         }
       }
     }

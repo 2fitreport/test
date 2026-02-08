@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 // GET: 소속 데이터 조회
@@ -11,67 +11,63 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const inspectorId = searchParams.get('inspector_id');
-        const excludeInspectorId = searchParams.get('exclude_inspector_id');
         const getAllAffiliations = searchParams.get('get_all');
+        const excludeInspectorId = searchParams.get('exclude_inspector_id');
 
-        // 모든 소속 목록 조회 (users 테이블의 company_name 중복 제거)
+        // 모든 소속 목록 조회
         if (getAllAffiliations === 'true') {
-            const { data: usersData, error: usersError } = await supabase
-                .from('users')
-                .select('company_name')
-                .not('company_name', 'is', null)
-                .neq('company_name', '');
+            const { data: allAffiliations, error: allError } = await supabase
+                .from('affiliations')
+                .select('name')
+                .order('name');
 
-            if (usersError) throw usersError;
+            if (allError) throw allError;
 
-            // 중복 제거
-            const allAffiliations = [...new Set(usersData?.map(u => u.company_name).filter(Boolean))] as string[];
+            // 검수자(level 6)가 배정받은 소속 목록 조회
+            let query = supabase
+                .from('user_affiliations')
+                .select('affiliations(name), user_id, users!inner(position_id)')
+                .eq('users.position_id', 6);
 
-            // 이미 배정된 소속 조회
-            let takenQuery = supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name');
-
+            // exclude_inspector_id가 있으면 제외
             if (excludeInspectorId) {
-                takenQuery = takenQuery.neq('inspector_id', parseInt(excludeInspectorId));
+                query = query.neq('user_id', parseInt(excludeInspectorId));
             }
 
-            const { data: takenData, error: takenError } = await takenQuery;
+            const { data: takenData, error: takenError } = await query;
+
             if (takenError) throw takenError;
 
-            const takenAffiliations = takenData?.map(item => item.affiliation_name) || [];
+            const takenAffiliations = (takenData?.map((item: any) => item.affiliations?.name).filter(Boolean) || []) as string[];
 
-            return NextResponse.json({ allAffiliations, takenAffiliations });
+            return NextResponse.json({
+                allAffiliations: allAffiliations?.map(a => a.name) || [],
+                takenAffiliations: [...new Set(takenAffiliations)]
+            });
         }
 
-        // 특정 검수자의 소속 조회
+        // 특정 사용자의 소속 조회
         if (inspectorId) {
             const { data, error } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', parseInt(inspectorId));
+                .from('user_affiliations')
+                .select('affiliations(name)')
+                .eq('user_id', parseInt(inspectorId));
 
             if (error) throw error;
 
-            const affiliations = data?.map(item => item.affiliation_name) || [];
+            const affiliations = (data?.map((item: any) => item.affiliations?.name).filter(Boolean) || []) as string[];
             return NextResponse.json({ affiliations });
         }
 
-        // 이미 배정된 소속 조회 (특정 검수자 제외 가능)
-        let query = supabase
-            .from('inspector_affiliations')
-            .select('affiliation_name');
-
-        if (excludeInspectorId) {
-            query = query.neq('inspector_id', parseInt(excludeInspectorId));
-        }
-
-        const { data, error } = await query;
+        // 모든 소속 목록
+        const { data, error } = await supabase
+            .from('affiliations')
+            .select('name')
+            .order('name');
 
         if (error) throw error;
 
-        const takenAffiliations = data?.map(item => item.affiliation_name) || [];
-        return NextResponse.json({ takenAffiliations });
+        return NextResponse.json(data?.map(a => a.name) || []);
 
     } catch (error) {
         console.error('소속 조회 실패:', error);
@@ -82,56 +78,78 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST: 검수자 소속 설정
+// POST: 소속 추가
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { inspector_id, affiliations } = body;
+        const { name } = body;
 
-        if (!inspector_id) {
+        if (!name || !name.trim()) {
             return NextResponse.json(
-                { message: '검수자 ID가 필요합니다.' },
+                { message: '소속 이름을 입력해주세요.' },
                 { status: 400 }
             );
         }
 
-        // 기존 소속 삭제
-        const { error: deleteError } = await supabase
-            .from('inspector_affiliations')
-            .delete()
-            .eq('inspector_id', inspector_id);
+        const { data, error } = await supabase
+            .from('affiliations')
+            .insert([{ name: name.trim() }])
+            .select('name')
+            .single();
 
-        if (deleteError) throw deleteError;
-
-        // 새 소속 추가
-        if (affiliations && affiliations.length > 0) {
-            const insertData = affiliations.map((affName: string) => ({
-                inspector_id,
-                affiliation_name: affName
-            }));
-
-            const { error: insertError } = await supabase
-                .from('inspector_affiliations')
-                .insert(insertData);
-
-            if (insertError) {
-                // 중복 소속 에러 처리
-                if (insertError.code === '23505') {
-                    return NextResponse.json(
-                        { message: '이미 다른 검수자에게 배정된 소속이 있습니다.' },
-                        { status: 400 }
-                    );
-                }
-                throw insertError;
+        if (error) {
+            if (error.code === '23505') {
+                return NextResponse.json(
+                    { message: '이미 존재하는 소속입니다.' },
+                    { status: 400 }
+                );
             }
+            throw error;
         }
 
-        return NextResponse.json({ success: true });
+        return NextResponse.json(
+            { message: '소속이 추가되었습니다.', data },
+            { status: 201 }
+        );
 
     } catch (error) {
-        console.error('소속 설정 실패:', error);
+        console.error('소속 추가 실패:', error);
         return NextResponse.json(
-            { message: '소속 설정 실패' },
+            { message: '소속 추가 실패' },
+            { status: 500 }
+        );
+    }
+}
+
+// DELETE: 소속 삭제
+export async function DELETE(request: NextRequest) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const name = searchParams.get('name');
+
+        if (!name) {
+            return NextResponse.json(
+                { message: '소속 이름이 필요합니다.' },
+                { status: 400 }
+            );
+        }
+
+        const { error } = await supabase
+            .from('affiliations')
+            .delete()
+            .eq('name', name);
+
+        if (error) throw error;
+
+        return NextResponse.json(
+            { message: '소속이 삭제되었습니다.' },
+            { status: 200 }
+        );
+
+    } catch (error) {
+        console.error('소속 삭제 실패:', error);
+        return NextResponse.json(
+            { message: '소속 삭제 실패' },
             { status: 500 }
         );
     }
