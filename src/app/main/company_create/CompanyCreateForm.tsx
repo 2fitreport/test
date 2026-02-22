@@ -1683,7 +1683,7 @@ export default function CompanyCreateForm() {
                     hour12: false
                 });
 
-                const newReason = `[${timeStr}] [반려] ${reasonInput || '사유 없음'}`;
+                const newReason = `[${timeStr}] [보류] ${reasonInput || '사유 없음'}`;
                 const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
 
                 const updated = {
@@ -1699,7 +1699,7 @@ export default function CompanyCreateForm() {
                 };
 
                 await saveDocumentToDatabase(updated);
-                setSuccessMessage('기업이 반려되었습니다.');
+                setSuccessMessage('기업이 보류되었습니다.');
                 setDocumentData({ ...documentData, ...updated });
             } else if (action === 'revision') {
                 const timeStr = now.toLocaleString('ko-KR', {
@@ -1964,7 +1964,7 @@ export default function CompanyCreateForm() {
                             <span className={`${styles.statusBadge} ${styles[documentData.status]}`}>
                                 {documentData.status === 'approved' ? '승인됨' :
                                  documentData.status === 'waiting' ? '대기중' :
-                                 documentData.status === 'rejected' ? '반려됨' :
+                                 documentData.status === 'rejected' ? '보류됨' :
                                  documentData.status === 'revision' ? '보완중' :
                                  documentData.status === 'started' ? '진행중' :
                                  documentData.status === 'submitted' ? '제출됨' :
@@ -2534,7 +2534,7 @@ export default function CompanyCreateForm() {
                     const isSalesperson = userLevel === 4;
                     const isInspector = userLevel === 6;
                     const isManager = userLevel === 2;
-                    // 영업자는 보완/반려 상태이거나 progress_details='영업자'일 때 버튼 있음
+                    // 영업자는 보완/보류 상태이거나 progress_details='영업자'일 때 버튼 있음
                     // 검수자는 progress_details가 '검수자'일 때만 버튼 있음
                     // 기타는 항상 버튼 있음
                     const hasSalespersonButtons = isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자');
@@ -2577,7 +2577,7 @@ export default function CompanyCreateForm() {
                                                 </>
                                             )}
 
-                                            {/* 영업자: 보완/반려 상태이거나 progress_details='영업자'일 때 제출 가능 */}
+                                            {/* 영업자: 보완/보류 상태이거나 progress_details='영업자'일 때 제출 가능 */}
                                             {isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자') && (
                                                 <button
                                                     type="button"
@@ -2591,7 +2591,7 @@ export default function CompanyCreateForm() {
                                             {/* 그 외 권한: 권한별로 다른 버튼 */}
                                             {!isSalesperson && !isInspector && (
                                                 <>
-                                                    {/* 대표실무자: 진행(대표실무자), 승인/배정, 반려, 보완 */}
+                                                    {/* 대표실무자: 진행(대표실무자), 승인/배정, 보류, 보완 */}
                                                     {isManager ? (
                                                         <>
                                                             <button
@@ -2613,7 +2613,7 @@ export default function CompanyCreateForm() {
                                                                 className={`${styles.actionButton} ${styles['action-reject']}`}
                                                                 onClick={() => documentData && handleReject(documentData.id)}
                                                             >
-                                                                반려
+                                                                보류
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -2662,7 +2662,7 @@ export default function CompanyCreateForm() {
                                                                 className={`${styles.actionButton} ${styles['action-reject']}`}
                                                                 onClick={() => documentData && handleReject(documentData.id)}
                                                             >
-                                                                반려
+                                                                보류
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -2810,7 +2810,7 @@ export default function CompanyCreateForm() {
                         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                     }}>
                         <h3 style={{ marginTop: 0, marginBottom: '15px' }}>
-                            {pendingReasonAction?.action === 'reject' ? '반려 사유' : '보완 사유'}
+                            {pendingReasonAction?.action === 'reject' ? '보류 사유' : '보완 사유'}
                         </h3>
                         <textarea
                             value={reasonInput}
@@ -2897,7 +2897,7 @@ export default function CompanyCreateForm() {
                     if (actionConfirmType === 'restart') return '기업 진행을 재시작하시겠습니까?';
                     if (actionConfirmType === 'delete') return '이 기업을 삭제하시겠습니까?';
                     if (actionConfirmType === 'approve') return isManagerAssigning ? '기업을 배정하시겠습니까?' : '기업을 승인하시겠습니까?';
-                    if (actionConfirmType === 'reject') return '기업을 반려하시겠습니까?';
+                    if (actionConfirmType === 'reject') return '기업을 보류하시겠습니까?';
                     if (actionConfirmType === 'revision') return '기업 보완을 요청하시겠습니까?';
                     if (actionConfirmType === 'submit') return '기업을 제출하시겠습니까?';
                     return '기업을 초기화하시겠습니까?\n(대기 상태로 돌아갑니다)';
