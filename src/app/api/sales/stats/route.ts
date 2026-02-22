@@ -34,13 +34,13 @@ export async function GET(request: NextRequest) {
         const statsPromises = (salespeople || []).map(async (person: any) => {
             const { data: documents } = await supabase
                 .from('documents')
-                .select('status')
+                .select('status, progress_details')
                 .eq('user_id', person.user_id);
 
             const docs = documents || [];
-            const inProgress = docs.filter(d => d.status === 'in_progress').length;
-            const approved = docs.filter(d => d.status === 'approved').length;
-            const rejected = docs.filter(d => d.status === 'rejected').length;
+            const inProgress = docs.filter(d => d.progress_details === '진행').length;
+            const approved = docs.filter(d => d.progress_details === '승인').length;
+            const rejected = docs.filter(d => d.status === '보류').length;
 
             return {
                 userId: person.user_id,
