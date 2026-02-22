@@ -30,10 +30,10 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
     approved:    { label: '승인',  badgeClass: 'approved',  dotClass: 'dotApproved' },
     rejected:    { label: '반려',  badgeClass: 'rejected',  dotClass: 'dotRejected' },
     revision:    { label: '보완',  badgeClass: 'revision',  dotClass: 'dotRevision' },
-    in_progress: { label: '진행',  badgeClass: 'started',   dotClass: 'dotStarted' },
+    in_progress: { label: '진행',  badgeClass: '진행',   dotClass: 'dotStarted' },
     submitted:   { label: '제출',  badgeClass: 'submitted', dotClass: 'dotSubmitted' },
     stopped:     { label: '중지',  badgeClass: 'stopped',   dotClass: 'dotStopped' },
-    assigned:    { label: '배정',  badgeClass: 'started',   dotClass: 'dotStarted' },
+    assigned:    { label: '배정',  badgeClass: '진행',   dotClass: 'dotStarted' },
 };
 
 const PROGRESS_STAGE_COLORS: Record<string, string> = {

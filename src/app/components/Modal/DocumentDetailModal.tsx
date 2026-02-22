@@ -47,7 +47,7 @@ function getStatusLabel(status: string) {
             return '반려';
         case 'revision':
             return '보완';
-        case 'in_progress':
+        case '진행':
             return '진행';
         case 'submitted':
             return '제출';

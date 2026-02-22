@@ -140,7 +140,7 @@ export async function PATCH(
       // position이 지정되지 않은 경우 현재 position 조회
       const { data: currentUser } = await supabase
         .from('users')
-        .select('position(level)')
+        .select('*, position(level)')
         .eq('id', userId)
         .single();
       const currentLevel = currentUser?.position?.level || 0;

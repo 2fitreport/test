@@ -12,7 +12,6 @@ import { canEditDocument } from '@/lib/permissions';
 import Modal from '@/app/components/Modal/Modal';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import CretopSection from './components/CretopSection';
-import DocumentActions from './components/DocumentActions';
 import MemoSection from './components/MemoSection';
 import DocumentUploadSection from './components/DocumentUploadSection';
 import FileViewerPanel from './components/FileViewerPanel';
@@ -48,7 +47,7 @@ interface Document {
     progress_details?: string;
     inspector_id?: string | null;
     status: '정상' | '보완' | '보류';
-    progress_status: 'in_progress' | 'stopped' | 'not_started';
+    progress_status: '진행' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
     progress_start_date?: string;
@@ -1443,7 +1442,7 @@ export default function CompanyCreateForm() {
         return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
     };
 
-    const saveDocumentToDatabase = async (document: Document) => {
+    const saveDocumentToDatabase = async (document: Partial<Document>) => {
         try {
             const hasMemosField = 'memos' in document;
             console.log('saveDocumentToDatabase 호출:', {
@@ -1540,7 +1539,7 @@ export default function CompanyCreateForm() {
 
     const handleProgressStop = (id: number) => {
         // 중지 조건 확인
-        if (!documentData?.manager_id || documentData?.status !== 'in_progress') {
+        if (!documentData?.manager_id || documentData?.status !== '진행') {
             setErrorMessage('실무자가 배정되어 있고<br>상태가 진행일 때만 중지할 수 있습니다.');
             setErrorModalOpen(true);
             return;
@@ -1610,7 +1609,7 @@ export default function CompanyCreateForm() {
                 setSuccessMessage('기업 진행이 시작되었습니다.');
                 setDocumentData(updated);
             } else if (action === 'approve') {
-                let updated: Document;
+                let updated: Partial<Document>;
                 let message = '';
                 const adminData = getAdminData();
                 const currentUserId = adminData?.user_id;
@@ -1731,9 +1730,9 @@ export default function CompanyCreateForm() {
                 setSuccessMessage('기업 보완이 요청되었습니다.');
                 setDocumentData(updated);
             } else if (action === 'submit') {
-                let updated: Document;
+                let updated: Partial<Document>;
 
-                if (documentData.status === 'rejected' || documentData.status === 'revision') {
+                if (documentData.status === '보류' || documentData.status === '보완') {
                     // 제출 시 사유는 초기화하지 않고 유지 (타임라인처럼 쌓임)
                     updated = {
                         ...documentData,
@@ -1962,13 +1961,9 @@ export default function CompanyCreateForm() {
                     {isViewMode && documentData && (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                             <span className={`${styles.statusBadge} ${styles[documentData.status]}`}>
-                                {documentData.status === 'approved' ? '승인됨' :
-                                 documentData.status === 'waiting' ? '대기중' :
-                                 documentData.status === 'rejected' ? '보류됨' :
-                                 documentData.status === 'revision' ? '보완중' :
-                                 documentData.status === 'started' ? '진행중' :
-                                 documentData.status === 'submitted' ? '제출됨' :
-                                 documentData.status === 'assigned' ? '배정됨' :
+                                {documentData.status === '정상' ? '정상' :
+                                 documentData.status === '보완' ? '보완' :
+                                 documentData.status === '보류' ? '보류' :
                                  documentData.status}
                             </span>
                             <span style={{
@@ -2537,7 +2532,7 @@ export default function CompanyCreateForm() {
                     // 영업자는 보완/보류 상태이거나 progress_details='영업자'일 때 버튼 있음
                     // 검수자는 progress_details가 '검수자'일 때만 버튼 있음
                     // 기타는 항상 버튼 있음
-                    const hasSalespersonButtons = isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자');
+                    const hasSalespersonButtons = isSalesperson && (documentData?.status === '보완' || documentData?.status === '보류' || documentData?.progress_details === '영업자');
                     const hasInspectorButtons = isInspector && documentData?.progress_details === '검수자';
                     const hasOtherButtons = !isSalesperson && !isInspector;
                     const hasButtons = hasSalespersonButtons || hasInspectorButtons || hasOtherButtons;
@@ -2546,7 +2541,7 @@ export default function CompanyCreateForm() {
                         <div className={styles.actionsGridContainer}>
                             <div className={styles.actionsGrid}>
                                 {(() => {
-                                    const isRevisionOrRejected = documentData?.status === 'revision' || documentData?.status === 'rejected';
+                                    const isRevisionOrRejected = documentData?.status === '보완' || documentData?.status === '보류';
 
                                     return (
                                         <>
@@ -2578,7 +2573,7 @@ export default function CompanyCreateForm() {
                                             )}
 
                                             {/* 영업자: 보완/보류 상태이거나 progress_details='영업자'일 때 제출 가능 */}
-                                            {isSalesperson && (documentData?.status === 'revision' || documentData?.status === 'rejected' || documentData?.progress_details === '영업자') && (
+                                            {isSalesperson && (documentData?.status === '보완' || documentData?.status === '보류' || documentData?.progress_details === '영업자') && (
                                                 <button
                                                     type="button"
                                                     className={`${styles.actionButton} ${styles['action-submit']}`}

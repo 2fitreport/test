@@ -14,8 +14,8 @@ interface Document {
     manager_id?: string | null;
     manager_name?: string | null;
     progress_details?: string;
-    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
-    progress_status: 'in_progress' | 'stopped' | 'not_started';
+    status: 'waiting' | 'approved' | 'rejected' | 'revision' | '진행' | 'submitted' | 'stopped' | 'assigned';
+    progress_status: '진행' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
     progress_start_date?: string;
@@ -54,7 +54,7 @@ export default function ActionModal({
                     <div className={styles.documentInfo}>
                         <p><strong>기업명:</strong> {document.company_name}</p>
                         <p><strong>현재 상태:</strong> {getStatusLabel(document.status)}</p>
-                        {document.status === 'in_progress' && (
+                        {document.status === '진행' && (
                             <>
                                 <p><strong>검수자:</strong> {document.progress_details || '-'}</p>
                                 <p><strong>대표실무자:</strong> {document.representative_name || '-'}</p>
@@ -92,7 +92,7 @@ function getStatusLabel(status: string) {
             return '반려';
         case 'revision':
             return '보완';
-        case 'in_progress':
+        case '진행':
             return '진행';
         case 'submitted':
             return '제출';

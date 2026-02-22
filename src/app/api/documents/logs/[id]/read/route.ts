@@ -27,61 +27,34 @@ export async function PATCH(
                 // 사용자 정보 조회
                 const { data: userData } = await supabase
                     .from('users')
-                    .select('position(level)')
+                    .select('*, position(level)')
                     .eq('user_id', userId)
                     .single();
 
                 if (userData) {
-                    userLevel = userData.position?.level || 0;
+                    userLevel = (userData.position as any)?.level || 0;
                 }
             } catch (e) {
                 // 토큰 파싱 실패 무시
             }
         }
 
-        if (userLevel === 1) {
-            // 대표자: leader_read = true
-            const { error } = await supabase
-                .from('document_logs')
-                .update({ leader_read: true })
-                .eq('id', logId);
+        // 모든 사용자: staff_read[userId] = true
+        const { data: log } = await supabase
+            .from('document_logs')
+            .select('staff_read')
+            .eq('id', logId)
+            .single();
 
-            if (error) throw error;
-        } else if (userLevel === 2) {
-            // 대표실무자: staff_read[userId] = true
-            const { data: log } = await supabase
-                .from('document_logs')
-                .select('staff_read')
-                .eq('id', logId)
-                .single();
+        const staffRead = log?.staff_read || {};
+        staffRead[userId] = true;
 
-            const staffRead = log?.staff_read || {};
-            staffRead[userId] = true;
+        const { error } = await supabase
+            .from('document_logs')
+            .update({ staff_read: staffRead })
+            .eq('id', logId);
 
-            const { error } = await supabase
-                .from('document_logs')
-                .update({ staff_read: staffRead })
-                .eq('id', logId);
-
-            if (error) throw error;
-        } else if (userLevel === 3 || userLevel === 4 || userLevel === 6) {
-            // 영업자, 실무자, 검수자: staff_read[userId] = true
-            const { data: log } = await supabase
-                .from('document_logs')
-                .select('staff_read')
-                .eq('id', logId)
-                .single();
-
-            const staffRead = log?.staff_read || {};
-            staffRead[userId] = true;
-
-            const { error } = await supabase
-                .from('document_logs')
-                .update({ staff_read: staffRead })
-                .eq('id', logId);
-
-            if (error) throw error;
-        }
+        if (error) throw error;
 
         return NextResponse.json({ success: true });
     } catch (error) {

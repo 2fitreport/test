@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
         const { data: currentUser } = await supabase
           .from('users')
-          .select('position(level)')
+          .select('*, position(level)')
           .eq('user_id', userId)
           .single();
 

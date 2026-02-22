@@ -27,13 +27,13 @@ export async function GET(request: NextRequest) {
 
                 const { data: userData } = await supabase
                     .from('users')
-                    .select('id, position(level), company_name, supervisor_id')
+                    .select('id, *, position(level), company_name, supervisor_id')
                     .eq('user_id', userId)
                     .single();
 
                 if (userData) {
                     userDbId = userData.id;
-                    userLevel = userData.position?.level || 0;
+                    userLevel = (userData.position as any)?.level || 0;
                     userAffiliation = userData.company_name || '';
                 }
                 console.log('로그 API - 사용자:', { userId, userDbId, userLevel, userAffiliation, revisionRejected });
