@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -28,10 +27,10 @@ interface Document {
     status: '정상' | '보완' | '보류';
     progress_status: '진행' | 'stopped' | 'not_started';
     submitted_date: string;
-    completed_date?: string;
-    progress_start_date?: string;
-    progress_end_time?: string;
-    stopped_time?: string;
+    completed_date?: string | null;
+    progress_start_date?: string | null;
+    progress_end_time?: string | null;
+    stopped_time?: string | null;
     reason?: string;
     reason_read: boolean;
     approval_amount?: number | null;
@@ -136,7 +135,7 @@ export default function DocumentSubmissionList() {
 
     const handleApprove = (id: number) => {
         const doc = documents.find(d => d.id === id);
-        if (doc && (doc.progress_details === '분석' && !doc.manager_id) || doc.progress_details === '대표실무자') {
+        if (doc && ((doc.progress_details === '분석' && !doc.manager_id) || doc.progress_details === '대표실무자')) {
             // 실무자 선택 모달 띄우기
             setSelectedManagerId(id);
             setManagerSelectModalOpen(true);
@@ -185,7 +184,7 @@ export default function DocumentSubmissionList() {
         const doc = documents.find(d => d.id === id);
 
         // 재시작 조건 확인
-        if (!doc?.manager_id || doc?.status !== 'stopped') {
+        if (!doc?.manager_id || doc?.progress_status !== 'stopped') {
             setErrorMessage('실무자가 배정되어 있고<br>상태가 중지일 때만 재시작할 수 있습니다.');
             setErrorModalOpen(true);
             return;
@@ -264,7 +263,6 @@ export default function DocumentSubmissionList() {
             if (doc) {
                 const updatedDoc = {
                     ...doc,
-                    status: '진행' as const,
                     progress_status: '진행' as const,
                     progress_start_date: String(Date.now())
                 };
@@ -349,7 +347,7 @@ export default function DocumentSubmissionList() {
 
                 const rejectedDoc = {
                     ...doc,
-                    status: 'rejected' as const,
+                    status: '보류' as const,
                     progress_status: 'not_started' as const,
                     progress_details: '영업자',
                     manager_name: null,
@@ -390,7 +388,7 @@ export default function DocumentSubmissionList() {
 
                 const revisionDoc = {
                     ...doc,
-                    status: 'revision' as const,
+                    status: '보완' as const,
                     progress_status: 'not_started' as const,
                     progress_details: '영업자',
                     manager_name: null,
@@ -429,7 +427,7 @@ export default function DocumentSubmissionList() {
                     // 기타 상태에서는 제출 상태로 변경
                     submittedDoc = {
                         ...doc,
-                        status: 'submitted' as const,
+                        status: '정상' as const,
                         progress_status: 'not_started' as const
                     };
                 }
@@ -475,10 +473,9 @@ export default function DocumentSubmissionList() {
 
                         return {
                             ...doc,
-                            status: 'stopped' as const,
                             progress_status: 'stopped' as const,
                             stopped_time: timeDisplay
-                        };
+                        } as Document;
                     }
                     return doc;
                 })
@@ -507,7 +504,7 @@ export default function DocumentSubmissionList() {
                             progress_end_time: null,
                             stopped_time: null,
                             completed_date: null
-                        };
+                        } as Document;
                     }
                     return doc;
                 })
@@ -533,11 +530,10 @@ export default function DocumentSubmissionList() {
 
                         return {
                             ...doc,
-                            status: '진행' as const,
                             progress_status: '진행' as const,
                             progress_start_date: String(newStartTime),
                             stopped_time: null
-                        };
+                        } as Document;
                     }
                     return doc;
                 })
@@ -560,7 +556,7 @@ export default function DocumentSubmissionList() {
         }
     };
 
-    const saveDocumentToDatabase = async (document: Document) => {
+    const saveDocumentToDatabase = async (document: Partial<Document> & { id: number }) => {
         try {
             const response = await fetch(`/api/documents/${document.id}`, {
                 method: 'PUT',
@@ -692,8 +688,8 @@ export default function DocumentSubmissionList() {
         });
 
         const sorted = [...filtered].sort((a, b) => {
-            let aValue: Document[SortColumn] = a[sortColumn];
-            let bValue: Document[SortColumn] = b[sortColumn];
+            let aValue: any = a[sortColumn];
+            let bValue: any = b[sortColumn];
 
             if (typeof aValue === 'string' && typeof bValue === 'string') {
                 aValue = aValue.toLowerCase();
@@ -1095,11 +1091,11 @@ export default function DocumentSubmissionList() {
                                             )}
                                         </td>
                                         <td className={styles.timeAgo}>
-                                            {doc.status === 'stopped' && doc.stopped_time ? (
+                                            {doc.progress_status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
-                                            ) : (doc.status === '정상' || doc.status === '보완' || doc.status === '보류') && doc.progress_start_date ? (
+                                            ) : doc.progress_status === '진행' && doc.progress_start_date ? (
                                                 <TimeAgo dateString={doc.progress_start_date} />
-                                            ) : doc.status === 'approved' && doc.progress_end_time ? (
+                                            ) : doc.progress_details === '승인' && doc.progress_end_time ? (
                                                 <span>{doc.progress_end_time}</span>
                                             ) : (
                                                 <span>-</span>
@@ -1456,8 +1452,8 @@ export default function DocumentSubmissionList() {
                                                     ...updatedDoc,
                                                     manager_id: selectedWorker.user_id,
                                                     manager_name: selectedWorker.name,
-                                                    progress_details: updatedDoc.progress_details === '분석' ? '분석' : '실무자',
-                                                    status: updatedDoc.progress_details === '분석' ? '정상' as const : 'assigned' as const
+                                                    progress_details: updatedDoc.progress_details === '분석' ? '분석' : '분석',
+                                                    status: '정상' as const
                                                 };
 
                                                 // 데이터베이스에 먼저 저장
@@ -1465,7 +1461,7 @@ export default function DocumentSubmissionList() {
 
                                                 // UI 상태 업데이트
                                                 setDocuments(docs =>
-                                                    docs.map(doc => doc.id === selectedManagerId ? newDoc : doc)
+                                                    docs.map(doc => doc.id === selectedManagerId ? (newDoc as Document) : doc)
                                                 );
                                             }
 

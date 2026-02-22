@@ -109,6 +109,8 @@ export default function CreateUserModal({
             return;
         }
 
+        if (!onCheckDuplicateUserId) return;
+
         setIsCheckingDuplicate(true);
         try {
             const isDuplicate = await onCheckDuplicateUserId(createFormData.user_id);

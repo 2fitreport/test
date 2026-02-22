@@ -77,6 +77,10 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    if (!data) {
+      return NextResponse.json([], { status: 200 });
+    }
+
     // 역할별 필터링
     if (userLevel === 4) {
       // 영업자: 자신의 정보만

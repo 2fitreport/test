@@ -299,7 +299,7 @@ export default function CompanyCreateForm() {
             }
 
             // 수정 권한 확인
-            const hasEditPermission = canEditDocument(
+            const hasEditPermission = userId ? canEditDocument(
                 userLevel,
                 userId,
                 data.user_id,
@@ -308,7 +308,7 @@ export default function CompanyCreateForm() {
                 data.inspector_id,
                 data.manager_id,
                 data.progress_details
-            );
+            ) : false;
 
             setCanEdit(hasEditPermission);
 
@@ -1194,7 +1194,7 @@ export default function CompanyCreateForm() {
     const handleDeleteMemo = async (memoIndex: number) => {
         if (!documentData) return;
 
-        const updatedMemos = documentData.memos?.filter((_, index) => index !== memoIndex) || [];
+        const updatedMemos = documentData.memos?.filter((_: any, index: number) => index !== memoIndex) || [];
 
         // 로컬 상태만 먼저 업데이트 (UI 즉시 반영)
         setDocumentData({

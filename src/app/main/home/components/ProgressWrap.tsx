@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -155,7 +154,7 @@ export default function ProgressWrap() {
                 {chartData && (
                     <Bar
                         data={chartData}
-                        options={options}
+                        options={options as any}
                     />
                 )}
             </div>

@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome } from 'react-icons/fi';
-import { clearAuthToken, getAdminData } from '@/lib/auth';
+import { clearAuthToken, getAdminData, type AdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
 interface MenuItem {
@@ -22,7 +22,7 @@ const menuItems: MenuItem[] = [
 export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
-    const [adminData, setAdminData] = useState(null);
+    const [adminData, setAdminData] = useState<AdminData | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [notificationCount, setNotificationCount] = useState(0);
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);

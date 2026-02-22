@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
@@ -231,7 +230,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
      */
     const handleFieldBlur = useCallback((fieldName: string) => {
         const value = formData[fieldName as keyof CreateUserFormData];
-        const error = validateField(fieldName, Array.isArray(value) ? value.join(',') : value);
+        const error = validateField(fieldName, Array.isArray(value) ? value.join(',') : String(value ?? ''));
         setErrors(prev => ({
             ...prev,
             [fieldName]: error,

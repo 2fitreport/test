@@ -49,7 +49,7 @@ interface CreateUserFormProps {
     onFieldBlur: (fieldName: string) => void;
     onCheckDuplicate: (userId: string) => Promise<boolean>;
     onStatusChange: (status: 'active' | 'inactive') => void;
-    onUpdateField: (fieldName: string, value: any) => void;
+    onUpdateField: (fieldName: keyof CreateUserFormProps['formData'], value: any) => void;
 }
 
 export default function CreateUserForm({
