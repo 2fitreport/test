@@ -17,6 +17,7 @@ export interface CreateUserFormData {
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
     affiliations?: string[];
+    is_affiliation_representative?: boolean;
     bank_name: string;
     account_holder: string;
     account_number: string;
@@ -42,6 +43,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
         status: 'active',
         supervisor_id: null,
         affiliations: [],
+        is_affiliation_representative: false,
         bank_name: '',
         account_holder: '',
         account_number: '',
@@ -270,11 +272,8 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
     const validateAndSubmit = (
         positions: Position[]
     ): { isValid: boolean; errors: { [key: string]: string } } => {
-        // ID가 변경되었거나 새로 생성할 때 중복확인 검사
-        const userIdChanged = isEditMode && formData.user_id !== originalUserId;
-        const needsDuplicateCheck = !isEditMode || userIdChanged;
-
-        if (needsDuplicateCheck) {
+        // 생성 모드일 때만 중복확인 검사 (수정 모드에서는 user_id 변경 불가)
+        if (!isEditMode) {
             if (!isDuplicateUserIdChecked) {
                 return {
                     isValid: false,
@@ -317,6 +316,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
             status: 'active',
             supervisor_id: null,
             affiliations: [],
+            is_affiliation_representative: false,
             bank_name: '',
             account_holder: '',
             account_number: '',

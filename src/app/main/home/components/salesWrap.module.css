@@ -1,0 +1,84 @@
+.salesWrap {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+}
+
+.salesWrap h2 {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 20px;
+    background-color: #2563eb;
+    color: #fff;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.tableWrapper {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.tableWrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tableWrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.salesTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.salesTable thead {
+    background-color: #f5f5f5;
+    position: sticky;
+    top: 0;
+}
+
+.salesTable th {
+    padding: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--black-color);
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.salesTable tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.salesTable tbody tr:hover {
+    background-color: #f9f9f9;
+}
+
+.salesTable tbody tr:last-child {
+    border-bottom: none;
+}
+
+.salesTable td {
+    padding: 20px;
+    font-size: 14px;
+    color: var(--black-color);
+    height: 60px;
+    vertical-align: middle;
+}

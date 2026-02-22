@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
           status: user.status,
           company_name: user.company_name,
           supervisor_id: user.supervisor_id,
+          is_affiliation_representative: user.is_affiliation_representative || false,
         },
       },
       { status: 200 }

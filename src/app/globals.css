@@ -6,6 +6,22 @@
     --main-color: #0f1a4d;
     --main-color-rgb: 15, 26, 77;
     --black-color: #292929;
+
+    /* 문서 상태 색상 (statBox) */
+    --status-all: #cccccc;
+    --status-all-hover: #999999;
+    --status-normal: #42a5f5;
+    --status-normal-hover: #1565c0;
+    --status-supplement: #ab47bc;
+    --status-supplement-hover: #6a1b9a;
+    --status-hold: #ef5350;
+    --status-hold-hover: #7a0f0f;
+
+    /* 진행단계 배지 색상 */
+    --status-waiting: #fdd835;
+    --status-analysis: #ff9800;
+    --status-progress: #42a5f5;
+    --status-approved: #66bb6a;
 }
 
 html {
@@ -209,7 +225,6 @@ img {
     box-sizing: border-box;
     padding: 0;
     margin: 0;
-    cursor: auto;
     user-select: none;
 }
 .inner {

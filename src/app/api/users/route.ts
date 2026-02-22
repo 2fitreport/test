@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, bank_name, account_holder, account_number } = body;
+    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, is_affiliation_representative, bank_name, account_holder, account_number } = body;
 
     // 필수 항목 검증
     if (!user_id || !name || !position_id || !password) {
@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
           address_detail: address_detail || null,
           company_name: company_name || null,
           status: status || 'active',
+          is_affiliation_representative: is_affiliation_representative || false,
           bank_name: bank_name || null,
           account_holder: account_holder || null,
           account_number: account_number || null,

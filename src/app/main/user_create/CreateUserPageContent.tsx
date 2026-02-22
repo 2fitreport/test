@@ -65,9 +65,17 @@ export default function CreateUserPageContent() {
                     if (!userRes.ok) throw new Error('사용자 조회 실패');
                     const userData = await userRes.json();
 
-                    // 검수자(Level 6)인 경우 소속 데이터 가져오기
+                    // 영업자(Level 4) / 검수자(Level 6)인 경우 소속 데이터 가져오기
                     let userAffiliations: string[] = [];
-                    if (userData.position?.level === 6) {
+                    const userLevel = userData.position?.level;
+
+                    if (userLevel === 4) {
+                        // 영업자: company_name을 affiliations으로 변환
+                        if (userData.company_name) {
+                            userAffiliations = [userData.company_name];
+                        }
+                    } else if (userLevel === 6) {
+                        // 검수자: user_affiliations에서 로드
                         const userAffRes = await fetch(`/api/affiliations?inspector_id=${userData.id}`);
                         if (userAffRes.ok) {
                             const affData = await userAffRes.json();
@@ -117,10 +125,17 @@ export default function CreateUserPageContent() {
             const url = isEditMode ? `/api/users/${userId}` : '/api/users';
             const method = isEditMode ? 'PATCH' : 'POST';
 
+            // 영업자(Level 4)인 경우 affiliations[0]을 company_name에 복사
+            const submitData = { ...form.formData };
+            const userLevel = positions.find(p => p.id === form.formData.position_id)?.level;
+            if (userLevel === 4 && form.formData.affiliations && form.formData.affiliations.length > 0) {
+                submitData.company_name = form.formData.affiliations[0];
+            }
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form.formData),
+                body: JSON.stringify(submitData),
             });
 
             if (!response.ok) {

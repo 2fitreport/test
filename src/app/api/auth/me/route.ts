@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       status: user.status,
       company_name: user.company_name,
       supervisor_id: user.supervisor_id,
+      is_affiliation_representative: user.is_affiliation_representative || false,
     });
   } catch (error) {
     console.error('사용자 정보 조회 실패:', error);

@@ -25,7 +25,7 @@ export default function RootLayout({
                 />
                 <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
             </head>
-            <body>
+            <body suppressHydrationWarning>
                 <QueryProvider>{children}</QueryProvider>
             </body>
         </html>

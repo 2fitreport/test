@@ -24,7 +24,7 @@ interface Document {
     phone?: string;
     progress_details?: string;
     inspector_id?: string | null;
-    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
+    status: '정상' | '보완' | '보류';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
@@ -33,6 +33,7 @@ interface Document {
     stopped_time?: string;
     reason?: string;
     reason_read: boolean;
+    approval_amount?: number | null;
     created_at?: string;
 }
 
@@ -44,7 +45,7 @@ interface Worker {
     company_name?: string;
 }
 
-type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'reason' | 'completed_date' | 'progress_start_date' | 'created_at';
+type SortColumn = 'user_id' | 'user_name' | 'company_name' | 'representative_name' | 'manager_name' | 'progress_details' | 'status' | 'submitted_date' | 'completed_date' | 'progress_start_date' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 export default function DocumentSubmissionList() {
@@ -56,7 +57,7 @@ export default function DocumentSubmissionList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -134,7 +135,7 @@ export default function DocumentSubmissionList() {
 
     const handleApprove = (id: number) => {
         const doc = documents.find(d => d.id === id);
-        if (doc && doc.progress_details === '대표실무자') {
+        if (doc && (doc.progress_details === '분석' && !doc.manager_id) || doc.progress_details === '대표실무자') {
             // 실무자 선택 모달 띄우기
             setSelectedManagerId(id);
             setManagerSelectModalOpen(true);
@@ -283,16 +284,26 @@ export default function DocumentSubmissionList() {
             const adminData = getAdminData();
             const currentUserId = adminData?.user_id;
 
-            if (doc.progress_details === '검수자') {
-                // 검수자 → 대표실무자로 변경 (inspector_id는 기존 값 유지, 없을 때만 현재 사용자 저장)
-                updatedDoc = { ...doc, progress_details: '대표실무자', inspector_id: doc.inspector_id || currentUserId };
-                message = '대표실무자로 진행합니다.';
-            } else if (doc.progress_details === '대표실무자') {
-                // 대표실무자 → 실무자로 변경
-                updatedDoc = { ...doc, status: 'assigned' as const, progress_details: '실무자' };
-                message = '실무자로 배정되었습니다.';
-            } else {
-                // 최종 승인
+            if (doc.progress_details === '서류요청') {
+                // 서류요청 → 분석으로 변경
+                updatedDoc = {
+                    ...doc,
+                    status: '정상' as const,
+                    progress_details: '분석',
+                    inspector_id: currentUserId,
+                    progress_start_date: String(Date.now())
+                };
+                message = '분석 상태로 변경되었습니다.';
+            } else if (doc.progress_details === '분석') {
+                // 분석 → 진행으로 변경
+                updatedDoc = { ...doc, status: '정상' as const, progress_details: '진행' };
+                message = '진행 상태로 변경되었습니다.';
+            } else if (doc.progress_details === '진행') {
+                // 진행 → 승인으로 변경
+                updatedDoc = { ...doc, status: '정상' as const, progress_details: '승인' };
+                message = '승인 상태로 변경되었습니다.';
+            } else if (doc.progress_details === '승인') {
+                // 승인 완료
                 const now = new Date();
                 const completedHours = String(now.getHours()).padStart(2, '0');
                 const completedMinutes = String(now.getMinutes()).padStart(2, '0');
@@ -300,11 +311,14 @@ export default function DocumentSubmissionList() {
 
                 updatedDoc = {
                     ...doc,
-                    status: 'approved' as const,
+                    status: '정상' as const,
                     progress_status: 'stopped' as const,
                     completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
                 };
                 message = '기업이 승인되었습니다.';
+            } else {
+                message = '현재 상태에서 승인할 수 없습니다.';
+                return;
             }
 
             // DB에 저장
@@ -401,12 +415,12 @@ export default function DocumentSubmissionList() {
                 let submittedDoc: Document;
 
                 // 반려되거나 보완이 요청된 상태에서 제출하면 대기 상태로 돌아감
-                if (doc.status === 'rejected' || doc.status === 'revision') {
+                if (doc.status === '보류' || doc.status === '보완') {
                     submittedDoc = {
                         ...doc,
-                        status: 'waiting' as const,
+                        status: '정상' as const,
                         progress_status: 'not_started' as const,
-                        progress_details: '검수자',
+                        progress_details: '서류요청',
                         inspector_id: null,
                         reason_read: true
                     };
@@ -425,7 +439,7 @@ export default function DocumentSubmissionList() {
                 // UI 상태 업데이트
                 setDocuments(docs => docs.map(d => d.id === id ? submittedDoc : d));
 
-                if (doc.status === 'rejected' || doc.status === 'revision') {
+                if (doc.status === '보류' || doc.status === '보완') {
                     setSuccessMessage('기업이 재제출되었습니다.');
                 } else {
                     setSuccessMessage('기업이 제출되었습니다.');
@@ -482,9 +496,9 @@ export default function DocumentSubmissionList() {
                     if (doc.id === id) {
                         return {
                             ...doc,
-                            status: 'waiting' as const,
+                            status: '정상' as const,
                             progress_status: 'not_started' as const,
-                            progress_details: '검수자',
+                            progress_details: '서류요청',
                             manager_name: null,
                             manager_id: null,
                             inspector_id: null,
@@ -706,51 +720,30 @@ export default function DocumentSubmissionList() {
         const userId = adminData?.user_id;
 
         // 영업자인 경우 자신의 문서만 카운트
-        // 검수자인 경우 자신의 담당 영업자 문서('검수자' 진행상태) + 자신이 승인한 문서(inspector_id) 모두 카운트
         let docsToCount = documents;
         if (userLevel === 4) {
             docsToCount = documents.filter(doc => doc.user_id === userId);
         } else if (userLevel === 6) {
-            docsToCount = documents.filter(doc => doc.progress_details === '검수자' || doc.inspector_id === userId);
+            docsToCount = documents.filter(doc => doc.progress_details === '분석' || doc.inspector_id === userId);
         }
 
-        const counts = {
+        const counts: Record<string, number> = {
             all: docsToCount.length,
-            waiting: 0,
-            in_progress: 0,
-            approved: 0,
-            revision: 0,
-            rejected: 0,
-            submitted: 0,
-            stopped: 0,
-            assigned: 0,
+            '정상': 0,
+            '보완': 0,
+            '보류': 0,
         };
 
         docsToCount.forEach(doc => {
             switch (doc.status) {
-                case 'waiting':
-                    counts.waiting++;
+                case '정상':
+                    counts['정상']++;
                     break;
-                case 'in_progress':
-                    counts.in_progress++;
+                case '보완':
+                    counts['보완']++;
                     break;
-                case 'approved':
-                    counts.approved++;
-                    break;
-                case 'revision':
-                    counts.revision++;
-                    break;
-                case 'rejected':
-                    counts.rejected++;
-                    break;
-                case 'submitted':
-                    counts.submitted++;
-                    break;
-                case 'stopped':
-                    counts.stopped++;
-                    break;
-                case 'assigned':
-                    counts.assigned++;
+                case '보류':
+                    counts['보류']++;
                     break;
             }
         });
@@ -770,22 +763,12 @@ export default function DocumentSubmissionList() {
 
     const getStatusLabel = (status: string) => {
         switch (status) {
-            case 'approved':
-                return '승인';
-            case 'waiting':
-                return '대기';
-            case 'rejected':
-                return '반려';
-            case 'revision':
+            case '정상':
+                return '정상';
+            case '보완':
                 return '보완';
-            case 'in_progress':
-                return '진행';
-            case 'submitted':
-                return '제출';
-            case 'stopped':
-                return '중지';
-            case 'assigned':
-                return '배정';
+            case '보류':
+                return '보류';
             default:
                 return status;
         }
@@ -793,24 +776,29 @@ export default function DocumentSubmissionList() {
 
     const getStatusBadgeClass = (status: string) => {
         switch (status) {
-            case 'approved':
-                return styles.approved;
-            case 'waiting':
-                return styles.waiting;
-            case 'rejected':
-                return styles.rejected;
-            case 'revision':
+            case '정상':
+                return styles.normal;
+            case '보완':
                 return styles.revision;
-            case 'in_progress':
-                return styles.started;
-            case 'submitted':
-                return styles.submitted;
-            case 'stopped':
-                return styles.stopped;
-            case 'assigned':
-                return styles.assigned;
+            case '보류':
+                return styles.rejected;
             default:
                 return '';
+        }
+    };
+
+    const getProgressDetailsBadgeClass = (progressDetails: string) => {
+        switch (progressDetails) {
+            case '서류요청':
+                return styles.progressBadgeWaiting;
+            case '분석':
+                return styles.progressBadgeAnalysis;
+            case '진행':
+                return styles.progressBadgeProgress;
+            case '승인':
+                return styles.progressBadgeApproved;
+            default:
+                return styles.progressBadgeProgress;
         }
     };
 
@@ -900,18 +888,14 @@ export default function DocumentSubmissionList() {
                                     className={styles.itemsSelect}
                                     value={statusFilter}
                                     onChange={(e) => {
-                                        setStatusFilter(e.target.value as 'all' | 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned');
+                                        setStatusFilter(e.target.value as 'all' | '정상' | '보완' | '보류');
                                         setCurrentPage(1);
                                     }}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="approved">승인</option>
-                                    <option value="waiting">대기</option>
-                                    <option value="rejected">반려</option>
-                                    <option value="revision">보완</option>
-                                    <option value="in_progress">진행</option>
-                                    <option value="submitted">제출</option>
-                                    <option value="assigned">배정</option>
+                                    <option value="정상">정상</option>
+                                    <option value="보완">보완</option>
+                                    <option value="보류">보류</option>
                                 </select>
                                 <Image
                                     src="/arrow.svg"
@@ -987,89 +971,6 @@ export default function DocumentSubmissionList() {
                     </div>
                 </div>
 
-                <div className={styles.statsContainer}>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'all' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('all');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>전체</span>
-                        <span className={styles.statCount}>{getStatusCounts().all}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'in_progress' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('in_progress');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>진행</span>
-                        <span className={styles.statCount}>{getStatusCounts().in_progress}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'approved' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('approved');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>승인</span>
-                        <span className={styles.statCount}>{getStatusCounts().approved}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'revision' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('revision');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>보완</span>
-                        <span className={styles.statCount}>{getStatusCounts().revision}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'rejected' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('rejected');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>반려</span>
-                        <span className={styles.statCount}>{getStatusCounts().rejected}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'waiting' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('waiting');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>대기</span>
-                        <span className={styles.statCount}>{getStatusCounts().waiting}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'submitted' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('submitted');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>제출</span>
-                        <span className={styles.statCount}>{getStatusCounts().submitted}</span>
-                    </button>
-                    <button
-                        className={`${styles.statBox} ${statusFilter === 'stopped' ? styles.statBoxActive : ''}`}
-                        onClick={() => {
-                            setStatusFilter('stopped');
-                            setCurrentPage(1);
-                        }}
-                    >
-                        <span className={styles.statLabel}>중지</span>
-                        <span className={styles.statCount}>{getStatusCounts().stopped}</span>
-                    </button>
-                </div>
-
                 <div className={styles.tableWrapper}>
                     {getFilteredAndSortedDocuments().length === 0 ? (
                         <div className={styles.noDataContainer}>
@@ -1119,7 +1020,6 @@ export default function DocumentSubmissionList() {
                                             />
                                         </th>
                                     )}
-                                    <th>작업</th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
                                         기업명{getSortIcon('company_name')}
                                     </th>
@@ -1127,23 +1027,12 @@ export default function DocumentSubmissionList() {
                                         대표자명{getSortIcon('representative_name')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('progress_details')}>
-                                        진행상황{getSortIcon('progress_details')}
-                                    </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
-                                        상태{getSortIcon('status')}
-                                    </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('reason')}>
-                                        사유{getSortIcon('reason')}
+                                        진행단계{getSortIcon('progress_details')}
                                     </th>
                                     <th className={styles.sortableHeader} onClick={() => handleSort('progress_start_date')}>
                                         시간 경과{getSortIcon('progress_start_date')}
                                     </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('submitted_date')}>
-                                        제출일{getSortIcon('submitted_date')}
-                                    </th>
-                                    <th className={styles.sortableHeader} onClick={() => handleSort('completed_date')}>
-                                        완료일{getSortIcon('completed_date')}
-                                    </th>
+                                    <th>승인금액</th>
                                     {!isUserSalesManager && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
                                             작성자{getSortIcon('user_name')}
@@ -1164,13 +1053,27 @@ export default function DocumentSubmissionList() {
                                             실무자 ID
                                         </th>
                                     )}
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
+                                        상태{getSortIcon('status')}
+                                    </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('submitted_date')}>
+                                        제출일{getSortIcon('submitted_date')}
+                                    </th>
+                                    <th className={styles.sortableHeader} onClick={() => handleSort('completed_date')}>
+                                        완료일{getSortIcon('completed_date')}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {getPaginatedDocuments().map((doc) => (
-                                    <tr key={doc.id} className={styles.documentRow}>
+                                    <tr
+                                        key={doc.id}
+                                        className={styles.documentRow}
+                                        onClick={() => router.push(`/main/company_create?view=${doc.id}`)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
                                         {!isUserSalesManager && userRoleLevel !== 6 && userRoleLevel !== 2 && (
-                                            <td className={styles.checkboxCell}>
+                                            <td className={styles.checkboxCell} onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedDocuments.has(doc.id)}
@@ -1178,64 +1081,22 @@ export default function DocumentSubmissionList() {
                                                 />
                                             </td>
                                         )}
-                                        <td className={styles.actionsCell}>
-                                            <button
-                                                className={styles.actionButton}
-                                                onClick={() => router.push(`/main/company_create?view=${doc.id}`)}
-                                            >
-                                                보기
-                                            </button>
+                                        <td className={styles.companyName}>
+                                            <div className={styles.companyNameText}>{doc.company_name || '-'}</div>
+                                            <div className={styles.businessNumber}>{doc.business_number || '-'}</div>
                                         </td>
-                                        <td className={styles.companyName}>{doc.company_name || '-'}</td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
                                         <td className={styles.progressDetails}>
                                             {doc.progress_details ? (
-                                                <span className={styles.badge}>{doc.progress_details}</span>
+                                                <span className={`${styles.badge} ${getProgressDetailsBadgeClass(doc.progress_details)}`}>{doc.progress_details}</span>
                                             ) : (
                                                 '-'
-                                            )}
-                                        </td>
-                                        <td className={styles.status}>
-                                            <span className={`${styles.statusBadge} ${getStatusBadgeClass(doc.status)}`}>
-                                                {getStatusLabel(doc.status)}
-                                            </span>
-                                        </td>
-                                        <td className={styles.reasonCell}>
-                                            {doc.reason ? (
-                                                <button
-                                                    className={`${styles.reasonButton} ${!doc.reason_read ? styles.unreadButton : ''}`}
-                                                    onClick={async () => {
-                                                        const wasUnread = !doc.reason_read;
-
-                                                        setSelectedReason({ id: doc.id, reason: doc.reason!, status: doc.status });
-                                                        setReasonModalOpen(true);
-                                                        setDocuments(docs =>
-                                                            docs.map(d =>
-                                                                d.id === doc.id ? { ...d, reason_read: true } : d
-                                                            )
-                                                        );
-                                                        // 데이터베이스에 읽음 상태 저장
-                                                        await saveDocumentToDatabase({
-                                                            ...doc,
-                                                            reason_read: true
-                                                        });
-
-                                                        // 읽지 않은 상태에서 읽음 상태로 변경될 때만 알림 업데이트
-                                                        if (wasUnread) {
-                                                            window.dispatchEvent(new CustomEvent('notificationUpdate', { detail: { type: 'read' } }));
-                                                        }
-                                                    }}
-                                                >
-                                                    보기
-                                                </button>
-                                            ) : (
-                                                <span className={styles.noReason}>없음</span>
                                             )}
                                         </td>
                                         <td className={styles.timeAgo}>
                                             {doc.status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
-                                            ) : (doc.status === 'in_progress' || doc.status === 'revision' || doc.status === 'submitted' || doc.status === 'rejected') && doc.progress_start_date ? (
+                                            ) : (doc.status === '정상' || doc.status === '보완' || doc.status === '보류') && doc.progress_start_date ? (
                                                 <TimeAgo dateString={doc.progress_start_date} />
                                             ) : doc.status === 'approved' && doc.progress_end_time ? (
                                                 <span>{doc.progress_end_time}</span>
@@ -1243,8 +1104,9 @@ export default function DocumentSubmissionList() {
                                                 <span>-</span>
                                             )}
                                         </td>
-                                        <td className={styles.date}>{formatSubmittedDate(doc.submitted_date)}</td>
-                                        <td className={styles.completedDate}>{formatSubmittedDate(doc.completed_date || '')}</td>
+                                        <td className={styles.approvalAmount}>
+                                            {doc.approval_amount ? `${doc.approval_amount.toLocaleString()}원` : '-'}
+                                        </td>
                                         {!isUserSalesManager && (
                                             <td className={styles.userName}>{doc.user_name}</td>
                                         )}
@@ -1257,6 +1119,13 @@ export default function DocumentSubmissionList() {
                                         {!isUserSalesManager && userRoleLevel !== 6 && (
                                             <td className={styles.managerId}>{doc.manager_id || '-'}</td>
                                         )}
+                                        <td className={styles.status}>
+                                            <span className={`${styles.statusBadge} ${getStatusBadgeClass(doc.status)}`}>
+                                                {getStatusLabel(doc.status)}
+                                            </span>
+                                        </td>
+                                        <td className={styles.date}>{formatSubmittedDate(doc.submitted_date)}</td>
+                                        <td className={styles.completedDate}>{formatSubmittedDate(doc.completed_date || '')}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1586,8 +1455,8 @@ export default function DocumentSubmissionList() {
                                                     ...updatedDoc,
                                                     manager_id: selectedWorker.user_id,
                                                     manager_name: selectedWorker.name,
-                                                    progress_details: '실무자',
-                                                    status: 'assigned' as const,
+                                                    progress_details: updatedDoc.progress_details === '분석' ? '분석' : '실무자',
+                                                    status: updatedDoc.progress_details === '분석' ? '정상' as const : 'assigned' as const
                                                 };
 
                                                 // 데이터베이스에 먼저 저장

@@ -78,52 +78,52 @@
 }
 
 .statBox:nth-child(1) {
-    background-color: #cccccc;
+    background-color: var(--status-all);
 }
 
 .statBox:nth-child(1):hover {
-    background-color: #999999;
+    background-color: var(--status-all-hover);
 }
 
 .statBox:nth-child(2) {
-    background-color: #42a5f5;
+    background-color: var(--status-progress);
 }
 
 .statBox:nth-child(2):hover {
-    background-color: #1565c0;
+    background-color: var(--status-progress-hover);
 }
 
 .statBox:nth-child(3) {
-    background-color: #66bb6a;
+    background-color: var(--status-approved);
 }
 
 .statBox:nth-child(3):hover {
-    background-color: #0f661a;
+    background-color: var(--status-approved-hover);
 }
 
 .statBox:nth-child(4) {
-    background-color: #ab47bc;
+    background-color: var(--status-supplement);
 }
 
 .statBox:nth-child(4):hover {
-    background-color: #6a1b9a;
+    background-color: var(--status-supplement-hover);
 }
 
 .statBox:nth-child(5) {
-    background-color: #ef5350;
+    background-color: var(--status-rejected);
 }
 
 .statBox:nth-child(5):hover {
-    background-color: #7a0f0f;
+    background-color: var(--status-rejected-hover);
 }
 
 .statBox:nth-child(6) {
-    background-color: #fdd835;
+    background-color: var(--status-waiting);
     color: #333;
 }
 
 .statBox:nth-child(6):hover {
-    background-color: #856404;
+    background-color: var(--status-waiting-hover);
 }
 
 .statBox:nth-child(6) .statLabel,
@@ -137,19 +137,19 @@
 }
 
 .statBox:nth-child(7) {
-    background-color: #ffb74d;
+    background-color: var(--status-submitted);
 }
 
 .statBox:nth-child(7):hover {
-    background-color: #f57c00;
+    background-color: var(--status-submitted-hover);
 }
 
 .statBox:nth-child(8) {
-    background-color: #a1887f;
+    background-color: var(--status-stopped);
 }
 
 .statBox:nth-child(8):hover {
-    background-color: #795548;
+    background-color: var(--status-stopped-hover);
 }
 
 .statBoxActive {
@@ -420,9 +420,14 @@
     }
 }
 
+.documentTable tbody tr.documentRow {
+    cursor: pointer !important;
+}
+
 .documentRow td {
     padding: 14px 12px;
     color: #333;
+    vertical-align: middle;
 }
 
 .userId {
@@ -459,6 +464,52 @@
     white-space: nowrap;
 }
 
+/* 진행단계 배지 색상 */
+.progressBadgeWaiting {
+    background-color: var(--status-waiting) !important;
+    color: #333 !important;
+}
+
+.progressBadgeAnalysis {
+    background-color: var(--status-analysis) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeProgress {
+    background-color: var(--status-progress) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeApproved {
+    background-color: var(--status-approved) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeRevision {
+    background-color: var(--status-supplement) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeRejected {
+    background-color: var(--status-rejected) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeSubmitted {
+    background-color: var(--status-submitted) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeStopped {
+    background-color: var(--status-stopped) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeInspector {
+    background-color: var(--status-progress) !important;
+    color: #ffffff !important;
+}
+
 .documentType {
     background-color: var(--main-color) !important;
     color: #ffffff !important;
@@ -478,6 +529,22 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.companyName {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.companyNameText {
+    font-weight: 600;
+    color: #333;
+}
+
+.businessNumber {
+    font-size: 12px;
+    color: #999;
 }
 
 .status {
@@ -547,19 +614,9 @@
     display: inline-block;
 }
 
-.approved {
-    background-color: #ecf9f0;
-    color: #0f661a;
-}
-
-.waiting {
-    background-color: #fff5cd;
-    color: #856404;
-}
-
-.rejected {
-    background-color: #fff5f5;
-    color: #7a0f0f;
+.normal {
+    background-color: #e3f2fd;
+    color: #1565c0;
 }
 
 .revision {
@@ -567,24 +624,9 @@
     color: #6a1b9a;
 }
 
-.started {
-    background-color: #e3f2fd;
-    color: #1565c0;
-}
-
-.submitted {
-    background-color: #fff3e0;
-    color: #e65100;
-}
-
-.stopped {
-    background-color: #efebe9;
-    color: #5d4037;
-}
-
-.assigned {
-    background-color: #e8eaf6;
-    color: #283593;
+.rejected {
+    background-color: #fff5f5;
+    color: #7a0f0f;
 }
 
 .date {
@@ -601,6 +643,13 @@
     white-space: nowrap;
     min-width: 160px;
     width: 160px;
+}
+
+.approvalAmount {
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
 }
 
 .timeAgo {

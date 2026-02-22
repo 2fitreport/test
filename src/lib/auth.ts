@@ -5,7 +5,7 @@ export const getAuthToken = () => {
 };
 
 // 세션스토리지에 로그인 정보 저장 (브라우저 종료 시 자동 삭제)
-export const setAuthToken = (token: string, adminData: { name: string; position: string; company_name?: string }) => {
+export const setAuthToken = (token: string, adminData: { name: string; position: string; company_name?: string; is_affiliation_representative?: boolean }) => {
   if (typeof window === 'undefined') return;
   sessionStorage.setItem('auth_token', token);
   sessionStorage.setItem('admin_data', JSON.stringify(adminData));

@@ -16,7 +16,7 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
         company_name: '',
         representative_name: '',
         manager_name: '',
-        progress_details: '검수자',
+        progress_details: '서류요청',
         time: '09:00',
     });
     const [documentType, setDocumentType] = useState<'individual' | 'business'>('individual');
@@ -145,7 +145,7 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
                     representative_name: formData.representative_name,
                     manager_name: formData.manager_name,
                     progress_details: formData.progress_details,
-                    status: 'waiting',
+                    status: '정상',
                     progress_status: 'not_started',
                     submitted_date: formattedDate,
                     reason_read: true,
@@ -239,23 +239,6 @@ export default function DocumentWriteForm({ onClose, onSuccess }: DocumentWriteF
                         />
                     </div>
 
-                    <div className={styles.formGroup}>
-                        <label htmlFor="progress_details">진행상황</label>
-                        <select
-                            id="progress_details"
-                            name="progress_details"
-                            value={formData.progress_details ?? '검수자'}
-                            onChange={(e) => setFormData(prev => ({
-                                ...prev,
-                                progress_details: e.target.value,
-                            }))}
-                            className={styles.select}
-                        >
-                            <option value="검수자">검수자</option>
-                            <option value="대표실무자">대표실무자</option>
-                            <option value="실무자">실무자</option>
-                        </select>
-                    </div>
 
                     <div className={styles.formGroup}>
                         <label htmlFor="time">제출 시간</label>

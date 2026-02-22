@@ -42,7 +42,7 @@ function getStatusLabel(status: string) {
         case 'approved':
             return '승인';
         case 'waiting':
-            return '대기';
+            return '서류수집';
         case 'rejected':
             return '반려';
         case 'revision':

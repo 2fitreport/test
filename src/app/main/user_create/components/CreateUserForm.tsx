@@ -21,6 +21,7 @@ interface CreateUserFormProps {
         company_name: string;
         status: 'active' | 'inactive';
         affiliations?: string[];
+        is_affiliation_representative?: boolean;
         bank_name: string;
         account_holder: string;
         account_number: string;
@@ -84,6 +85,43 @@ export default function CreateUserForm({
 }: CreateUserFormProps) {
     const [showKoreanWarning, setShowKoreanWarning] = useState(false);
     const [showAddressLoadingError, setShowAddressLoadingError] = useState(false);
+    const [representativeInfo, setRepresentativeInfo] = useState<{ hasRepresentative: boolean; representative: { user_id: string; name: string } | null }>({
+        hasRepresentative: false,
+        representative: null
+    });
+    const [checkingRepresentative, setCheckingRepresentative] = useState(false);
+
+    // 영업자가 소속을 선택했을 때 소속대표 확인
+    const currentLevel = positions.find(p => p.id === formData.position_id)?.level || 0;
+    const selectedAffiliation = formData.affiliations?.[0] || '';
+
+    useEffect(() => {
+        if (currentLevel !== 4 || !selectedAffiliation) {
+            setRepresentativeInfo({ hasRepresentative: false, representative: null });
+            return;
+        }
+
+        const checkRepresentative = async () => {
+            setCheckingRepresentative(true);
+            try {
+                const response = await fetch(`/api/affiliations/representative?company_name=${encodeURIComponent(selectedAffiliation)}`);
+                const data = await response.json();
+
+                // 수정 모드에서 본인이 소속대표인 경우 제외
+                if (isEditMode && data.representative?.user_id === formData.user_id) {
+                    setRepresentativeInfo({ hasRepresentative: false, representative: null });
+                } else {
+                    setRepresentativeInfo(data);
+                }
+            } catch (error) {
+                console.error('소속대표 확인 실패:', error);
+            } finally {
+                setCheckingRepresentative(false);
+            }
+        };
+
+        checkRepresentative();
+    }, [currentLevel, selectedAffiliation, isEditMode, formData.user_id]);
 
     const handleAddressSearchClick = () => {
         interface DaumData {
@@ -136,7 +174,7 @@ export default function CreateUserForm({
                                 ref={userIdRef}
                                 type="text"
                                 className={styles.input}
-                                value={formData.user_id}
+                                value={formData.user_id ?? ''}
                                 disabled
                                 style={{
                                     backgroundColor: '#f5f5f5',
@@ -152,7 +190,7 @@ export default function CreateUserForm({
                                         type="text"
                                         className={styles.input}
                                         placeholder="사용자 ID를 입력하세요"
-                                        value={formData.user_id}
+                                        value={formData.user_id ?? ''}
                                         onChange={(e) => onUpdateUserId(e.target.value, () => setShowKoreanWarning(true))}
                                         onBlur={() => onFieldBlur('user_id')}
                                         style={{
@@ -208,7 +246,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="비밀번호를 입력하세요"
-                            value={formData.password}
+                            value={formData.password ?? ''}
                             onChange={(e) => onUpdatePassword(e.target.value)}
                             onBlur={() => onFieldBlur('password')}
                             style={{
@@ -226,7 +264,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="이름을 입력하세요"
-                            value={formData.name}
+                            value={formData.name ?? ''}
                             onChange={(e) => onUpdateName(e.target.value)}
                             onBlur={() => onFieldBlur('name')}
                             style={{
@@ -257,11 +295,10 @@ export default function CreateUserForm({
                                             border: `1px solid ${formData.position_id === position.id ? 'var(--main-color)' : '#e5e7eb'}`,
                                             backgroundColor: formData.position_id === position.id ? 'var(--main-color)' : '#ffffff',
                                             color: formData.position_id === position.id ? '#ffffff' : '#333',
-                                            cursor: isEditMode ? 'not-allowed' : 'pointer',
+                                            cursor: 'pointer',
                                             transition: 'all 0.2s ease',
                                             fontWeight: formData.position_id === position.id ? '600' : '500',
                                             fontSize: '14px',
-                                            opacity: isEditMode ? 0.6 : 1,
                                         }}
                                     >
                                         <input
@@ -269,16 +306,15 @@ export default function CreateUserForm({
                                             name="position"
                                             value={position.id}
                                             checked={formData.position_id === position.id}
-                                            onChange={() => !isEditMode && onUpdatePosition(position.id)}
+                                            onChange={() => onUpdatePosition(position.id)}
                                             onBlur={() => onFieldBlur('position_id')}
-                                            disabled={isEditMode}
                                             style={{
                                                 display: 'none',
-                                                cursor: isEditMode ? 'not-allowed' : 'pointer',
+                                                cursor: 'pointer',
                                                 accentColor: 'var(--main-color)',
                                             }}
                                         />
-                                        <span style={{ cursor: isEditMode ? 'not-allowed' : 'pointer' }}>{position.name}</span>
+                                        <span style={{ cursor: 'pointer' }}>{position.name}</span>
                                     </label>
                                 ))}
                             </div>
@@ -290,10 +326,92 @@ export default function CreateUserForm({
                     {formData.position_id > 0 &&
                      [4, 6].includes(positions.find(p => p.id === formData.position_id)?.level || 0) && (
                         <div className={styles.formGroup}>
-                            <label className={styles.label}>소속 <span className={styles.required}>*</span></label>
+                            {(() => {
+                                const currentLevel = positions.find(p => p.id === formData.position_id)?.level || 0;
+                                const isSalesPerson = currentLevel === 4; // 영업자는 단일선택
+                                const selectedAffiliation = formData.affiliations?.[0] || '';
+
+                                return (
+                                    <>
+                                        <label className={styles.label}>소속 <span className={styles.required}>*</span></label>
+                                        <div style={{
+                                            display: 'flex',
+                                            flexWrap: 'wrap',
+                                            gap: '12px',
+                                            padding: '12px',
+                                            border: '1px solid #e0e0e0',
+                                            borderRadius: '4px',
+                                            backgroundColor: '#fafafa',
+                                            minHeight: '44px',
+                                        }}>
+                                            {allAffiliations.map(affName => {
+                                                const isChecked = isSalesPerson
+                                                    ? selectedAffiliation === affName
+                                                    : formData.affiliations?.includes(affName) || false;
+                                                return (
+                                                    <label
+                                                        key={affName}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '4px',
+                                                            backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
+                                                            color: isChecked ? '#fff' : '#333',
+                                                            border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            fontWeight: isChecked ? '500' : '400'
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type={isSalesPerson ? 'radio' : 'checkbox'}
+                                                            name={isSalesPerson ? 'affiliation' : undefined}
+                                                            checked={isChecked}
+                                                            onChange={() => {
+                                                                if (isSalesPerson) {
+                                                                    // 영업자: 단일선택 (첫번째 항목만)
+                                                                    onToggleAffiliation(affName);
+                                                                    // 다른 항목 제거
+                                                                    if (formData.affiliations?.length && formData.affiliations[0] !== affName) {
+                                                                        formData.affiliations.forEach(aff => {
+                                                                            if (aff !== affName) onToggleAffiliation(aff);
+                                                                        });
+                                                                    }
+                                                                } else {
+                                                                    // 검수자: 복수선택
+                                                                    onToggleAffiliation(affName);
+                                                                }
+                                                            }}
+                                                            style={{ display: 'none' }}
+                                                        />
+                                                        <span style={{ cursor: 'pointer' }}>
+                                                            {affName}
+                                                        </span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        {allAffiliations.length === 0 && (
+                                            <p style={{ color: '#999', fontSize: '13px', margin: '12px 0 0 0' }}>
+                                                소속 관리에서 추가된 소속이 없습니다.
+                                            </p>
+                                        )}
+                                        {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    )}
+
+                    {/* 소속대표 (영업자 + 소속 선택 시) */}
+                    {currentLevel === 4 && selectedAffiliation && (
+                        <div className={styles.formGroup}>
+                            <label className={styles.label}>소속대표</label>
                             <div style={{
                                 display: 'flex',
-                                flexWrap: 'wrap',
+                                alignItems: 'center',
                                 gap: '12px',
                                 padding: '12px',
                                 border: '1px solid #e0e0e0',
@@ -301,44 +419,30 @@ export default function CreateUserForm({
                                 backgroundColor: '#fafafa',
                                 minHeight: '44px',
                             }}>
-                                {allAffiliations.map(affName => {
-                                    const isChecked = formData.affiliations?.includes(affName) || false;
-                                    return (
-                                        <label
-                                            key={affName}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                padding: '6px 12px',
-                                                borderRadius: '4px',
-                                                backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
-                                                color: isChecked ? '#fff' : '#333',
-                                                border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s ease',
-                                                fontWeight: isChecked ? '500' : '400'
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => onToggleAffiliation(affName)}
-                                                style={{ display: 'none' }}
-                                            />
-                                            <span style={{ cursor: 'pointer' }}>
-                                                {affName}
-                                            </span>
-                                        </label>
-                                    );
-                                })}
+                                {checkingRepresentative ? (
+                                    <span style={{ color: '#999', fontSize: '14px' }}>확인 중...</span>
+                                ) : representativeInfo.hasRepresentative ? (
+                                    <span style={{ color: '#d32f2f', fontSize: '14px' }}>
+                                        이미 소속대표가 설정되어 있습니다. ({representativeInfo.representative?.name})
+                                    </span>
+                                ) : (
+                                    <label style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px',
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.is_affiliation_representative || false}
+                                            onChange={(e) => onUpdateField('is_affiliation_representative', e.target.checked)}
+                                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                        />
+                                        <span>소속대표로 설정</span>
+                                    </label>
+                                )}
                             </div>
-                            {allAffiliations.length === 0 && (
-                                <p style={{ color: '#999', fontSize: '13px', margin: '12px 0 0 0' }}>
-                                    소속 관리에서 추가된 소속이 없습니다.
-                                </p>
-                            )}
-                            {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
                         </div>
                     )}
 
@@ -349,7 +453,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="연락처를 입력하세요"
-                            value={formData.phone}
+                            value={formData.phone ?? ''}
                             onChange={(e) => onUpdatePhone(e.target.value)}
                             onBlur={() => onFieldBlur('phone')}
                             style={{
@@ -367,7 +471,7 @@ export default function CreateUserForm({
                             type="email"
                             className={styles.input}
                             placeholder="이메일을 입력하세요"
-                            value={formData.email_display}
+                            value={formData.email_display ?? ''}
                             onChange={(e) => onUpdateEmail(e.target.value)}
                             onBlur={() => onFieldBlur('email_display')}
                             style={{
@@ -385,7 +489,7 @@ export default function CreateUserForm({
                                 type="text"
                                 className={styles.input}
                                 placeholder="주소를 입력하세요"
-                                value={formData.address}
+                                value={formData.address ?? ''}
                                 readOnly
                                 onClick={handleAddressSearchClick}
                                 style={{ flex: 1, cursor: 'pointer' }}
@@ -417,7 +521,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="상세주소를 입력하세요"
-                            value={formData.address_detail}
+                            value={formData.address_detail ?? ''}
                             onChange={(e) => onUpdateAddressDetail(e.target.value)}
                             disabled={!formData.address}
                             style={{
@@ -448,7 +552,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="은행명을 입력하세요"
-                            value={formData.bank_name}
+                            value={formData.bank_name ?? ''}
                             onChange={(e) => onUpdateField('bank_name', e.target.value)}
                         />
                     </div>
@@ -460,7 +564,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="예금주를 입력하세요"
-                            value={formData.account_holder}
+                            value={formData.account_holder ?? ''}
                             onChange={(e) => onUpdateField('account_holder', e.target.value)}
                         />
                     </div>
@@ -472,7 +576,7 @@ export default function CreateUserForm({
                             type="text"
                             className={styles.input}
                             placeholder="계좌번호를 입력하세요"
-                            value={formData.account_number}
+                            value={formData.account_number ?? ''}
                             onChange={(e) => onUpdateField('account_number', e.target.value)}
                         />
                     </div>

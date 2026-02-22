@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile, FiClock } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome } from 'react-icons/fi';
 import { clearAuthToken, getAdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
     { path: '/main/document_submission', label: '기업관리' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
+    { path: '/main/home', label: '메인홈' },
 ];
 
 export default function Sidebar() {
@@ -66,16 +67,30 @@ export default function Sidebar() {
     };
 
     useEffect(() => {
-        const data = getAdminData();
-        if (data) {
-            setAdminData(data);
-        }
-        fetchNotificationCount();
+        const initAdminData = async () => {
+            let data = getAdminData();
+            if (!data) {
+                // 새 탭 등 sessionStorage가 비어있으면 쿠키로 API 조회
+                try {
+                    const res = await fetch('/api/auth/me');
+                    if (res.ok) {
+                        data = await res.json();
+                        sessionStorage.setItem('admin_data', JSON.stringify(data));
+                    }
+                } catch (e) {
+                    console.error('사용자 정보 조회 실패:', e);
+                }
+            }
+            if (data) {
+                setAdminData(data);
+                if (data.position?.level === 4 && data.supervisor_id) {
+                    fetchSupervisorInfo(data.supervisor_id);
+                }
+            }
+            fetchNotificationCount();
+        };
 
-        // 영업자(Level 4)인 경우 담당검수자 정보 조회
-        if (data?.position?.level === 4 && data?.supervisor_id) {
-            fetchSupervisorInfo(data.supervisor_id);
-        }
+        initAdminData();
 
         // 알림 업데이트 이벤트 리스닝
         const handleNotificationUpdate = () => {
@@ -108,8 +123,6 @@ export default function Sidebar() {
     const handleLogout = () => {
         clearAuthToken();
         document.cookie = 'auth_token=; path=/; max-age=0';
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('admin_data');
         // 뒤로가기 비활성화 (로그인 페이지에서 뒤로갈 수 없게)
         window.history.pushState(null, '', '/login');
         window.addEventListener('popstate', function(e) {
@@ -173,6 +186,8 @@ export default function Sidebar() {
                                         <FiUsers className={styles.menuIcon} />
                                     ) : item.path === '/main/history' ? (
                                         <FiClock className={styles.menuIcon} />
+                                    ) : item.path === '/main/home' ? (
+                                        <FiHome className={styles.menuIcon} />
                                     ) : (
                                         <FiFile className={styles.menuIcon} />
                                     )}

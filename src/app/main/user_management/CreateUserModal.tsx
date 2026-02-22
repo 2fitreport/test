@@ -179,7 +179,7 @@ export default function CreateUserModal({
                             ref={userIdRef}
                             type="text"
                             className={styles.createInput}
-                            value={createFormData.user_id}
+                            value={createFormData.user_id ?? ''}
                             disabled
                             style={{
                                 backgroundColor: '#f5f5f5',
@@ -195,7 +195,7 @@ export default function CreateUserModal({
                                     type="text"
                                     className={styles.createInput}
                                     placeholder="사용자 ID를 입력하세요"
-                                    value={createFormData.user_id}
+                                    value={createFormData.user_id ?? ''}
                                     onChange={(e) => {
                                         let value = e.target.value;
 
@@ -273,7 +273,7 @@ export default function CreateUserModal({
                         type="text"
                         className={styles.createInput}
                         placeholder="비밀번호를 입력하세요"
-                        value={createFormData.password}
+                        value={createFormData.password ?? ''}
                         onChange={(e) => {
                             setCreateFormData({ ...createFormData, password: e.target.value });
                             if (e.target.value) {
@@ -295,7 +295,7 @@ export default function CreateUserModal({
                         type="text"
                         className={styles.createInput}
                         placeholder="이름을 입력하세요"
-                        value={createFormData.name}
+                        value={createFormData.name ?? ''}
                         onChange={(e) => {
                             let value = e.target.value;
                             // 숫자 제거
@@ -348,92 +348,116 @@ export default function CreateUserModal({
                 </div>
                 )}
 
-                {/* 검수자(Level 6)일 때 소속 체크박스 표시 */}
+                {/* 영업자(Level 4)/검수자(Level 6)일 때 소속 선택 표시 */}
                 {createFormData.position_id > 0 &&
-                 positions.find(p => p.id === createFormData.position_id)?.level === 6 && (
+                 [4, 6].includes(positions.find(p => p.id === createFormData.position_id)?.level || 0) && (
                     <div className={styles.createFormGroup}>
-                        <label className={styles.createLabel}>담당 소속 <span className={styles.required}>*</span></label>
-                        <input
-                            type="text"
-                            placeholder="소속 검색..."
-                            value={affiliationSearch}
-                            onChange={(e) => setAffiliationSearch(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '6px 10px',
-                                marginBottom: '8px',
-                                border: '1px solid #ddd',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                            }}
-                        />
-                        <div style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: '12px',
-                            padding: '12px',
-                            border: '1px solid #e0e0e0',
-                            borderRadius: '4px',
-                            backgroundColor: '#fafafa',
-                            maxHeight: '200px',
-                            overflowY: 'auto'
-                        }}>
-                            {allAffiliations
-                                .filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase()))
-                                .map(affName => {
-                                const isChecked = createFormData.affiliations?.includes(affName) || false;
-                                const isTakenByOther = takenAffiliations.includes(affName) && !isChecked;
+                        {(() => {
+                            const currentLevel = positions.find(p => p.id === createFormData.position_id)?.level || 0;
+                            const isSalesPerson = currentLevel === 4; // 영업자는 단일선택
+                            const selectedAffiliation = createFormData.affiliations?.[0] || '';
 
-                                return (
-                                    <label
-                                        key={affName}
+                            return (
+                                <>
+                                    <label className={styles.createLabel}>담당 소속 <span className={styles.required}>*</span></label>
+                                    <input
+                                        type="text"
+                                        placeholder="소속 검색..."
+                                        value={affiliationSearch}
+                                        onChange={(e) => setAffiliationSearch(e.target.value)}
                                         style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            cursor: isTakenByOther ? 'not-allowed' : 'pointer',
-                                            opacity: isTakenByOther ? 0.5 : 1,
-                                            padding: '6px 12px',
+                                            width: '100%',
+                                            padding: '6px 10px',
+                                            marginBottom: '8px',
+                                            border: '1px solid #ddd',
                                             borderRadius: '4px',
-                                            backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
-                                            color: isChecked ? '#fff' : '#333',
-                                            border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
-                                            transition: 'all 0.2s ease'
+                                            fontSize: '13px',
                                         }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={isChecked}
-                                            disabled={isTakenByOther}
-                                            onChange={(e) => {
-                                                const currentAffiliations = createFormData.affiliations || [];
-                                                if (e.target.checked) {
-                                                    setCreateFormData({
-                                                        ...createFormData,
-                                                        affiliations: [...currentAffiliations, affName]
-                                                    });
-                                                } else {
-                                                    setCreateFormData({
-                                                        ...createFormData,
-                                                        affiliations: currentAffiliations.filter(a => a !== affName)
-                                                    });
-                                                }
-                                                if (errors.affiliations) {
-                                                    setErrors((prev: { [key: string]: string }) => ({ ...prev, affiliations: '' }));
-                                                }
-                                            }}
-                                            style={{ display: 'none' }}
-                                        />
-                                        <span style={{ fontWeight: '500', cursor: 'pointer' }}>{affName}</span>
-                                        {isTakenByOther && <span style={{ fontSize: '11px', color: '#999' }}>(배정됨)</span>}
-                                    </label>
-                                );
-                            })}
-                            {allAffiliations.filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase())).length === 0 && (
-                                <span style={{ color: '#999', fontSize: '13px' }}>검색 결과가 없습니다</span>
-                            )}
-                        </div>
-                        {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
+                                    />
+                                    <div style={{
+                                        display: 'flex',
+                                        flexWrap: 'wrap',
+                                        gap: '12px',
+                                        padding: '12px',
+                                        border: '1px solid #e0e0e0',
+                                        borderRadius: '4px',
+                                        backgroundColor: '#fafafa',
+                                        maxHeight: '200px',
+                                        overflowY: 'auto'
+                                    }}>
+                                        {allAffiliations
+                                            .filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase()))
+                                            .map(affName => {
+                                            const isChecked = isSalesPerson
+                                                ? selectedAffiliation === affName
+                                                : createFormData.affiliations?.includes(affName) || false;
+                                            const isTakenByOther = takenAffiliations.includes(affName) && !isChecked;
+
+                                            return (
+                                                <label
+                                                    key={affName}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        cursor: isTakenByOther ? 'not-allowed' : 'pointer',
+                                                        opacity: isTakenByOther ? 0.5 : 1,
+                                                        padding: '6px 12px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
+                                                        color: isChecked ? '#fff' : '#333',
+                                                        border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
+                                                        transition: 'all 0.2s ease'
+                                                    }}
+                                                >
+                                                    <input
+                                                        type={isSalesPerson ? 'radio' : 'checkbox'}
+                                                        name={isSalesPerson ? 'affiliation' : undefined}
+                                                        checked={isChecked}
+                                                        disabled={isTakenByOther}
+                                                        onChange={(e) => {
+                                                            if (isSalesPerson) {
+                                                                // 영업자: 단일선택 - 첫번째 항목만
+                                                                if (e.target.checked) {
+                                                                    setCreateFormData({
+                                                                        ...createFormData,
+                                                                        affiliations: [affName]
+                                                                    });
+                                                                }
+                                                            } else {
+                                                                // 검수자: 복수선택
+                                                                const currentAffiliations = createFormData.affiliations || [];
+                                                                if (e.target.checked) {
+                                                                    setCreateFormData({
+                                                                        ...createFormData,
+                                                                        affiliations: [...currentAffiliations, affName]
+                                                                    });
+                                                                } else {
+                                                                    setCreateFormData({
+                                                                        ...createFormData,
+                                                                        affiliations: currentAffiliations.filter(a => a !== affName)
+                                                                    });
+                                                                }
+                                                            }
+                                                            if (errors.affiliations) {
+                                                                setErrors((prev: { [key: string]: string }) => ({ ...prev, affiliations: '' }));
+                                                            }
+                                                        }}
+                                                        style={{ display: 'none' }}
+                                                    />
+                                                    <span style={{ fontWeight: '500', cursor: 'pointer' }}>{affName}</span>
+                                                    {isTakenByOther && <span style={{ fontSize: '11px', color: '#999' }}>(배정됨)</span>}
+                                                </label>
+                                            );
+                                        })}
+                                        {allAffiliations.filter(affName => affName.toLowerCase().includes(affiliationSearch.toLowerCase())).length === 0 && (
+                                            <span style={{ color: '#999', fontSize: '13px' }}>검색 결과가 없습니다</span>
+                                        )}
+                                    </div>
+                                    {errors.affiliations && <span className={styles.errorMessage}>{errors.affiliations}</span>}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -443,7 +467,7 @@ export default function CreateUserModal({
                         type="text"
                         className={styles.createInput}
                         placeholder="연락처를 입력하세요"
-                        value={createFormData.phone}
+                        value={createFormData.phone ?? ''}
                         onChange={(e) => {
                             let value = e.target.value.replace(/[^0-9]/g, '');
                             if (value.length > 11) {
@@ -479,7 +503,7 @@ export default function CreateUserModal({
                         type="email"
                         className={styles.createInput}
                         placeholder="이메일을 입력하세요"
-                        value={createFormData.email_display}
+                        value={createFormData.email_display ?? ''}
                         onChange={(e) => {
                             setCreateFormData({ ...createFormData, email_display: e.target.value });
                             // 유효한 이메일이면 에러 제거
@@ -502,7 +526,7 @@ export default function CreateUserModal({
                             type="text"
                             className={styles.createInput}
                             placeholder="주소를 입력하세요"
-                            value={createFormData.address}
+                            value={createFormData.address ?? ''}
                             readOnly
                             onClick={handleAddressSearchClick}
                             style={{ flex: 1, cursor: 'pointer' }}
@@ -533,7 +557,7 @@ export default function CreateUserModal({
                         type="text"
                         className={styles.createInput}
                         placeholder="상세주소를 입력하세요"
-                        value={createFormData.address_detail}
+                        value={createFormData.address_detail ?? ''}
                         onChange={(e) => setCreateFormData({ ...createFormData, address_detail: e.target.value })}
                         disabled={!createFormData.address}
                         style={{
@@ -550,7 +574,7 @@ export default function CreateUserModal({
                         type="text"
                         className={styles.createInput}
                         placeholder="소속을 입력하세요"
-                        value={createFormData.company_name}
+                        value={createFormData.company_name ?? ''}
                         onChange={(e) => {
                             let value = e.target.value;
                             // 10글자 이하로 제한

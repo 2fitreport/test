@@ -91,7 +91,7 @@ export default function HistoryPage() {
 
     const getStatusLabel = (status: string) => {
         const statusLabels: Record<string, string> = {
-            waiting: '대기',
+            waiting: '서류수집',
             approved: '승인',
             rejected: '반려',
             revision: '보완',
@@ -182,7 +182,7 @@ export default function HistoryPage() {
                                     <th>기업명</th>
                                     <th>대표자명</th>
                                     <th>사업자유형</th>
-                                    <th>진행상황</th>
+                                    <th>진행단계</th>
                                     <th>상태</th>
                                     <th>작성자</th>
                                     <th>삭제자</th>
@@ -274,7 +274,7 @@ export default function HistoryPage() {
                                 <h3>진행 정보</h3>
                                 <div className={styles.detailGrid}>
                                     <div className={styles.detailItem}>
-                                        <span className={styles.detailLabel}>진행상황</span>
+                                        <span className={styles.detailLabel}>진행단계</span>
                                         <span className={styles.detailValue}>{selectedHistory.progress_details || '-'}</span>
                                     </div>
                                     <div className={styles.detailItem}>

@@ -2,12 +2,44 @@ import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 export async function GET(request: NextRequest) {
   try {
+    // 요청자 정보 추출
+    const authToken = request.cookies.get('auth_token')?.value;
+    let userLevel = 0;
+
+    if (authToken) {
+      try {
+        const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+        const userId = tokenData.user_id;
+
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('position(level)')
+          .eq('user_id', userId)
+          .single();
+
+        userLevel = currentUser?.position?.level || 0;
+      } catch (e) {
+        console.error('토큰 파싱 실패:', e);
+      }
+    }
+
+    // Level 1, 2만 모든 사용자 조회 가능
+    // 나머지는 빈 배열 반환
+    if (userLevel !== 1 && userLevel !== 2) {
+      return NextResponse.json({
+        total: 0,
+        byStatus: { active: 0, inactive: 0 },
+        byPosition: [],
+        byCompany: {},
+      });
+    }
+
     const { data: usersData, error: usersError } = await supabase
       .from('users')
       .select(`

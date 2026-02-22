@@ -1,0 +1,32 @@
+.progressWrap {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+    flex: 1;
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+}
+
+.progressWrap h2 {
+    font-size: 18px;
+    font-weight: 700;
+    padding: 20px;
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+    color: #fff;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    margin: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chartContainer {
+    padding: 30px;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}

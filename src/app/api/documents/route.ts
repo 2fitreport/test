@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         else if (userLevel === 4) {
             filteredDocuments = data.filter((doc: any) => doc.user_id === userId);
         }
-        // Level 6 (검수자): 자신의 담당 소속에 해당하는 영업자 문서만 (progress_details가 '검수자'이거나 과거에 승인한 문서)
+        // Level 6 (검수자): 자신의 담당 소속에 해당하는 영업자 문서만
         else if (userLevel === 6) {
             // 검수자의 담당 소속 조회
             const { data: affiliationsData, error: affiliationsError } = await supabase
@@ -88,20 +88,20 @@ export async function GET(request: NextRequest) {
 
                 if (!usersError && usersData) {
                     const assignedUserIds = usersData.map((u: any) => u.user_id);
-                    // 담당 소속의 영업자가 올린 문서 (영업자 상태 제외) OR 과거에 승인했던 문서 (영업자 상태 제외)
+                    // 담당 소속의 영업자가 올린 문서 OR 과거에 배정받은 문서
                     filteredDocuments = data.filter((doc: any) =>
-                        (assignedUserIds.includes(doc.user_id) && doc.progress_details !== '영업자') ||
-                        (doc.inspector_id === userId && doc.progress_details !== '영업자')
+                        assignedUserIds.includes(doc.user_id) ||
+                        doc.inspector_id === userId
                     );
                 }
             }
         }
         // Level 1 (대표자), Level 2 (대표실무자): 필터링 없음 (모든 문서)
 
-        // 데이터 변환 (timestamp를 ISO 문자열로 변환)
+        // progress_start_date를 string으로 변환하여 반환 (TimeAgo 컴포넌트용)
         const documents = filteredDocuments.map((doc: any) => ({
             ...doc,
-            progress_start_date: doc.progress_start_date ? new Date(doc.progress_start_date).toISOString() : undefined,
+            progress_start_date: doc.progress_start_date ? String(doc.progress_start_date) : undefined,
         }));
 
         return NextResponse.json(documents);

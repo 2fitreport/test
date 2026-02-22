@@ -30,6 +30,7 @@ export async function GET(
         company_name,
         password,
         supervisor_id,
+        is_affiliation_representative,
         bank_name,
         account_holder,
         account_number,
@@ -102,7 +103,7 @@ export async function PATCH(
     }
 
     // 전체 정보 수정
-    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, bank_name, account_holder, account_number } = body;
+    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, is_affiliation_representative, bank_name, account_holder, account_number } = body;
 
     const updateData: Record<string, unknown> = {};
     // user_id는 수정 불가 (documents 테이블에서 참조됨)
@@ -118,16 +119,34 @@ export async function PATCH(
     if (bank_name !== undefined) updateData.bank_name = bank_name;
     if (account_holder !== undefined) updateData.account_holder = account_holder;
     if (account_number !== undefined) updateData.account_number = account_number;
+    if (is_affiliation_representative !== undefined) updateData.is_affiliation_representative = is_affiliation_representative;
 
-    // position level 확인
+    // position level 확인 (새로운 position 또는 기존 position)
+    let newPositionLevel = 0;
     let isInspector = false;
-    if (position_id) {
+    let isSalesPerson = false;
+
+    if (position_id !== undefined) {
+      // 새로운 position이 지정된 경우
       const { data: positionData } = await supabase
         .from('position')
         .select('level')
         .eq('id', position_id)
         .single();
-      isInspector = positionData?.level === 6;
+      newPositionLevel = positionData?.level || 0;
+      isInspector = newPositionLevel === 6;
+      isSalesPerson = newPositionLevel === 4;
+    } else {
+      // position이 지정되지 않은 경우 현재 position 조회
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('position(level)')
+        .eq('id', userId)
+        .single();
+      const currentLevel = currentUser?.position?.level || 0;
+      isInspector = currentLevel === 6;
+      isSalesPerson = currentLevel === 4;
+      newPositionLevel = currentLevel;
     }
 
     // 검수자인 경우 소속 필수 확인
@@ -183,42 +202,29 @@ export async function PATCH(
 
     if (error) throw error;
 
-    // 영업자/검수자인 경우 소속 업데이트
-    if ((isInspector || position_id > 0 && (data?.position as any)?.level === 4) && affiliations !== undefined) {
+    // 검수자인 경우만 inspector_affiliations에 소속 업데이트
+    // 영업자는 company_name으로 처리됨
+    if (isInspector && affiliations !== undefined) {
       // 기존 소속 삭제
       const { error: deleteError } = await supabase
-        .from('user_affiliations')
+        .from('inspector_affiliations')
         .delete()
-        .eq('user_id', userId);
+        .eq('inspector_id', userId);
 
       if (deleteError) throw deleteError;
 
       // 새 소속 추가
       if (affiliations.length > 0) {
-        // affiliations 이름으로 id 조회
-        const { data: affData, error: affQueryError } = await supabase
-          .from('affiliations')
-          .select('id, name')
-          .in('name', affiliations);
+        const insertData = affiliations.map((affName: string) => ({
+          inspector_id: userId,
+          affiliation_name: affName
+        }));
 
-        if (affQueryError) throw affQueryError;
+        const { error: affError } = await supabase
+          .from('inspector_affiliations')
+          .insert(insertData);
 
-        // affiliation_id 매핑
-        const affMap = new Map(affData?.map((a: any) => [a.name, a.id]) || []);
-        const insertData = affiliations
-          .map((affName: string) => ({
-            user_id: userId,
-            affiliation_id: affMap.get(affName)
-          }))
-          .filter((item: any) => item.affiliation_id !== undefined);
-
-        if (insertData.length > 0) {
-          const { error: affError } = await supabase
-            .from('user_affiliations')
-            .insert(insertData);
-
-          if (affError) throw affError;
-        }
+        if (affError) throw affError;
       }
     }
 

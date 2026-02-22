@@ -50,18 +50,35 @@ export async function PUT(
         const body = await request.json();
         const docId = parseInt(id);
 
-        // progress_start_date가 숫자(타임스탐프)면 로컬 시간 기준 ISO 문자열로 변환
+        // 액터 정보 파싱 (쿠키 토큰)
+        let actorId = 'unknown';
+        let actorName = '알 수 없음';
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (authToken) {
+            try {
+                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+                actorId = tokenData.user_id || 'unknown';
+                const { data: actorUser } = await supabase
+                    .from('users')
+                    .select('name')
+                    .eq('user_id', actorId)
+                    .single();
+                if (actorUser) actorName = actorUser.name || actorId;
+            } catch {}
+        }
+
+        // 변경 전 문서 조회
+        const { data: prevDoc } = await supabase
+            .from('documents')
+            .select('status, progress_details, memos, title, company_name')
+            .eq('id', docId)
+            .single();
+
+        // progress_start_date가 문자열 타임스탐프면 숫자로 변환
         if (body.progress_start_date && typeof body.progress_start_date === 'string') {
             const timestamp = parseInt(body.progress_start_date);
             if (!isNaN(timestamp)) {
-                const d = new Date(timestamp);
-                const year = d.getFullYear();
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                const hours = String(d.getHours()).padStart(2, '0');
-                const minutes = String(d.getMinutes()).padStart(2, '0');
-                const seconds = String(d.getSeconds()).padStart(2, '0');
-                body.progress_start_date = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+                body.progress_start_date = timestamp;
             }
         }
 
@@ -73,6 +90,87 @@ export async function PUT(
 
         if (error) {
             throw error;
+        }
+
+        // 로그 생성
+        if (prevDoc) {
+            const logBase = {
+                document_id: docId,
+                document_title: prevDoc.title,
+                company_name: prevDoc.company_name,
+                actor_id: actorId,
+                actor_name: actorName,
+            };
+
+            const logsToInsert: any[] = [];
+
+            // 상태 변경 감지
+            if (body.status !== undefined && body.status !== prevDoc.status) {
+                logsToInsert.push({
+                    ...logBase,
+                    action_type: 'status_change',
+                    old_value: prevDoc.status,
+                    new_value: body.status,
+                });
+            }
+
+            // 진행단계 변경 감지
+            if (body.progress_details !== undefined && body.progress_details !== prevDoc.progress_details) {
+                logsToInsert.push({
+                    ...logBase,
+                    action_type: 'progress_details_change',
+                    old_value: prevDoc.progress_details,
+                    new_value: body.progress_details,
+                });
+            }
+
+            // 메모 변경 감지 (memos 필드가 명시적으로 포함되고, 실제로 배열인 경우에만)
+            if ('memos' in body && Array.isArray(body.memos)) {
+                const prevMemos: any[] = prevDoc.memos || [];
+                const newMemos: any[] = body.memos;
+
+                console.log('메모 변경 감지:', {
+                    'prevMemos 길이': prevMemos.length,
+                    'newMemos 길이': newMemos.length,
+                    'prevMemos': prevMemos,
+                    'newMemos': newMemos
+                });
+
+                if (newMemos.length > prevMemos.length) {
+                    // 메모 추가: 마지막에 추가된 메모
+                    const addedMemo = newMemos[newMemos.length - 1];
+                    logsToInsert.push({
+                        ...logBase,
+                        action_type: 'memo_add',
+                        new_value: addedMemo?.content || addedMemo?.text || JSON.stringify(addedMemo),
+                    });
+                } else if (newMemos.length < prevMemos.length) {
+                    // 메모 삭제: 없어진 메모 찾기
+                    const newIds = new Set(newMemos.map((m: any) => m.id));
+                    const deletedMemo = prevMemos.find((m: any) => !newIds.has(m.id));
+                    logsToInsert.push({
+                        ...logBase,
+                        action_type: 'memo_delete',
+                        old_value: deletedMemo?.content || deletedMemo?.text || JSON.stringify(deletedMemo),
+                    });
+                }
+            }
+
+            for (const log of logsToInsert) {
+                const { error: logError } = await supabase.rpc('insert_document_log', {
+                    p_document_id: docId,
+                    p_document_title: log.document_title ?? null,
+                    p_company_name: log.company_name ?? null,
+                    p_action_type: log.action_type,
+                    p_actor_id: log.actor_id,
+                    p_actor_name: log.actor_name,
+                    p_old_value: log.old_value ?? null,
+                    p_new_value: log.new_value ?? null,
+                });
+                if (logError) {
+                    console.error('로그 저장 실패:', logError);
+                }
+            }
         }
 
         return NextResponse.json(data[0]);

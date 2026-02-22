@@ -1,0 +1,211 @@
+.logWrap {
+    background: #fff;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.logWrap h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--black-color);
+    padding: 20px;
+    background-color: #2563eb;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 64px;
+}
+
+.logWrap ul {
+    display: flex;
+    flex-direction: column;
+    min-height: 320px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.logWrap ul::-webkit-scrollbar {
+    width: 6px;
+}
+
+.logWrap ul::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.logWrap ul::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.logWrap ul::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.logWrap li {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 20px;
+    cursor: pointer;
+    height: 80px;
+}
+
+.logWrap li:hover li:not(.empty) {
+    background: #f1f1f1;
+}
+
+.logWrap li * {
+    cursor: pointer;
+}
+
+.logWrap li:last-child {
+    border-bottom: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logWrap li h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.logWrap li p {
+    font-size: 16px;
+    color: #777;
+}
+
+.logWrap li b {
+    border-radius: 100px;
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+.logWrap li b.normal {
+    background: #059669;
+}
+
+.logWrap li div {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 250px;
+}
+
+.logWrap li h3 {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.logWrap li h4 {
+    margin-left: 100px;
+    font-size: 20px;
+}
+
+.logWrap li h4 strong {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 20px;
+    margin-right: 10px;
+}
+
+.approved {
+    background-color: var(--badge-approved-bg);
+    color: var(--badge-approved-color);
+}
+
+.waiting {
+    background-color: var(--badge-waiting-bg);
+    color: var(--badge-waiting-color);
+}
+
+.rejected {
+    background-color: var(--badge-rejected-bg);
+    color: var(--badge-rejected-color);
+}
+
+.revision {
+    background-color: var(--badge-revision-bg);
+    color: var(--badge-revision-color);
+}
+
+.started {
+    background-color: var(--badge-started-bg);
+    color: var(--badge-started-color);
+}
+
+.submitted {
+    background-color: var(--badge-submitted-bg);
+    color: var(--badge-submitted-color);
+}
+
+.stopped {
+    background-color: var(--badge-stopped-bg);
+    color: var(--badge-stopped-color);
+}
+
+.deleteButton {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #aaa;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.deleteButton:hover {
+    background-color: #f0f0f0;
+    color: #333;
+}
+
+.empty {
+    color: #aaa;
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    padding: 30px 20px !important;
+    justify-content: center;
+    width: 100%;
+    height: 420px !important;
+    cursor: auto !important;
+
+} 
+
+.manager { font-weight: 600; color: var(--black-color); }
+.date { color: #aaa; }
+
+.countBadge {
+    background-color: #dc2626;
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+.dotApproved { background-color: var(--badge-approved-color); }
+.dotWaiting { background-color: var(--badge-waiting-color); }
+.dotRejected { background-color: var(--badge-rejected-color); }
+.dotRevision { background-color: var(--badge-revision-color); }
+.dotStarted { background-color: var(--badge-started-color); }
+.dotSubmitted { background-color: var(--badge-submitted-color); }
+.dotStopped { background-color: var(--badge-stopped-color); }

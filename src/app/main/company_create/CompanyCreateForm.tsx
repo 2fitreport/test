@@ -47,7 +47,7 @@ interface Document {
     phone?: string;
     progress_details?: string;
     inspector_id?: string | null;
-    status: 'waiting' | 'approved' | 'rejected' | 'revision' | 'in_progress' | 'submitted' | 'stopped' | 'assigned';
+    status: '정상' | '보완' | '보류';
     progress_status: 'in_progress' | 'stopped' | 'not_started';
     submitted_date: string;
     completed_date?: string;
@@ -326,13 +326,6 @@ export default function CompanyCreateForm() {
             } else {
                 // edit 파라미터가 없으면 뷰 모드로 설정
                 setIsEditMode(false);
-                // 보기 모드에서 첫 번째 파일 자동 미리보기
-                if (data.files && data.files.length > 0) {
-                    setTimeout(() => {
-                        handleViewFile(data.files[0]);
-                        setCurrentFileIndex(0);
-                    }, 300);
-                }
             }
         } catch (err) {
             console.error('문서 데이터 로드 실패:', err);
@@ -1077,8 +1070,8 @@ export default function CompanyCreateForm() {
                     document_type: '기업등록',
                     title: formData.company_name,
                     manager_name: '',
-                    progress_details: '검수자',
-                    status: 'waiting',
+                    progress_details: '서류요청',
+                    status: '정상',
                     progress_status: 'not_started',
                     submitted_date: now.toLocaleString('ko-KR'),
                     files: uploadedFiles,
@@ -1177,6 +1170,13 @@ export default function CompanyCreateForm() {
         };
 
         const updatedMemos = [...(documentData.memos || []), newMemo];
+
+        console.log('handleAddMemo 호출:', {
+            'documentData.id': documentData.id,
+            'documentData.memos 길이': documentData.memos?.length ?? 'undefined',
+            'updatedMemos 길이': updatedMemos.length,
+            'newMemo': newMemo
+        });
 
         // 로컬 상태만 먼저 업데이트 (UI 즉시 반영)
         setDocumentData({
@@ -1445,6 +1445,13 @@ export default function CompanyCreateForm() {
 
     const saveDocumentToDatabase = async (document: Document) => {
         try {
+            const hasMemosField = 'memos' in document;
+            console.log('saveDocumentToDatabase 호출:', {
+                'document.id': document.id,
+                'memos 필드 포함': hasMemosField,
+                'document.memos 길이': document.memos?.length ?? 'undefined',
+                'body 전체': document
+            });
             const response = await fetch(`/api/documents/${document.id}`, {
                 method: 'PUT',
                 headers: {
@@ -1477,20 +1484,17 @@ export default function CompanyCreateForm() {
     };
 
     const handleProgressStart = (id: number) => {
-        // 검수자 또는 대표실무자 상태에서는 진행할 수 없음
-        if (documentData?.progress_details === '검수자' || documentData?.progress_details === '대표실무자') {
-            setError('실무자가 배정되어있지 않으면<br>진행할수없습니다.');
-            setErrorModalOpen(true);
+        // 진행 단계에 따라 처리
+        const progressDetails = documentData?.progress_details;
+
+        // 분석 단계에서 실무자가 배정되지 않았으면 실무자 선택 모달
+        if (progressDetails === '분석' && !documentData?.manager_id) {
+            setSelectedManagerId(id);
+            setManagerSelectModalOpen(true);
             return;
         }
 
-        // 진행 조건 확인: 실무자 배정 필수 & 상태가 대기
-        if (!documentData?.manager_id || documentData?.status !== 'waiting') {
-            setError('실무자가 배정되어있지 않으면<br>진행할수없습니다.');
-            setErrorModalOpen(true);
-            return;
-        }
-
+        // 그 외는 일반 승인 진행
         setPendingAction({ id, action: 'start' });
         setActionConfirmType('start');
         setActionConfirmModalOpen(true);
@@ -1506,7 +1510,7 @@ export default function CompanyCreateForm() {
             return;
         }
 
-        if (doc && doc.progress_details === '대표실무자') {
+        if (doc && (doc.progress_details === '분석' && !doc.manager_id) || doc.progress_details === '대표실무자') {
             setSelectedManagerId(id);
             setManagerSelectModalOpen(true);
         } else {
@@ -1597,8 +1601,9 @@ export default function CompanyCreateForm() {
             if (action === 'start') {
                 const updated = {
                     ...documentData,
-                    status: 'in_progress' as const,
-                    progress_status: 'in_progress' as const,
+                    status: '정상' as const,
+                    progress_details: '진행',
+                    progress_status: 'not_started' as const,
                     progress_start_date: String(Date.now())
                 };
                 await saveDocumentToDatabase(updated);
@@ -1621,28 +1626,47 @@ export default function CompanyCreateForm() {
                     return;
                 }
 
-                if (documentData.progress_details === '검수자') {
-                    // 검수자가 승인할 때 inspector_id 저장
+                if (documentData.progress_details === '서류요청') {
+                    // 서류요청 → 분석으로 변경 (필요한 필드만 전송)
                     updated = {
-                        ...documentData,
-                        progress_details: '대표실무자',
-                        inspector_id: currentUserId
+                        id: documentData.id,
+                        status: '정상' as const,
+                        progress_details: '분석',
+                        inspector_id: currentUserId,
+                        progress_start_date: String(Date.now())
                     };
-                    message = '대표실무자로 진행합니다.';
-                } else if (documentData.progress_details === '대표실무자') {
-                    updated = { ...documentData, status: 'assigned' as const, progress_details: '실무자' };
-                    message = '실무자로 배정되었습니다.';
-                } else {
+                    message = '분석 상태로 변경되었습니다.';
+                } else if (documentData.progress_details === '분석') {
+                    // 분석 → 진행으로 변경 (필요한 필드만 전송)
+                    updated = {
+                        id: documentData.id,
+                        status: '정상' as const,
+                        progress_details: '진행'
+                    };
+                    message = '진행 상태로 변경되었습니다.';
+                } else if (documentData.progress_details === '진행') {
+                    // 진행 → 승인으로 변경 (필요한 필드만 전송)
+                    updated = {
+                        id: documentData.id,
+                        status: '정상' as const,
+                        progress_details: '승인'
+                    };
+                    message = '승인 상태로 변경되었습니다.';
+                } else if (documentData.progress_details === '승인') {
+                    // 승인 완료 (필요한 필드만 전송)
                     const completedHours = String(now.getHours()).padStart(2, '0');
                     const completedMinutes = String(now.getMinutes()).padStart(2, '0');
                     const dateStr = now.toISOString().split('T')[0].replace(/(\d{4})-(\d{2})-(\d{2})/, '25-$2-$3');
                     updated = {
-                        ...documentData,
-                        status: 'approved' as const,
-                        progress_status: 'stopped' as const,
+                        id: documentData.id,
+                        status: '정상' as const,
+                        progress_status: 'not_started' as const,
                         completed_date: `${dateStr} ${completedHours}:${completedMinutes}`
                     };
                     message = '기업이 승인되었습니다.';
+                } else {
+                    message = '현재 상태에서 승인할 수 없습니다.';
+                    return;
                 }
 
                 await saveDocumentToDatabase(updated);
@@ -1663,10 +1687,10 @@ export default function CompanyCreateForm() {
                 const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
 
                 const updated = {
-                    ...documentData,
-                    status: 'rejected' as const,
+                    id: documentData.id,
+                    status: '보류' as const,
                     progress_status: 'not_started' as const,
-                    progress_details: '영업자',
+                    progress_details: '서류요청',
                     manager_name: null,
                     manager_id: null,
                     inspector_id: null,
@@ -1676,7 +1700,7 @@ export default function CompanyCreateForm() {
 
                 await saveDocumentToDatabase(updated);
                 setSuccessMessage('기업이 반려되었습니다.');
-                setDocumentData(updated);
+                setDocumentData({ ...documentData, ...updated });
             } else if (action === 'revision') {
                 const timeStr = now.toLocaleString('ko-KR', {
                     year: '2-digit',
@@ -1692,10 +1716,10 @@ export default function CompanyCreateForm() {
                 const combinedReason = documentData.reason ? `${documentData.reason}\n${newReason}` : newReason;
 
                 const updated = {
-                    ...documentData,
-                    status: 'revision' as const,
+                    id: documentData.id,
+                    status: '보완' as const,
                     progress_status: 'not_started' as const,
-                    progress_details: '영업자',
+                    progress_details: '서류요청',
                     manager_name: null,
                     manager_id: null,
                     inspector_id: null,
@@ -1713,9 +1737,9 @@ export default function CompanyCreateForm() {
                     // 제출 시 사유는 초기화하지 않고 유지 (타임라인처럼 쌓임)
                     updated = {
                         ...documentData,
-                        status: 'waiting' as const,
+                        status: '정상' as const,
                         progress_status: 'not_started' as const,
-                        progress_details: '검수자',
+                        progress_details: '서류요청',
                         manager_name: null,
                         manager_id: null,
                         inspector_id: null,
@@ -1724,8 +1748,8 @@ export default function CompanyCreateForm() {
                 } else {
                     updated = {
                         ...documentData,
-                        status: 'submitted' as const,
-                        progress_status: 'stopped' as const,
+                        status: '정상' as const,
+                        progress_status: 'not_started' as const,
                         submitted_date: now.toLocaleString('ko-KR')
                     };
                 }
@@ -1763,8 +1787,8 @@ export default function CompanyCreateForm() {
 
                 const updated = {
                     ...documentData,
-                    status: 'stopped' as const,
-                    progress_status: 'stopped' as const,
+                    status: '보류' as const,
+                    progress_status: 'not_started' as const,
                     stopped_time: stoppedTime
                 };
                 await saveDocumentToDatabase(updated);
@@ -1777,9 +1801,9 @@ export default function CompanyCreateForm() {
             } else if (action === 'reset') {
                 const updated = {
                     ...documentData,
-                    status: 'waiting' as const,
+                    status: '정상' as const,
                     progress_status: 'not_started' as const,
-                    progress_details: '검수자',
+                    progress_details: '서류요청',
                     progress_start_date: null,
                     progress_end_time: null,
                     stopped_time: null,
@@ -1810,8 +1834,8 @@ export default function CompanyCreateForm() {
 
                 const updated = {
                     ...documentData,
-                    status: 'in_progress' as const,
-                    progress_status: 'in_progress' as const,
+                    status: '정상' as const,
+                    progress_status: 'not_started' as const,
                     progress_start_date: String(newStartTime),
                     stopped_time: null
                 };
@@ -2975,7 +2999,8 @@ export default function CompanyCreateForm() {
                                         const selectedWorker = workers.find(w => w.user_id === selectedManager);
                                         const updated = {
                                             ...documentData,
-                                            progress_details: '실무자',
+                                            progress_details: documentData?.progress_details === '분석' ? '분석' : '실무자',
+                                            status: documentData?.progress_details === '분석' ? '정상' : 'assigned',
                                             manager_id: selectedManager,
                                             manager_name: selectedWorker?.name || ''
                                         };

@@ -1,0 +1,62 @@
+.statisticsWrap {
+    margin-bottom: 30px;
+}
+
+.statistics {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+}
+
+.statistics li {
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+.statistics li:hover {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+}
+
+.statistics li h2 {
+    color: #777;
+    margin-bottom: 20px;
+}
+
+.statistics li span {
+    font-size: 35px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: inline-block;
+}
+
+.statistics li p {
+    font-weight: 600;
+    color: #aaa;
+}
+
+.statistics li:first-child span {
+    color: #4f46e5;
+}
+
+.statistics li:nth-child(2) span {
+    color: #2563eb;
+}
+
+.statistics li:nth-child(3) span {
+    color: #059669;
+}
+
+.statistics li:nth-child(4) span {
+    color: #9336eb;
+}
+
+.statistics li:nth-child(5) span {
+    color: #ea580c;
+}
+
+.statistics li:first-child p,
+.statistics li:nth-child(4) p {
+    color: #4b9a58;
+}
