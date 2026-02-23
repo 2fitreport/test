@@ -1,0 +1,318 @@
+/* === 진행단계 카드 === */
+.progressWrap {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.progressTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+
+.progressTitle h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.progressTitle h3 {
+    font-size: 15px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* === 콘텐츠 래퍼 === */
+.contentWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1;
+    gap: 30px;
+}
+
+/* === 단계 표시 === */
+.stepsContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    overflow: visible;
+}
+
+.stepsList {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.stepItemWrapper {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 0;
+}
+
+.stepItemWrapper:last-child {
+    flex: 0.5;
+}
+
+.stepItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    flex-shrink: 0;
+}
+
+.stepCircle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 600;
+    position: relative;
+    z-index: 2;
+    background: #ffffff;
+    border: 2px solid #e0e0e0;
+    color: #999;
+    flex-shrink: 0;
+}
+
+.stepItem.completed .stepCircle {
+    background: #00b175;
+    border-color: #52ea9b;
+    color: #fff;
+}
+
+.stepItem.current .stepCircle {
+    background: #1c283c;
+    border-color: #1c283c;
+    color: #fff;
+}
+
+.stepItem.pending .stepCircle {
+    background: #ffffff;
+    border-color: #e0e0e0;
+    color: #999;
+}
+
+.stepLine {
+    flex: 1;
+    height: 4px;
+    background: #e0e0e0;
+    z-index: 1;
+    margin: 0 10px;
+    align-self: center;
+    position: relative;
+    top: -15px;
+}
+
+.stepLine.active {
+    background: #00b175;
+}
+
+.stepLabel {
+    font-size: 15px;
+    color: #666;
+    margin: 0;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* === 액션 버튼 === */
+.actionButtons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    flex-wrap: wrap;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 24px;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: 1.5px solid transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.btnWarning {
+    background: linear-gradient(135deg, #fff8f0 0%, #fef3e0 100%);
+    border-color: #fdd835;
+    color: #ff9800;
+}
+
+.btnWarning:hover {
+    background: linear-gradient(135deg, #fef7e0 0%, #fef1d0 100%);
+    border-color: #ffb300;
+}
+
+.btnSecondary {
+    background: linear-gradient(135deg, #f8f8f8 0%, #f0f0f0 100%);
+    border-color: #e0e0e0;
+    color: #333;
+}
+
+.btnSecondary:hover {
+    background: linear-gradient(135deg, #efefef 0%, #e8e8e8 100%);
+    border-color: #bbb;
+}
+
+.btnPrimary {
+    background: linear-gradient(135deg, #1c283c 0%, #0f1a2e 100%);
+    border-color: #0f1a2e;
+    color: #fff;
+}
+
+.btnPrimary:hover {
+    background: linear-gradient(135deg, #151f32 0%, #0a1220 100%);
+    border-color: #000;
+}
+
+.btnDanger {
+    background: linear-gradient(135deg, #fff0f0 0%, #ffebeb 100%);
+    border-color: #ef5350;
+    color: #ef5350;
+}
+
+.btnDanger:hover {
+    background: linear-gradient(135deg, #ffebeb 0%, #ffd9d9 100%);
+    border-color: #e53935;
+}
+
+/* === 반응형 === */
+@media (max-width: 1200px) {
+    .progressWrap {
+        padding: 25px 35px;
+    }
+
+    .stepCircle {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+
+    .stepCircle svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .stepLine {
+        margin: 0 -24px;
+    }
+}
+
+@media (max-width: 768px) {
+    .progressWrap {
+        padding: 20px 25px;
+    }
+
+    .progressTitle {
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+
+    .progressTitle h2 {
+        font-size: 18px;
+    }
+
+    .progressTitle h3 {
+        font-size: 13px;
+    }
+
+    .stepsList {
+        gap: 8px;
+    }
+
+    .stepCircle {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+    }
+
+    .stepLabel {
+        font-size: 12px;
+    }
+
+    .stepLine {
+        margin: 0 -22px;
+    }
+
+    .actionButtons {
+        gap: 8px;
+        padding-top: 15px;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .progressWrap {
+        padding: 16px 20px;
+    }
+
+    .stepsList {
+        gap: 4px;
+    }
+
+    .stepCircle {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+    }
+
+    .stepLabel {
+        font-size: 11px;
+    }
+
+    .stepLine {
+        margin: 0 -20px;
+    }
+
+    .actionButtons {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn {
+        width: 100%;
+        justify-content: center;
+        padding: 10px 12px;
+    }
+}

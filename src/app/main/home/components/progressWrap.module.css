@@ -11,12 +11,14 @@
 
 .progressHeader {
     background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-    padding: 20px;
+    padding: 0 20px;
+    height: 80px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 20px;
+    box-sizing: border-box;
 }
 
 .progressWrap h2 {

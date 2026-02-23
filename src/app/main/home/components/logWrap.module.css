@@ -10,13 +10,14 @@
     font-size: 18px;
     font-weight: 700;
     color: var(--black-color);
-    padding: 20px;
+    padding: 0 20px;
     background-color: #2563eb;
     color: #fff;
     display: flex;
     align-items: center;
     gap: 3px;
-    height: 64px;
+    height: 80px;
+    box-sizing: border-box;
 }
 
 .logWrap ul {

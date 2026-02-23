@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
                 .eq('user_id', person.user_id);
 
             const docs = documents || [];
+            const registrations = docs.length;
             const inProgress = docs.filter(d => d.progress_details === '진행').length;
             const approved = docs.filter(d => d.progress_details === '승인').length;
             const rejected = docs.filter(d => d.status === '보류').length;
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
             return {
                 userId: person.user_id,
                 name: person.name,
+                registrations,
                 inProgress,
                 approved,
                 rejected,

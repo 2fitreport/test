@@ -1,0 +1,342 @@
+/* === 첨부파일 등록 카드 === */
+.fileWrap {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+}
+
+.fileTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+}
+
+.fileTitle h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.fileTitle h3 {
+    font-size: 15px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* === 사업자 유형 선택 === */
+.businessTypeSelector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.typeBtn {
+    padding: 10px 20px;
+    border: 1.5px solid #e0e0e0;
+    background: #ffffff;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.typeBtn:hover {
+    border-color: #1c283c;
+    color: #1c283c;
+}
+
+.typeBtn.active {
+    background: #1c283c;
+    border-color: #1c283c;
+    color: #fff;
+}
+
+/* === 문서 목록 === */
+.docList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 280px;
+}
+
+.emptyPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 280px;
+}
+
+.placeholderText {
+    font-size: 25px;
+    color: #999;
+    margin: 0;
+    font-weight: 500;
+}
+
+.docItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+    height: 70px;
+    cursor: pointer;
+}
+
+.docItem:hover {
+    background: #f5f5f5;
+    border-color: #d0d0d0;
+}
+
+.docContent {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex: 1;
+}
+
+.docIcon {
+    width: 40px;
+    height: 40px;
+    color: #1c283c;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.docInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.docName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.docRequired {
+    color: #ef5350;
+    margin-left: 4px;
+}
+
+.docDescription {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+}
+
+.uploadBtn {
+    padding: 8px 16px;
+    background: #1c283c;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.uploadBtn:hover {
+    background: #0f1a2e;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* === 업로드된 파일 === */
+.uploadedItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #f0fdf4;
+    border-radius: 8px;
+    border: 1.5px solid #52ea9b;
+    transition: all 0.2s ease;
+    height: 70px;
+}
+
+.uploadedItem:hover {
+    background: #e8fce2;
+    border-color: #40d987;
+}
+
+.uploadedContent {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.checkIcon {
+    width: 20px;
+    height: 20px;
+    color: #52ea9b;
+    flex-shrink: 0;
+}
+
+.uploadedInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.uploadedName {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.uploadedMeta {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+}
+
+.removeIcon {
+    padding: 6px;
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.removeIcon:hover {
+    color: #ef5350;
+    transform: scale(1.1);
+}
+
+/* === 반응형 === */
+@media (max-width: 1200px) {
+    .fileWrap {
+        padding: 25px 35px;
+    }
+}
+
+@media (max-width: 768px) {
+    .fileWrap {
+        padding: 20px 25px;
+    }
+
+    .fileTitle {
+        padding-bottom: 15px;
+        margin-bottom: 16px;
+    }
+
+    .fileTitle h2 {
+        font-size: 18px;
+    }
+
+    .fileTitle h3 {
+        font-size: 13px;
+    }
+
+    .businessTypeSelector {
+        margin-bottom: 16px;
+    }
+
+    .typeBtn {
+        flex: 1;
+    }
+
+    .docItem {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .uploadBtn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .uploadedItem {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .removeIcon {
+        align-self: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .fileWrap {
+        padding: 16px 20px;
+    }
+
+    .businessTypeSelector {
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .typeBtn {
+        padding: 8px 16px;
+        font-size: 12px;
+    }
+
+    .docItem {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .docIcon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .docName {
+        font-size: 13px;
+    }
+
+    .docDescription {
+        font-size: 12px;
+    }
+
+    .uploadBtn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+
+    .uploadedItem {
+        padding: 10px 12px;
+    }
+
+    .checkIcon {
+        width: 20px;
+        height: 20px;
+    }
+
+    .uploadedName {
+        font-size: 12px;
+    }
+
+    .uploadedMeta {
+        font-size: 11px;
+    }
+
+    .removeIcon {
+        padding: 4px;
+    }
+}

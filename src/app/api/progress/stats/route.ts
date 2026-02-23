@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
             labels: allLabels,
             datasets: [
                 {
-                    label: '진행단계 & 상태',
+                    label: '진행상황',
                     data: allData,
                     backgroundColor: allColors,
                     borderColor: allBorderColors,

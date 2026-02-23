@@ -6,6 +6,7 @@ import styles from './salesWrap.module.css';
 interface SalesData {
     userId: string;
     name: string;
+    registrations: number;
     inProgress: number;
     approved: number;
     rejected: number;
@@ -47,6 +48,8 @@ export default function SalesWrap() {
     const [companyName, setCompanyName] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
+    const [sortColumn, setSortColumn] = useState<keyof SalesData>('userId');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -102,6 +105,48 @@ export default function SalesWrap() {
         fetchSalesData();
     }, [userLevel, currentUserId, isRepresentative, companyName, viewMode]);
 
+    const handleSort = (column: keyof SalesData) => {
+        if (sortColumn === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortColumn(column);
+            setSortOrder('asc');
+        }
+    };
+
+    const getSortedData = () => {
+        return [...salesData].sort((a, b) => {
+            let aVal: any = a[sortColumn];
+            let bVal: any = b[sortColumn];
+
+            // 숫자 변환 정렬이 필요한 필드들
+            if (sortColumn === 'approvalAmount') {
+                aVal = parseInt(String(aVal).replace(/[^0-9]/g, '')) || 0;
+                bVal = parseInt(String(bVal).replace(/[^0-9]/g, '')) || 0;
+            } else if (sortColumn === 'conversionRate') {
+                aVal = parseFloat(String(aVal).replace(/[^0-9.]/g, '')) || 0;
+                bVal = parseFloat(String(bVal).replace(/[^0-9.]/g, '')) || 0;
+            } else if (typeof aVal === 'string') {
+                aVal = aVal.toLowerCase();
+                bVal = bVal.toLowerCase();
+            }
+
+            if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    const getSortIcon = (column: keyof SalesData) => {
+        const isActive = sortColumn === column;
+        return (
+            <span className={styles.sortIcon}>
+                <span className={isActive && sortOrder === 'asc' ? styles.active : ''}>↑</span>
+                <span className={isActive && sortOrder === 'desc' ? styles.active : ''}>↓</span>
+            </span>
+        );
+    };
+
     // 대표(1), 대표실무자(2): 모든 영업자 데이터
     // 영업자(4): 자신의 데이터만
     // 나머지: 표시 안 함
@@ -112,6 +157,7 @@ export default function SalesWrap() {
     }
 
     const isAffiliationRepresentative = isRepresentative && userLevel === 4;
+    const sortedData = getSortedData();
 
     return (
         <div className={styles.salesWrap}>
@@ -154,27 +200,29 @@ export default function SalesWrap() {
                 <table className={styles.salesTable}>
                     <thead>
                         <tr>
-                            <th>영업자</th>
-                            <th>진행</th>
-                            <th>승인</th>
-                            <th>반려</th>
-                            <th>승인금액</th>
-                            <th>전환율</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('name')}>영업자{getSortIcon('name')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('registrations')}>등록{getSortIcon('registrations')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('inProgress')}>진행{getSortIcon('inProgress')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('approved')}>승인{getSortIcon('approved')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('rejected')}>보류{getSortIcon('rejected')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('approvalAmount')}>승인금액{getSortIcon('approvalAmount')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('conversionRate')}>전환율{getSortIcon('conversionRate')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {loading ? (
                             <tr>
-                                <td colSpan={6} style={{ textAlign: 'center' }}>로딩 중...</td>
+                                <td colSpan={7} style={{ textAlign: 'center' }}>로딩 중...</td>
                             </tr>
-                        ) : salesData.length === 0 ? (
+                        ) : sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={6} style={{ textAlign: 'center' }}>데이터가 없습니다.</td>
+                                <td colSpan={7} style={{ textAlign: 'center' }}>데이터가 없습니다.</td>
                             </tr>
                         ) : (
-                            salesData.map((row) => (
+                            sortedData.map((row) => (
                                 <tr key={row.userId}>
                                     <td>{row.name}</td>
+                                    <td style={{ color: '#666', fontWeight: 600, fontSize: '16px' }}>{row.registrations}</td>
                                     <td style={{ color: '#2563eb', fontWeight: 600, fontSize: '16px' }}>{row.inProgress}</td>
                                     <td style={{ color: '#16a34a', fontWeight: 600, fontSize: '16px' }}>{row.approved}</td>
                                     <td style={{ color: '#dc2626', fontWeight: 600, fontSize: '16px' }}>{row.rejected}</td>

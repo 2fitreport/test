@@ -1,0 +1,313 @@
+/* === 메모 섹션 === */
+.memoWrap {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+/* === 메모 헤더 === */
+.memoTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    height: 58px;
+}
+
+.memoTitle div {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+
+.titleIcon {
+    width: 40px;
+    height: 40px;
+    background: #1c283c;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.memoTitle h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.memoTitle h3 {
+    font-size: 15px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* === 메모 리스트 === */
+.memoList {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-bottom: 20px;
+}
+
+.memoList::-webkit-scrollbar {
+    width: 6px;
+}
+
+.memoList::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 3px;
+}
+
+.memoList::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 3px;
+}
+
+.memoList::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.memoItem {
+    padding: 14px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.2s ease;
+}
+
+.memoItem:hover {
+    background: #f5f5f5;
+    border-color: #d0d0d0;
+}
+
+.memoHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.memoAuthor {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.authorIcon {
+    width: 28px;
+    height: 28px;
+    color: #1c283c;
+    flex-shrink: 0;
+}
+
+.authorName {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.timestamp {
+    font-size: 13px;
+    color: #999;
+}
+
+.memoContent {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* === 메모 입력 === */
+.memoInputWrap {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.memoInput {
+    flex: 1;
+    padding: 12px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #333;
+    resize: none;
+    min-height: 44px;
+    max-height: 100px;
+    transition: all 0.2s ease;
+}
+
+.memoInput:focus {
+    outline: none;
+    border-color: #1c283c;
+    box-shadow: 0 0 0 3px rgba(28, 40, 60, 0.1);
+}
+
+.memoInput::placeholder {
+    color: #999;
+}
+
+.submitBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 20px;
+    background: #1c283c;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    height: 58px;
+}
+
+.submitBtn:hover {
+    background: #0f1a2e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.submitBtn:active {
+    transform: translateY(0);
+}
+
+/* === 반응형 === */
+@media (max-width: 1200px) {
+    .memoWrap {
+        padding: 25px 35px;
+    }
+}
+
+@media (max-width: 768px) {
+    .memoWrap {
+        padding: 20px 25px;
+    }
+
+    .memoTitle {
+        padding-bottom: 15px;
+        margin-bottom: 16px;
+    }
+
+    .memoTitle h2 {
+        font-size: 18px;
+    }
+
+    .memoTitle h3 {
+        font-size: 13px;
+    }
+
+    .titleIcon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .titleIcon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .memoItem {
+        padding: 12px;
+    }
+
+    .authorIcon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .authorName {
+        font-size: 13px;
+    }
+
+    .timestamp {
+        font-size: 12px;
+    }
+
+    .memoContent {
+        font-size: 13px;
+    }
+
+    .memoInput {
+        font-size: 13px;
+        padding: 10px 12px;
+        min-height: 40px;
+    }
+
+    .submitBtn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+
+    .submitBtn svg {
+        width: 16px;
+        height: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .memoWrap {
+        padding: 16px 20px;
+    }
+
+    .memoTitle {
+        gap: 12px;
+    }
+
+    .titleIcon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .titleIcon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .memoTitle h2 {
+        font-size: 16px;
+    }
+
+    .memoTitle h3 {
+        font-size: 12px;
+    }
+
+    .memoHeader {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .memoInputWrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .submitBtn {
+        width: 100%;
+        justify-content: center;
+    }
+}

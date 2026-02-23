@@ -1,0 +1,158 @@
+/* === 기업정보 카드 === */
+.companyInfo {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+}
+
+.titleWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+}
+
+.title {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 15px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* === 정보 레이아웃 === */
+.companyWrap {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 40px;
+}
+
+.leftBox,
+.rightBox {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* === 입력 필드 === */
+.fieldItem {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+}
+
+.fieldItem:has(> div) {
+    flex-direction: row;
+    gap: 10px;
+}
+
+.fieldItem div {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+
+.label {
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+    display: block;
+}
+
+.input {
+    padding: 8px 0;
+    border: none;
+    font-size: 13px;
+    color: #333;
+    background: transparent;
+    transition: border-color 0.2s ease;
+    outline: none;
+    font-family: inherit;
+    border-bottom: 1px solid #e0e0e0 !important;
+}
+
+.input:focus {
+    border-bottom-color: #1c283c;
+}
+
+.input::placeholder {
+    color: #bbb;
+}
+
+.ratingWrap {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0 !important;
+}
+
+.ratingWrap b {
+    white-space: nowrap;
+}
+
+.ratingWrap input {
+    border-bottom: none !important;
+}
+
+/* === 반응형 === */
+@media (max-width: 1200px) {
+    .companyWrap {
+        gap: 30px;
+    }
+}
+
+@media (max-width: 768px) {
+    .companyInfo {
+        padding: 20px 25px;
+    }
+
+    .companyWrap {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .titleWrap {
+        padding-bottom: 15px;
+        margin-bottom: 16px;
+    }
+
+    .title {
+        font-size: 18px;
+    }
+
+    .subtitle {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .companyInfo {
+        padding: 16px 20px;
+    }
+
+    .fieldItem {
+        gap: 6px;
+    }
+
+    .label {
+        font-size: 13px;
+    }
+
+    .input {
+        font-size: 12px;
+    }
+}

@@ -32,7 +32,7 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
     '보류':    { label: '보류',  badgeClass: 'stopped',   dotClass: 'dotStopped', backgroundColor: 'var(--color-hold)' },
     waiting:     { label: '서류수집',  badgeClass: 'waiting',   dotClass: 'dotWaiting' },
     approved:    { label: '승인',  badgeClass: 'approved',  dotClass: 'dotApproved' },
-    rejected:    { label: '반려',  badgeClass: 'rejected',  dotClass: 'dotRejected' },
+    rejected:    { label: '보류',  badgeClass: 'rejected',  dotClass: 'dotRejected' },
     revision:    { label: '보완',  badgeClass: 'revision',  dotClass: 'dotRevision' },
     in_progress: { label: '진행',  badgeClass: '진행',   dotClass: 'dotStarted' },
     submitted:   { label: '제출',  badgeClass: 'submitted', dotClass: 'dotSubmitted' },

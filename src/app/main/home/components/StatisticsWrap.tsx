@@ -1,6 +1,26 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import styles from './statisticsWrap.module.css';
 
 export default function StatisticsWrap() {
+    const [userLevel, setUserLevel] = useState<number>(0);
+
+    useEffect(() => {
+        const adminData = sessionStorage.getItem('admin_data');
+        if (adminData) {
+            try {
+                const data = JSON.parse(adminData);
+                setUserLevel(data.position?.level || 0);
+            } catch (error) {
+                console.error('admin_data 파싱 실패:', error);
+            }
+        }
+    }, []);
+
+    // 실무자(검수자, level 6)는 이번달 매출 섹션 제외
+    const isInspector = userLevel === 6;
+
     return (
         <div className={styles.statisticsWrap}>
             <ul className={styles.statistics}>
@@ -14,11 +34,13 @@ export default function StatisticsWrap() {
                     <span>82억</span>
                     <p>원</p>
                 </li>
-                <li>
-                    <h2>이번달 매출</h2>
-                    <span>3.2억</span>
-                    <p>예상 수수료</p>
-                </li>
+                {!isInspector && (
+                    <li>
+                        <h2>이번달 매출</h2>
+                        <span>3.2억</span>
+                        <p>예상 수수료</p>
+                    </li>
+                )}
                 <li>
                     <h2>이번달 신규</h2>
                     <span>12</span>

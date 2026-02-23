@@ -10,10 +10,12 @@
 
 .salesHeader {
     background-color: #2563eb;
-    padding: 20px;
+    padding: 0 20px;
+    height: 80px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    box-sizing: border-box;
 }
 
 .salesWrap h2 {
@@ -63,6 +65,38 @@
     color: var(--black-color);
     text-align: left;
     border-bottom: 1px solid #ddd;
+}
+
+.sortableHeader {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+}
+
+.sortableHeader:hover {
+    background-color: #eee;
+}
+
+.sortIcon {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0;
+    margin-left: 12px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #ccc;
+    vertical-align: middle;
+    align-items: center;
+}
+
+.sortIcon span {
+    display: block;
+    line-height: 1;
+}
+
+.sortIcon .active {
+    color: #2563eb;
+    font-weight: bold;
 }
 
 .salesTable tbody tr {
