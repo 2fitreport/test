@@ -29,7 +29,7 @@ export default function LoginPage() {
         // 이미 로그인된 상태면 문서 제출 페이지로 리다이렉트
         const authToken = getAuthToken();
         if (authToken) {
-            router.push('/main/document_submission');
+            router.push('/main/home');
         }
 
         // localStorage에서 저장된 아이디 불러오기
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 // 세션스토리지에 저장 (브라우저 종료 시 자동 삭제)
                 setAuthToken(data.token, data.admin);
                 // 문서 제출 페이지로 이동
-                router.push('/main/document_submission');
+                router.push('/main/home');
             } else {
                 setModal({
                     isOpen: true,

@@ -1093,7 +1093,7 @@ export default function DocumentSubmissionList() {
                                         <td className={styles.timeAgo}>
                                             {doc.progress_status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
-                                            ) : doc.progress_status === '진행' && doc.progress_start_date ? (
+                                            ) : (doc.progress_details === '분석' || doc.progress_details === '진행') && doc.progress_start_date ? (
                                                 <TimeAgo dateString={doc.progress_start_date} />
                                             ) : doc.progress_details === '승인' && doc.progress_end_time ? (
                                                 <span>{doc.progress_end_time}</span>

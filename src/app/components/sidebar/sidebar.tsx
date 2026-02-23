@@ -13,10 +13,10 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+    { path: '/main/home', label: '메인홈' },
     { path: '/main/document_submission', label: '기업관리' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
-    { path: '/main/home', label: '메인홈' },
 ];
 
 export default function Sidebar() {
