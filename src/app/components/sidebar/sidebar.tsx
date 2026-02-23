@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase } from 'react-icons/fi';
 import { clearAuthToken, getAdminData, type AdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -14,6 +14,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     { path: '/main/home', label: '메인홈' },
+    { path: '/main/clients', label: '고객사' },
     { path: '/main/document_submission', label: '기업관리' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
@@ -184,6 +185,8 @@ export default function Sidebar() {
                                 >
                                     {item.path === '/main/user_management' ? (
                                         <FiUsers className={styles.menuIcon} />
+                                    ) : item.path === '/main/clients' ? (
+                                        <FiBriefcase className={styles.menuIcon} />
                                     ) : item.path === '/main/history' ? (
                                         <FiClock className={styles.menuIcon} />
                                     ) : item.path === '/main/home' ? (
