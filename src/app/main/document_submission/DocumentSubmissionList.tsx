@@ -58,6 +58,7 @@ export default function DocumentSubmissionList() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류'>('all');
+    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담' | '서류요청' | '분석' | '진행' | '승인'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -665,6 +666,9 @@ export default function DocumentSubmissionList() {
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
                 return false;
             }
+            if (progressDetailsFilter !== 'all' && doc.progress_details !== progressDetailsFilter) {
+                return false;
+            }
             const query = searchQuery.toLowerCase();
             return (
                 (doc.user_id || '').toLowerCase().includes(query) ||
@@ -866,6 +870,33 @@ export default function DocumentSubmissionList() {
 
                     <div className={styles.filtersContainer}>
                         <div className={styles.itemsPerPageContainer}>
+                            <label className={styles.itemsLabel}>진행단계:</label>
+                            <div className={styles.selectWrapper}>
+                                <select
+                                    className={styles.itemsSelect}
+                                    value={progressDetailsFilter}
+                                    onChange={(e) => {
+                                        setProgressDetailsFilter(e.target.value as 'all' | '상담' | '서류요청' | '분석' | '진행' | '승인');
+                                        setCurrentPage(1);
+                                    }}
+                                >
+                                    <option value="all">전체</option>
+                                    <option value="상담">상담</option>
+                                    <option value="서류요청">서류요청</option>
+                                    <option value="분석">분석</option>
+                                    <option value="진행">진행</option>
+                                    <option value="승인">승인</option>
+                                </select>
+                                <Image
+                                    src="/arrow.svg"
+                                    alt="드롭다운"
+                                    width={16}
+                                    height={16}
+                                    className={styles.selectArrow}
+                                />
+                            </div>
+                        </div>
+                        <div className={styles.itemsPerPageContainer}>
                             <label className={styles.itemsLabel}>상태:</label>
                             <div className={styles.selectWrapper}>
                                 <select
@@ -940,6 +971,8 @@ export default function DocumentSubmissionList() {
                                     <option value="user_id-desc">사용자 ID (Z-A)</option>
                                     <option value="user_name-asc">이름 (A-Z)</option>
                                     <option value="user_name-desc">이름 (Z-A)</option>
+                                    <option value="progress_details-asc">진행단계 (A-Z)</option>
+                                    <option value="progress_details-desc">진행단계 (Z-A)</option>
                                     <option value="status-asc">상태 (A-Z)</option>
                                     <option value="status-desc">상태 (Z-A)</option>
                                 </select>

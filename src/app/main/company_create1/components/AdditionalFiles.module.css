@@ -1,0 +1,330 @@
+/* === 추가서류 카드 === */
+.additionalWrap {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.additionalTitle {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+}
+
+.additionalTitle h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.additionalTitle h3 {
+    font-size: 15px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+/* === 파일 리스트 === */
+.fileList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* === 문서 아이템 (업로드 전) === */
+.docItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: 70px;
+}
+
+.docItem:hover {
+    background: #f5f5f5;
+    border-color: #d0d0d0;
+}
+
+.docContent {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex: 1;
+}
+
+.docIcon {
+    width: 40px;
+    height: 40px;
+    color: #1c283c;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.docInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.docName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.docDescription {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+}
+
+.uploadBtn {
+    padding: 8px 16px;
+    background: #1c283c;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.uploadBtn:hover {
+    background: #0f1a2e;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.uploadedFilesList {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.uploadedItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #f0fdf4;
+    border: 1.5px solid #52ea9b;
+    border-radius: 8px;
+    height: 70px;
+    transition: all 0.2s ease;
+}
+
+.addMoreWrapper {
+    margin-top: 8px;
+}
+
+.uploadedContent {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+}
+
+.checkIcon {
+    width: 24px;
+    height: 24px;
+    color: #52ea9b;
+    flex-shrink: 0;
+}
+
+.uploadedInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.uploadedName {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.uploadedMeta {
+    font-size: 13px;
+    color: #999;
+    margin: 0;
+}
+
+.removeIcon {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.2s ease;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.removeIcon:hover {
+    color: #dc2626;
+}
+
+/* === 파일 추가 버튼 === */
+.addFileBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px 20px;
+    background: #f0f0f0;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    align-self: flex-start;
+}
+
+.addFileBtn:hover {
+    background: #e8e8e8;
+    border-color: #bbb;
+    transform: translateY(-2px);
+}
+
+.addFileBtn:active {
+    transform: translateY(0);
+}
+
+/* === 반응형 === */
+@media (max-width: 1200px) {
+    .additionalWrap {
+        padding: 25px 35px;
+    }
+}
+
+@media (max-width: 768px) {
+    .additionalWrap {
+        padding: 20px 25px;
+    }
+
+    .additionalTitle {
+        padding-bottom: 15px;
+        margin-bottom: 16px;
+    }
+
+    .additionalTitle h2 {
+        font-size: 18px;
+    }
+
+    .additionalTitle h3 {
+        font-size: 13px;
+    }
+
+    .docItem {
+        padding: 16px;
+        height: auto;
+    }
+
+    .docIcon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .docName {
+        font-size: 14px;
+    }
+
+    .docDescription {
+        font-size: 12px;
+    }
+
+    .uploadBtn {
+        font-size: 12px;
+        padding: 8px 14px;
+    }
+
+    .uploadedItem {
+        padding: 16px;
+        height: auto;
+    }
+
+    .uploadedName {
+        font-size: 14px;
+    }
+
+    .uploadedMeta {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .additionalWrap {
+        padding: 16px 20px;
+    }
+
+    .additionalTitle h2 {
+        font-size: 16px;
+    }
+
+    .additionalTitle h3 {
+        font-size: 12px;
+    }
+
+    .docItem {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 12px;
+    }
+
+    .docContent {
+        width: 100%;
+        margin-bottom: 12px;
+    }
+
+    .uploadBtn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .uploadedItem {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        padding: 12px;
+    }
+
+    .uploadedContent {
+        width: 100%;
+    }
+
+    .removeIcon {
+        align-self: flex-end;
+        margin-top: -28px;
+    }
+}

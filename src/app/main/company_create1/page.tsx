@@ -3,6 +3,7 @@ import CompanyInfoCard from './components/CompanyInfoCard';
 import ProgressStepsSection from './components/ProgressStepsSection';
 import CompanyFile from './components/CompanyFile';
 import MemoSection from './components/MemoSection';
+import AdditionalFiles from './components/AdditionalFiles';
 
 export default function Company1() {
     return (
@@ -16,6 +17,7 @@ export default function Company1() {
                 <ProgressStepsSection />
                 <CompanyFile/>
                 <MemoSection />
+                <AdditionalFiles />
             </div>
         </div>
     )

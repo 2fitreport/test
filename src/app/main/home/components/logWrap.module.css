@@ -56,8 +56,8 @@
     height: 80px;
 }
 
-.logWrap li:hover li:not(.empty) {
-    background: #f1f1f1;
+.logWrap li:hover {
+    background: #f9f9f9;
 }
 
 .logWrap li * {

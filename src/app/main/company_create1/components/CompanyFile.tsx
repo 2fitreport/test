@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { File, CheckCircle2, X } from 'lucide-react';
+import { File, CheckCircle2, X, Check } from 'lucide-react';
 import styles from './CompanyFile.module.css';
 
 type BusinessType = 'corporation' | 'individual' | null;
@@ -21,7 +21,9 @@ interface UploadedFile {
 export default function CompanyFile() {
     const [businessType, setBusinessType] = useState<BusinessType>(null);
     const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({});
+    const [cretabStatus, setCretabStatus] = useState<'none' | 'file' | null>(null);
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+    const cretabFileInputRef = useRef<HTMLInputElement | null>(null);
 
     const corporationDocuments: Document[] = [
         {
@@ -97,11 +99,42 @@ export default function CompanyFile() {
 
     const isFileUploaded = (docId: string) => !!uploadedFiles[docId];
 
+    const handleCretabFileClick = () => {
+        cretabFileInputRef.current?.click();
+    };
+
+    const handleCretabFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setCretabStatus('file');
+        }
+    };
+
+    const handleCretabNoneClick = () => {
+        setCretabStatus('none');
+    };
+
     return (
         <div className={styles.fileWrap}>
             <div className={styles.fileTitle}>
-                <h2>첨부파일 등록</h2>
-                <h3>필요한 서류를 선택하여 업로드해주세요</h3>
+                <div className={styles.fileTitleLeft}>
+                    <h2>첨부파일 등록</h2>
+                    <h3>필요한 서류를 선택하여 업로드해주세요</h3>
+                </div>
+                <div className={styles.fileTitleRight}>
+                    <button className={styles.cretabFileBtn} onClick={handleCretabFileClick}>
+                        크레탑 파일 등록
+                    </button>
+                    <button className={styles.cretabNoneBtn} onClick={handleCretabNoneClick}>
+                        크레탑 정보 없음
+                    </button>
+                    <input
+                        type="file"
+                        ref={cretabFileInputRef}
+                        onChange={handleCretabFileChange}
+                        style={{ display: 'none' }}
+                    />
+                </div>
             </div>
 
             <div className={styles.businessTypeSelector}>
@@ -124,6 +157,13 @@ export default function CompanyFile() {
                     개인사업자
                 </button>
             </div>
+
+            {cretabStatus && (
+                <div className={styles.cretabStatusBadge}>
+                    <Check size={16} />
+                    {cretabStatus === 'file' ? '크레탑 파일 등록됨' : '크레탑 정보 없음'}
+                </div>
+            )}
 
             <div className={styles.docList}>
                 {!businessType ? (

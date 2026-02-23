@@ -8,11 +8,18 @@
 
 .fileTitle {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
     border-bottom: 1px solid #e0e0e0;
     padding-bottom: 20px;
     margin-bottom: 24px;
+}
+
+.fileTitleLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .fileTitle h2 {
@@ -27,6 +34,63 @@
     color: #999;
     margin: 0;
     font-weight: 400;
+}
+
+.fileTitleRight {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.cretabFileBtn,
+.cretabNoneBtn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    white-space: nowrap;
+}
+
+.cretabFileBtn {
+    background: #1c283c;
+    color: #fff;
+}
+
+.cretabFileBtn:hover {
+    background: #0f1a2e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.cretabNoneBtn {
+    background: #f0f0f0;
+    color: #666;
+    border: 1.5px solid #ddd;
+}
+
+.cretabNoneBtn:hover {
+    background: #e8e8e8;
+    border-color: #bbb;
+    transform: translateY(-2px);
+}
+
+/* === 크레탑 상태 배지 === */
+.cretabStatusBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #f0fdf4;
+    border: 1px solid #d1fae5;
+    border-radius: 8px;
+    color: #059669;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 20px;
 }
 
 /* === 사업자 유형 선택 === */
