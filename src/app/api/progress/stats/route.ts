@@ -6,7 +6,7 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const PROGRESS_STAGES = ['서류요청', '분석', '진행', '승인'];
+const PROGRESS_STAGES = ['상담', '서류요청', '분석', '진행', '승인'];
 const STATUS_LIST = ['보완', '보류'];
 
 export async function GET(request: NextRequest) {
@@ -14,8 +14,9 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const userId = searchParams.get('userId');
         const companyName = searchParams.get('companyName');
+        const month = searchParams.get('month');
 
-        let query = supabase.from('documents').select('progress_details, status, user_id');
+        let query = supabase.from('documents').select('progress_details, status, user_id, created_at');
 
         // 소속대표: 같은 소속의 모든 영업자 문서
         if (companyName) {
@@ -41,18 +42,31 @@ export async function GET(request: NextRequest) {
 
         if (error) throw error;
 
+        // 월 필터링
+        let filteredDocuments = documents || [];
+        if (month) {
+            const [year, monthNum] = month.split('-');
+            filteredDocuments = filteredDocuments.filter((doc: any) => {
+                if (!doc.created_at) return false;
+                const docDate = new Date(doc.created_at);
+                return docDate.getFullYear() === parseInt(year) &&
+                       docDate.getMonth() + 1 === parseInt(monthNum);
+            });
+        }
+
         // 진행단계별 건수 계산
         const stageCounts = PROGRESS_STAGES.map(stage => {
-            return (documents || []).filter(doc => doc.progress_details === stage).length;
+            return filteredDocuments.filter((doc: any) => doc.progress_details === stage).length;
         });
 
         // 상태별 건수 계산 (보완, 보류만)
         const statusCounts = STATUS_LIST.map(status => {
-            return (documents || []).filter(doc => doc.status === status).length;
+            return filteredDocuments.filter((doc: any) => doc.status === status).length;
         });
 
         // 모든 레이블과 데이터 합치기
         const allLabels = [
+            '상담',
             '서류요청',
             '분석',
             '진행',
@@ -61,8 +75,8 @@ export async function GET(request: NextRequest) {
             '보류'
         ];
         const allData = [...stageCounts, ...statusCounts];
-        const allColors = ['#fdd835', '#ff9800', '#42a5f5', '#66bb6a', '#ab47bc', '#ef5350'];
-        const allBorderColors = ['#f9a825', '#f57c00', '#1565c0', '#2e7d32', '#6a1b9a', '#7a0f0f'];
+        const allColors = ['#b0b9c6', '#f2e7a2', '#d8c9f1', '#82cbc4', '#a0c4ff', '#ffd6a5', '#ffadad'];
+        const allBorderColors = ['#8a9aaa', '#e8d670', '#c9a5e8', '#5ca9a0', '#7aacff', '#ffb873', '#ff8b8b'];
 
         // Chart.js 형식으로 반환
         return NextResponse.json({

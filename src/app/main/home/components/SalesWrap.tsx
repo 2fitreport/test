@@ -46,6 +46,7 @@ export default function SalesWrap() {
     const [isRepresentative, setIsRepresentative] = useState(false);
     const [companyName, setCompanyName] = useState<string>('');
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -72,11 +73,11 @@ export default function SalesWrap() {
                 const params = new URLSearchParams();
 
                 if (userLevel === 4) {
-                    if (isRepresentative && companyName) {
+                    if (isRepresentative && companyName && viewMode === 'all') {
                         // 소속대표: 같은 소속의 모든 영업자
                         params.append('companyName', companyName);
                     } else {
-                        // 일반 영업자: 자신만
+                        // 일반 영업자 또는 소속대표의 내 데이터만
                         params.append('userId', currentUserId);
                     }
                 }
@@ -99,7 +100,7 @@ export default function SalesWrap() {
         };
 
         fetchSalesData();
-    }, [userLevel, currentUserId, isRepresentative, companyName]);
+    }, [userLevel, currentUserId, isRepresentative, companyName, viewMode]);
 
     // 대표(1), 대표실무자(2): 모든 영업자 데이터
     // 영업자(4): 자신의 데이터만
@@ -110,9 +111,45 @@ export default function SalesWrap() {
         return null;
     }
 
+    const isAffiliationRepresentative = isRepresentative && userLevel === 4;
+
     return (
         <div className={styles.salesWrap}>
-            <h2>영업자 현황</h2>
+            <div className={styles.salesHeader}>
+                <h2>영업자 현황</h2>
+                {isAffiliationRepresentative && (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            onClick={() => setViewMode('all')}
+                            style={{
+                                padding: '8px 16px',
+                                border: viewMode === 'all' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '4px',
+                                backgroundColor: viewMode === 'all' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontWeight: viewMode === 'all' ? '600' : '500'
+                            }}
+                        >
+                            소속 영업자
+                        </button>
+                        <button
+                            onClick={() => setViewMode('my')}
+                            style={{
+                                padding: '8px 16px',
+                                border: viewMode === 'my' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
+                                borderRadius: '4px',
+                                backgroundColor: viewMode === 'my' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                color: '#fff',
+                                cursor: 'pointer',
+                                fontWeight: viewMode === 'my' ? '600' : '500'
+                            }}
+                        >
+                            내 현황
+                        </button>
+                    </div>
+                )}
+            </div>
             <div className={styles.tableWrapper}>
                 <table className={styles.salesTable}>
                     <thead>

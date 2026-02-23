@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './logWrap.module.css';
 import LogDeleteButton from './LogDeleteButton';
@@ -9,7 +10,7 @@ interface DocumentLog {
     document_id: number;
     document_title: string;
     company_name: string;
-    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change';
+    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned';
     actor_id: string;
     actor_name: string;
     old_value: string | null;
@@ -25,7 +26,10 @@ interface LogItemListProps {
     onLogDeleted?: () => void;
 }
 
-const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: string }> = {
+const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: string; backgroundColor?: string }> = {
+    '정상':     { label: '정상',  badgeClass: 'waiting',   dotClass: 'dotWaiting', backgroundColor: 'var(--color-normal)' },
+    '보완':    { label: '보완',  badgeClass: 'revision',  dotClass: 'dotRevision', backgroundColor: 'var(--color-revision)' },
+    '보류':    { label: '보류',  badgeClass: 'stopped',   dotClass: 'dotStopped', backgroundColor: 'var(--color-hold)' },
     waiting:     { label: '서류수집',  badgeClass: 'waiting',   dotClass: 'dotWaiting' },
     approved:    { label: '승인',  badgeClass: 'approved',  dotClass: 'dotApproved' },
     rejected:    { label: '반려',  badgeClass: 'rejected',  dotClass: 'dotRejected' },
@@ -37,10 +41,11 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
 };
 
 const PROGRESS_STAGE_COLORS: Record<string, string> = {
-    '서류요청': '#fdd835',
-    '분석': '#ff9800',
-    '진행': '#42a5f5',
-    '승인': '#66bb6a',
+    '상담': 'var(--color-consultation)',
+    '서류요청': 'var(--color-document-request)',
+    '분석': 'var(--color-analysis)',
+    '진행': 'var(--color-progress)',
+    '승인': 'var(--color-approval)',
 };
 
 function timeAgo(dateStr: string) {
@@ -60,6 +65,7 @@ function getLogContent(log: DocumentLog) {
             badgeClass: styles[status?.badgeClass ?? ''] || '',
             label: status?.label ?? log.new_value ?? '',
             description: '상태로 변경되었습니다.',
+            backgroundColor: status?.backgroundColor
         };
     }
     if (log.action_type === 'memo_add') {
@@ -87,6 +93,15 @@ function getLogContent(log: DocumentLog) {
             backgroundColor: PROGRESS_STAGE_COLORS[log.new_value ?? ''] || '#999'
         };
     }
+    if (log.action_type === 'manager_assigned') {
+        return {
+            dotClass: styles.dotStarted,
+            badgeClass: styles.started,
+            label: '실무자',
+            description: `가 배정되었습니다. (${log.new_value})`,
+            backgroundColor: '#2196f3'
+        };
+    }
     return {
         dotClass: styles.dotStopped,
         badgeClass: styles.stopped,
@@ -97,6 +112,19 @@ function getLogContent(log: DocumentLog) {
 
 export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemListProps) {
     const router = useRouter();
+    const [userLevel, setUserLevel] = useState<number>(0);
+
+    useEffect(() => {
+        const adminData = sessionStorage.getItem('admin_data');
+        if (adminData) {
+            try {
+                const data = JSON.parse(adminData);
+                setUserLevel(data.position?.level || 0);
+            } catch (error) {
+                console.error('admin_data 파싱 실패:', error);
+            }
+        }
+    }, []);
 
     const handleLogClick = async (log: DocumentLog) => {
         try {
@@ -113,15 +141,27 @@ export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemLi
         router.push(`/main/company_create?view=${log.document_id}`);
     };
 
+    const filteredLogs = logs.filter(log => {
+        // 메모 삭제 로그는 표시하지 않음
+        if (log.action_type === 'memo_delete') {
+            return false;
+        }
+        // 실무자 배정 알림은 대표(1) 또는 대표실무자(2)일 때만 표시
+        if (log.action_type === 'manager_assigned' && userLevel !== 1 && userLevel !== 2) {
+            return false;
+        }
+        return true;
+    });
+
     return (
         <ul>
-            {logs.length === 0 && (
+            {filteredLogs.length === 0 && (
                 <li className={styles.empty}>알림사항이 없습니다.</li>
             )}
-            {logs.map((log, idx) => {
+            {filteredLogs.map((log, idx) => {
                 const content = getLogContent(log);
                 const { dotClass, badgeClass, label, description, backgroundColor } = content as any;
-                const isLast = idx === logs.length - 1;
+                const isLast = idx === filteredLogs.length - 1;
                 const showBorder = hasScroll || !isLast;
                 return (
                     <li

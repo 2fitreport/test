@@ -9,7 +9,7 @@ interface DocumentLog {
     document_id: number;
     document_title: string;
     company_name: string;
-    action_type: 'status_change' | 'memo_add' | 'memo_delete';
+    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned';
     actor_id: string;
     actor_name: string;
     old_value: string | null;
@@ -22,7 +22,7 @@ export default function LogWrap() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
-        fetch('/api/documents/logs', { credentials: 'include' })
+        fetch('/api/documents/logs?memo_only=true', { credentials: 'include' })
             .then(res => res.ok ? res.json() : [])
             .then(data => setLogs(data))
             .catch(() => setLogs([]));

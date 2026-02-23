@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
         const documentId = searchParams.get('document_id');
         const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
         const revisionRejected = searchParams.get('revision_rejected') === 'true';
+        const memoOnly = searchParams.get('memo_only') === 'true';
+        const statusChangeOnly = searchParams.get('status_change_only') === 'true';
 
         // 요청자 정보 추출
         const authToken = request.cookies.get('auth_token')?.value;
@@ -118,11 +120,19 @@ export async function GET(request: NextRequest) {
             .order('created_at', { ascending: false });
 
         // 상태 필터
-        if (revisionRejected) {
+        if (statusChangeOnly) {
+            // 모든 상태 변경 로그 (보완요청 알림 영역용)
+            query = query.eq('action_type', 'status_change');
+        } else if (memoOnly) {
+            // 메모, 진행단계 변경, 실무자 배정 (알림사항 영역용)
+            query = query.in('action_type', ['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned']);
+        } else if (revisionRejected) {
+            // 이전 호환성: 보완/보류만
             query = query
                 .eq('action_type', 'status_change')
                 .in('new_value', ['보완', '보류']);
         } else {
+            // 기본: 상태 변경 중 보완/보류 제외
             query = query
                 .eq('action_type', 'status_change')
                 .not('new_value', 'in', '("보완","보류")');

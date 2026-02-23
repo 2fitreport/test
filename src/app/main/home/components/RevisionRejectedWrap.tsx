@@ -22,7 +22,7 @@ export default function RevisionRejectedWrap() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
-        fetch('/api/documents/logs?revision_rejected=true', { credentials: 'include' })
+        fetch('/api/documents/logs?status_change_only=true', { credentials: 'include' })
             .then(res => res.ok ? res.json() : [])
             .then(data => setLogs(data))
             .catch(() => setLogs([]));

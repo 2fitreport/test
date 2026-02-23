@@ -1688,11 +1688,6 @@ export default function CompanyCreateForm() {
                 const updated = {
                     id: documentData.id,
                     status: '보류' as const,
-                    progress_status: 'not_started' as const,
-                    progress_details: '서류요청',
-                    manager_name: null,
-                    manager_id: null,
-                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -1717,11 +1712,6 @@ export default function CompanyCreateForm() {
                 const updated = {
                     id: documentData.id,
                     status: '보완' as const,
-                    progress_status: 'not_started' as const,
-                    progress_details: '서류요청',
-                    manager_name: null,
-                    manager_id: null,
-                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
                 };
@@ -1737,18 +1727,12 @@ export default function CompanyCreateForm() {
                     updated = {
                         ...documentData,
                         status: '정상' as const,
-                        progress_status: 'not_started' as const,
-                        progress_details: '서류요청',
-                        manager_name: null,
-                        manager_id: null,
-                        inspector_id: null,
                         reason_read: true
                     };
                 } else {
                     updated = {
                         ...documentData,
                         status: '정상' as const,
-                        progress_status: 'not_started' as const,
                         submitted_date: now.toLocaleString('ko-KR')
                     };
                 }
@@ -1972,14 +1956,11 @@ export default function CompanyCreateForm() {
                                 padding: '4px 12px',
                                 borderRadius: '4px',
                                 display: 'inline-block',
-                                backgroundColor: documentData.progress_details === '검수자' ? '#FFF3CD' :
-                                                documentData.progress_details === '대표실무자' ? '#D1ECF1' :
-                                                documentData.progress_details === '실무자' ? '#E7D4F5' :
+                                backgroundColor: documentData.progress_details === '검수자' ? 'var(--color-analysis)' :
+                                                documentData.progress_details === '대표실무자' ? 'var(--color-progress)' :
+                                                documentData.progress_details === '실무자' ? 'var(--color-approval)' :
                                                 '#E8E8E8',
-                                color: documentData.progress_details === '검수자' ? '#856404' :
-                                       documentData.progress_details === '대표실무자' ? '#0C5460' :
-                                       documentData.progress_details === '실무자' ? '#6A1B9A' :
-                                       '#333'
+                                color: '#fff'
                             }}>
                                 {documentData.progress_details === '검수자' ? (
                                     supervisorInfo ? `검수자: ${supervisorInfo.name}(${supervisorInfo.user_id})` : '검수자 대기중'

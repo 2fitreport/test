@@ -8,15 +8,18 @@
     flex-direction: column;
 }
 
+.salesHeader {
+    background-color: #2563eb;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .salesWrap h2 {
     font-size: 18px;
     font-weight: 700;
-    padding: 20px;
-    background-color: #2563eb;
     color: #fff;
-    height: 64px;
-    display: flex;
-    align-items: center;
     margin: 0;
 }
 

@@ -348,14 +348,9 @@ export default function DocumentSubmissionList() {
                 const rejectedDoc = {
                     ...doc,
                     status: '보류' as const,
-                    progress_status: 'not_started' as const,
-                    progress_details: '영업자',
-                    manager_name: null,
-                    manager_id: null,
-                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
-                };
+                } as Document;
 
                 // DB에 저장
                 await saveDocumentToDatabase(rejectedDoc);
@@ -389,14 +384,9 @@ export default function DocumentSubmissionList() {
                 const revisionDoc = {
                     ...doc,
                     status: '보완' as const,
-                    progress_status: 'not_started' as const,
-                    progress_details: '영업자',
-                    manager_name: null,
-                    manager_id: null,
-                    inspector_id: null,
                     reason: combinedReason,
                     reason_read: false
-                };
+                } as Document;
 
                 // DB에 저장
                 await saveDocumentToDatabase(revisionDoc);
@@ -413,22 +403,19 @@ export default function DocumentSubmissionList() {
             if (doc) {
                 let submittedDoc: Document;
 
-                // 반려되거나 보완이 요청된 상태에서 제출하면 대기 상태로 돌아감
+                // 반려되거나 보완이 요청된 상태에서 제출하면 상태만 정상으로 변경
                 if (doc.status === '보류' || doc.status === '보완') {
                     submittedDoc = {
                         ...doc,
                         status: '정상' as const,
-                        progress_status: 'not_started' as const,
-                        progress_details: '서류요청',
                         inspector_id: null,
                         reason_read: true
                     };
                 } else {
-                    // 기타 상태에서는 제출 상태로 변경
+                    // 기타 상태에서는 상태를 정상으로 변경
                     submittedDoc = {
                         ...doc,
-                        status: '정상' as const,
-                        progress_status: 'not_started' as const
+                        status: '정상' as const
                     };
                 }
 

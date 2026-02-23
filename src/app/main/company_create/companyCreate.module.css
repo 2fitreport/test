@@ -1559,3 +1559,27 @@
     border: 1px solid #e0e0e0;
     position: relative;
 }
+
+/* 상태 배지 */
+.statusBadge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 100px;
+    color: #fff;
+    display: inline-block;
+    min-width: 60px;
+    text-align: center;
+}
+
+.정상 {
+    background-color: var(--color-normal);
+}
+
+.보완 {
+    background-color: var(--color-revision);
+}
+
+.보류 {
+    background-color: var(--color-hold);
+}

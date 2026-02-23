@@ -26,8 +26,9 @@ interface RevisionRejectedItemListProps {
 }
 
 const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: string; backgroundColor: string }> = {
-    '보완': { label: '보완', badgeClass: styles.revision, dotClass: styles.dotRevision, backgroundColor: '#ab47bc' },
-    '보류': { label: '보류', badgeClass: styles.rejected, dotClass: styles.dotRejected, backgroundColor: '#ef5350' },
+    '정상': { label: '정상', badgeClass: styles.waiting, dotClass: styles.dotWaiting, backgroundColor: 'var(--color-normal)' },
+    '보완': { label: '보완', badgeClass: styles.revision, dotClass: styles.dotRevision, backgroundColor: 'var(--color-revision)' },
+    '보류': { label: '보류', badgeClass: styles.rejected, dotClass: styles.dotRejected, backgroundColor: 'var(--color-hold)' },
 };
 
 function timeAgo(dateStr: string) {

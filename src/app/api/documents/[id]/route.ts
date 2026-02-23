@@ -70,7 +70,7 @@ export async function PUT(
         // 변경 전 문서 조회
         const { data: prevDoc } = await supabase
             .from('documents')
-            .select('status, progress_details, memos, title, company_name')
+            .select('status, progress_details, memos, title, company_name, manager_id, manager_name')
             .eq('id', docId)
             .single();
 
@@ -154,6 +154,28 @@ export async function PUT(
                         old_value: deletedMemo?.content || deletedMemo?.text || JSON.stringify(deletedMemo),
                     });
                 }
+            }
+
+            // 실무자 배정 감지
+            if (body.manager_id !== undefined && body.manager_id !== prevDoc.manager_id) {
+                let newValue = '';
+                if (body.manager_id) {
+                    // manager_id가 설정된 경우, manager_name도 가져오기
+                    const { data: managerData } = await supabase
+                        .from('users')
+                        .select('name')
+                        .eq('user_id', body.manager_id)
+                        .single();
+                    newValue = managerData?.name || body.manager_id;
+                } else {
+                    newValue = '(제거됨)';
+                }
+                logsToInsert.push({
+                    ...logBase,
+                    action_type: 'manager_assigned',
+                    old_value: prevDoc.manager_name || prevDoc.manager_id || '(없음)',
+                    new_value: newValue,
+                });
             }
 
             for (const log of logsToInsert) {
