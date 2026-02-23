@@ -1452,9 +1452,9 @@ export default function DocumentSubmissionList() {
                                                     ...updatedDoc,
                                                     manager_id: selectedWorker.user_id,
                                                     manager_name: selectedWorker.name,
-                                                    progress_details: updatedDoc.progress_details === '분석' ? '분석' : '분석',
+                                                    progress_details: updatedDoc.progress_details === '분석' ? '분석' : '진행',
                                                     status: '정상' as const
-                                                };
+                                                } as Document;
 
                                                 // 데이터베이스에 먼저 저장
                                                 await saveDocumentToDatabase(newDoc);
