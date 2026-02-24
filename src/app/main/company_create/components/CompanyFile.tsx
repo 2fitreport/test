@@ -14,7 +14,7 @@ interface Document {
 }
 
 interface UploadedFile {
-    file: File;
+    file?: File;
     fileName: string;
     fileSize: string;
     storagePath?: string;
@@ -22,7 +22,7 @@ interface UploadedFile {
 }
 
 interface CretabFile {
-    file: File;
+    file?: File;
     fileName: string;
     fileSize: string;
     storagePath?: string;
@@ -145,15 +145,17 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
     useImperativeHandle(ref, () => ({
         getFilesForUpload: () => {
-            return Object.entries(uploadedFiles).map(([docId, file]) => ({
-                docId,
-                file: file.file,
-                fileName: file.fileName,
-            }));
+            return Object.entries(uploadedFiles)
+                .filter(([, file]) => file.file !== undefined)
+                .map(([docId, file]) => ({
+                    docId,
+                    file: file.file as File,
+                    fileName: file.fileName,
+                }));
         },
         getExistingFiles: () => existingFiles,
         getCretabFileForUpload: () => {
-            return cretabFile ? { file: cretabFile.file, fileName: cretabFile.fileName } : null;
+            return cretabFile && cretabFile.file ? { file: cretabFile.file, fileName: cretabFile.fileName } : null;
         },
         getBusinessType: () => businessType,
         setBusinessType: (type: 'business' | 'individual') => {
@@ -246,14 +248,16 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
     const handleOpenPreview = (file: CretabFile | UploadedFile) => {
         setPreviewFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const result = e.target?.result;
-            if (typeof result === 'string') {
-                setPreviewUrl(result);
-            }
-        };
-        reader.readAsDataURL(file.file);
+        if (file.file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result;
+                if (typeof result === 'string') {
+                    setPreviewUrl(result);
+                }
+            };
+            reader.readAsDataURL(file.file);
+        }
     };
 
     const handleClosePreview = () => {
@@ -279,7 +283,9 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
         try {
             const zip = new JSZip();
-            zip.file(cretabFile.fileName, cretabFile.file);
+            if (cretabFile.file) {
+                zip.file(cretabFile.fileName, cretabFile.file);
+            }
 
             const blob = await zip.generateAsync({ type: 'blob' });
             const url = URL.createObjectURL(blob);
@@ -310,7 +316,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     ? (documents.find(d => d.id === docId))
                     : (documents.find(d => d.id === docId));
 
-                if (doc) {
+                if (doc && file.file) {
                     zip.file(`${doc.name}_${file.fileName}`, file.file);
                 }
             }
@@ -498,7 +504,11 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                                         body: JSON.stringify({ filePath: existingFile.path }),
                                                     });
                                                     const data = await response.json();
-                                                    setPreviewFile({ ...existingFile, fileName: existingFile.name });
+                                                    setPreviewFile({
+                                                        fileName: existingFile.name,
+                                                        fileSize: formatFileSize(existingFile.size),
+                                                        storagePath: existingFile.path
+                                                    });
                                                     setPreviewUrl(data.url);
                                                 } catch (error) {
                                                     console.error('미리보기 로드 실패:', error);
@@ -515,7 +525,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                             <div className={styles.uploadedInfo}>
                                                 <p className={styles.uploadedName}>{doc.name}</p>
                                                 <p className={styles.uploadedMeta}>
-                                                    {isUploaded ? `${uploadedFile.fileName} · ${uploadedFile.fileSize}` : `${existingFile.name}`}
+                                                    {isUploaded ? `${uploadedFile.fileName} · ${uploadedFile.fileSize}` : `${existingFile?.name}`}
                                                 </p>
                                             </div>
                                         </div>

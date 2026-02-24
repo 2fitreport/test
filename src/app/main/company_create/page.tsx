@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import styles from './companyCreate1.module.css';
@@ -12,7 +12,7 @@ import CompanyFile, { CompanyFileHandle } from './components/CompanyFile';
 import MemoSection from './components/MemoSection';
 import AdditionalFiles, { AdditionalFilesHandle } from './components/AdditionalFiles';
 
-export default function Company1() {
+function Company1Content() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const viewId = searchParams.get('view');
@@ -439,4 +439,12 @@ export default function Company1() {
             />
         </div>
     )
+}
+
+export default function Company1() {
+    return (
+        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}><p>로딩 중...</p></div>}>
+            <Company1Content />
+        </Suspense>
+    );
 }

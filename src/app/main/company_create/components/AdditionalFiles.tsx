@@ -7,7 +7,7 @@ import styles from './AdditionalFiles.module.css';
 
 interface UploadedFile {
     id: string;
-    file: File;
+    file?: File;
     fileName: string;
     fileSize: string;
     storagePath?: string;
@@ -86,10 +86,12 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
 
     useImperativeHandle(ref, () => ({
         getFilesForUpload: () => {
-            return uploadedFiles.map((file) => ({
-                file: file.file,
-                fileName: file.fileName,
-            }));
+            return uploadedFiles
+                .filter((file) => file.file !== undefined)
+                .map((file) => ({
+                    file: file.file as File,
+                    fileName: file.fileName,
+                }));
         },
         setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => {
             setExistingFiles(files);
@@ -127,14 +129,16 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
 
     const handleOpenPreview = (file: UploadedFile) => {
         setPreviewFile(file);
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const result = e.target?.result;
-            if (typeof result === 'string') {
-                setPreviewUrl(result);
-            }
-        };
-        reader.readAsDataURL(file.file);
+        if (file.file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result;
+                if (typeof result === 'string') {
+                    setPreviewUrl(result);
+                }
+            };
+            reader.readAsDataURL(file.file);
+        }
     };
 
     const handleClosePreview = () => {
@@ -162,7 +166,9 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
             const zip = new JSZip();
 
             for (const file of uploadedFiles) {
-                zip.file(file.fileName, file.file);
+                if (file.file) {
+                    zip.file(file.fileName, file.file);
+                }
             }
 
             const blob = await zip.generateAsync({ type: 'blob' });
@@ -299,7 +305,12 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                                             body: JSON.stringify({ filePath: existingFile.path }),
                                         });
                                         const data = await response.json();
-                                        setPreviewFile({ ...existingFile, fileName: existingFile.name });
+                                        setPreviewFile({
+                                            id: `existing-${idx}`,
+                                            fileName: existingFile.name,
+                                            fileSize: formatFileSize(existingFile.size),
+                                            storagePath: existingFile.path
+                                        });
                                         setPreviewUrl(data.url);
                                     } catch (error) {
                                         console.error('미리보기 로드 실패:', error);
