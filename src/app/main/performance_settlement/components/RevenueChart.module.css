@@ -1,0 +1,56 @@
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.button {
+    padding: 8px 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.button:hover {
+    background-color: #f9f9f9;
+}
+
+.yearInput {
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    width: 100px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.chartContainer {
+    height: 300px;
+}

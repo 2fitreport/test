@@ -1,0 +1,128 @@
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.button {
+    padding: 8px 12px;
+    font-size: 16px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.button:hover {
+    background-color: #f9f9f9;
+}
+
+.monthInput {
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #fff;
+    color: #333;
+    width: 150px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.searchContainer {
+    margin-bottom: 15px;
+}
+
+.searchInput {
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    background-color: #fff !important;
+    color: #333 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+}
+
+.searchInput:focus {
+    border-color: #553be9;
+    box-shadow: 0 0 0 2px rgba(85, 59, 233, 0.1);
+}
+
+.emptyMessage {
+    padding: 40px;
+    text-align: center;
+    color: #999;
+    font-size: 16px;
+}
+
+.paginationWrapper {
+    margin-top: 15px;
+}
+
+.summarySection {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    margin-top: 10px;
+}
+
+.summaryTitle {
+    font-weight: 700;
+    font-size: 17px;
+    color: #333;
+}
+
+.summaryValues {
+    display: flex;
+    gap: 25px;
+}
+
+.summaryItem {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.summaryItem span:first-child {
+    color: #666;
+    margin-right: 8px;
+}
+
+.summaryItem span:last-child {
+    font-size: 18px;
+}
+
+.summaryValueBlue {
+    color: #3b5bdb;
+    font-weight: 800;
+}
+
+.summaryValueGreen {
+    color: #2f9e44;
+    font-weight: 800;
+}

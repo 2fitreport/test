@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Pagination from '@/app/components/Pagination/Pagination';
 import styles from './salesWrap.module.css';
 
 interface SalesData {
@@ -50,6 +51,8 @@ export default function SalesWrap() {
     const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
     const [sortColumn, setSortColumn] = useState<keyof SalesData>('userId');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -112,6 +115,7 @@ export default function SalesWrap() {
             setSortColumn(column);
             setSortOrder('asc');
         }
+        setCurrentPage(1);
     };
 
     const getSortedData = () => {
@@ -158,6 +162,10 @@ export default function SalesWrap() {
 
     const isAffiliationRepresentative = isRepresentative && userLevel === 4;
     const sortedData = getSortedData();
+
+    const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const paginatedData = sortedData.slice(startIdx, startIdx + itemsPerPage);
 
     return (
         <div className={styles.salesWrap}>
@@ -219,7 +227,7 @@ export default function SalesWrap() {
                                 <td colSpan={7} style={{ textAlign: 'center' }}>데이터가 없습니다.</td>
                             </tr>
                         ) : (
-                            sortedData.map((row) => (
+                            paginatedData.map((row) => (
                                 <tr key={row.userId}>
                                     <td>{row.name}</td>
                                     <td style={{ color: '#666', fontWeight: 600, fontSize: '16px' }}>{row.registrations}</td>
@@ -233,6 +241,14 @@ export default function SalesWrap() {
                         )}
                     </tbody>
                 </table>
+            </div>
+            <div className={styles.paginationWrapper}>
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={sortedData.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                />
             </div>
         </div>
     );

@@ -16,21 +16,33 @@
     margin-bottom: 24px;
 }
 
-.fileTitleLeft {
+.fileTitleContent {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex: 1;
+}
+
+.fileTitleLeft {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fileTitleLeft svg {
+    color: #1c283c;
+    flex-shrink: 0;
 }
 
 .fileTitle h2 {
-    font-size: 22px;
-    font-weight: 600;
-    color: #1a1a1a;
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
     margin: 0;
 }
 
 .fileTitle h3 {
-    font-size: 15px;
+    font-size: 14px;
     color: #999;
     margin: 0;
     font-weight: 400;
@@ -40,6 +52,8 @@
     display: flex;
     gap: 10px;
     flex-shrink: 0;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .cretabFileBtn,
@@ -79,18 +93,206 @@
 
 /* === 크레탑 상태 배지 === */
 .cretabStatusBadge {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 10px 16px;
     background: #f0fdf4;
-    border: 1px solid #d1fae5;
+    border: 1.5px solid #52ea9b;
     border-radius: 8px;
-    color: #059669;
+    color: #052e16;
     font-size: 14px;
     font-weight: 600;
-    margin-bottom: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* === 크레탑 파일 정보 === */
+.cretabFileInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #f0fdf4;
+    border: 1.5px solid #52ea9b;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.cretabCheckIcon {
+    width: 20px;
+    height: 20px;
+    color: #52ea9b;
+    flex-shrink: 0;
+}
+
+.cretabFileDetail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cretabFileName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cretabFileSize {
+    font-size: 12px;
+    color: #999;
+    margin: 0;
+}
+
+.cretabRemoveBtn {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.cretabRemoveBtn:hover {
+    color: #ef5350;
+    transform: scale(1.1);
+}
+
+/* === 다운로드 버튼 === */
+.downloadBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #42a5f5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.downloadBtn:hover {
+    background: #1565c0;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.downloadBtn:active {
+    transform: translateY(0);
+}
+
+/* === 미리보기 모달 === */
+.previewModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.previewContent {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    width: 95%;
+    height: 95vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.previewCloseBtn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #fff;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.previewCloseBtn:hover {
+    background: #f0f0f0;
+    transform: scale(1.1);
+}
+
+.previewBody {
+    padding: 20px;
+    overflow: auto;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.previewImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.previewPdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 8px;
+}
+
+.previewOther {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px;
+    color: #999;
+}
+
+.previewOther svg {
+    color: #ddd;
+}
+
+.previewFileName {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    word-break: break-all;
+    max-width: 400px;
+}
+
+.previewFileSize {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
 }
 
 /* === 사업자 유형 선택 === */
@@ -98,6 +300,8 @@
     display: flex;
     gap: 12px;
     margin-bottom: 24px;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .typeBtn {
@@ -303,8 +507,19 @@
     }
 
     .fileTitle {
+        flex-direction: column;
+        align-items: flex-start;
         padding-bottom: 15px;
         margin-bottom: 16px;
+    }
+
+    .fileTitleLeft {
+        width: 100%;
+    }
+
+    .fileTitleRight {
+        width: 100%;
+        flex-direction: column;
     }
 
     .fileTitle h2 {
@@ -348,6 +563,16 @@
 @media (max-width: 480px) {
     .fileWrap {
         padding: 16px 20px;
+    }
+
+    .fileTitle h2 {
+        font-size: 16px;
+    }
+
+    .cretabFileBtn,
+    .cretabNoneBtn {
+        padding: 8px 12px;
+        font-size: 12px;
     }
 
     .businessTypeSelector {

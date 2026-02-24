@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, Plugin } from 'chart.js';
 import styles from './progressWrap.module.css';
@@ -139,6 +140,11 @@ export default function ProgressWrap() {
                 bodyFont: { size: 12 }
             }
         },
+        elements: {
+            bar: {
+                borderWidth: 0
+            }
+        },
         scales: {
             x: {
                 beginAtZero: true,
@@ -232,10 +238,11 @@ export default function ProgressWrap() {
                         style={{
                             padding: '8px 12px',
                             fontSize: '16px',
-                            border: 'none',
+                            fontWeight: '600',
+                            border: '1px solid #ddd',
                             borderRadius: '4px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                            color: '#fff',
+                            backgroundColor: '#fff',
+                            color: '#000',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -243,7 +250,12 @@ export default function ProgressWrap() {
                         }}
                         title="이전 달"
                     >
-                        ◀
+                        <Image
+                            src="/arrow_left.svg"
+                            alt="이전 달"
+                            width={20}
+                            height={20}
+                        />
                     </button>
                     <input
                         ref={monthInputRef}
@@ -257,10 +269,11 @@ export default function ProgressWrap() {
                         style={{
                             padding: '8px 12px',
                             fontSize: '14px',
-                            border: 'none',
+                            fontWeight: '600',
+                            border: '1px solid #ddd',
                             borderRadius: '4px',
                             backgroundColor: '#fff',
-                            color: '#333',
+                            color: '#000',
                             width: '150px',
                             cursor: 'pointer',
                             textAlign: 'center'
@@ -271,10 +284,11 @@ export default function ProgressWrap() {
                         style={{
                             padding: '8px 12px',
                             fontSize: '16px',
-                            border: 'none',
+                            fontWeight: '600',
+                            border: '1px solid #ddd',
                             borderRadius: '4px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                            color: '#fff',
+                            backgroundColor: '#fff',
+                            color: '#000',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -282,7 +296,12 @@ export default function ProgressWrap() {
                         }}
                         title="다음 달"
                     >
-                        ▶
+                        <Image
+                            src="/arrow_right.svg"
+                            alt="다음 달"
+                            width={20}
+                            height={20}
+                        />
                     </button>
                 </div>
             </div>

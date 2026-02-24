@@ -11,13 +11,13 @@
     font-weight: 700;
     color: var(--black-color);
     padding: 0 20px;
-    background-color: #2563eb;
-    color: #fff;
+    color: #000;
     display: flex;
     align-items: center;
     gap: 3px;
     height: 80px;
     box-sizing: border-box;
+    border-bottom: 1px solid #ddd;
 }
 
 .logWrap ul {

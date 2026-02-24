@@ -78,7 +78,8 @@
       "Bash(set -x)",
       "Bash(git checkout:*)",
       "Bash(tail:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cd C:\\\\Users\\\\111\\\\Desktop\\\\2fitreport\\\\src\\\\app\\\\main:*)"
     ],
     "deny": [],
     "ask": []

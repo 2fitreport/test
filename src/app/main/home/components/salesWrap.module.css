@@ -9,42 +9,33 @@
 }
 
 .salesHeader {
-    background-color: #2563eb;
     padding: 0 20px;
     height: 80px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-sizing: border-box;
+    border-bottom: 1px solid #ddd;
+}
+
+.button {
+    font-weight: 600;
+}
+
+.monthInput {
+    font-weight: 600;
 }
 
 .salesWrap h2 {
     font-size: 18px;
     font-weight: 700;
-    color: #fff;
+    color: #000;
     margin: 0;
 }
 
 .tableWrapper {
     flex: 1;
-    overflow-y: auto;
-}
-
-.tableWrapper::-webkit-scrollbar {
-    width: 6px;
-}
-
-.tableWrapper::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.tableWrapper::-webkit-scrollbar-thumb {
-    background: #ddd;
-    border-radius: 3px;
-}
-
-.tableWrapper::-webkit-scrollbar-thumb:hover {
-    background: #999;
+    overflow: hidden;
 }
 
 .salesTable {
@@ -109,13 +100,20 @@
 }
 
 .salesTable tbody tr:last-child {
-    border-bottom: none;
+    border-bottom: 1px solid #ddd;
 }
 
 .salesTable td {
-    padding: 20px;
+    padding: 0 20px;
     font-size: 14px;
     color: var(--black-color);
-    height: 60px;
+    height: 50px;
+    display: table-cell;
     vertical-align: middle;
+}
+
+.paginationWrapper {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: center;
 }

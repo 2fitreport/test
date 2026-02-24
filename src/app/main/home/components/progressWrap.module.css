@@ -10,7 +10,6 @@
 }
 
 .progressHeader {
-    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
     padding: 0 20px;
     height: 80px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -19,12 +18,13 @@
     align-items: center;
     gap: 20px;
     box-sizing: border-box;
+    border-bottom: 1px solid #ddd;
 }
 
 .progressWrap h2 {
     font-size: 18px;
     font-weight: 700;
-    color: #fff;
+    color: #000;
     margin: 0;
 }
 

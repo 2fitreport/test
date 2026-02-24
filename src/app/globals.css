@@ -6,6 +6,7 @@
     --main-color: #0f1a4d;
     --main-color-rgb: 15, 26, 77;
     --black-color: #292929;
+    --sidebar-width: 280px;
 
     /* 문서 상태 색상 (statBox) */
     --status-all: #cccccc;

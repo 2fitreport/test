@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase, FiBarChart2 } from 'react-icons/fi';
 import { clearAuthToken, getAdminData, type AdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
     { path: '/main/home', label: '메인홈' },
     { path: '/main/clients', label: '고객사' },
     { path: '/main/document_submission', label: '기업관리' },
+    { path: '/main/performance_settlement', label: '성과 정산' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
 ];
@@ -137,10 +138,10 @@ export default function Sidebar() {
             <div className={styles.headerWrapper}>
                 <button
                     className={styles.logoWrapper}
-                    onClick={() => router.push('/main/document_submission')}
+                    onClick={() => router.push('/main/home')}
                     aria-label="메인페이지로 이동"
                 >
-                    <Image src="/logo.png" alt="로고" width={120} height={80} className={styles.logoImage} priority />
+                    <Image src="/logo.png" alt="로고" width={220} height={120} className={styles.logoImage} priority />
                 </button>
                 <div className={styles.headerUserName}>
                     <FiUser className={styles.headerUserIcon} />
@@ -172,9 +173,14 @@ export default function Sidebar() {
                         if (item.path === '/main/history' && adminData?.position?.level !== 1) {
                             return null;
                         }
+                        // 성과 정산은 대표자(level=1)만 접근 가능
+                        if (item.path === '/main/performance_settlement' && adminData?.position?.level !== 1) {
+                            return null;
+                        }
 
                         const isActive = pathname === item.path ||
                             (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create')) ||
+                            (item.path === '/main/performance_settlement' && pathname.startsWith('/main/performance_settlement')) ||
                             (item.path === '/main/user_management' && pathname.startsWith('/main/user_create'));
 
                         return (
@@ -187,6 +193,8 @@ export default function Sidebar() {
                                         <FiUsers className={styles.menuIcon} />
                                     ) : item.path === '/main/clients' ? (
                                         <FiBriefcase className={styles.menuIcon} />
+                                    ) : item.path === '/main/performance_settlement' ? (
+                                        <FiBarChart2 className={styles.menuIcon} />
                                     ) : item.path === '/main/history' ? (
                                         <FiClock className={styles.menuIcon} />
                                     ) : item.path === '/main/home' ? (

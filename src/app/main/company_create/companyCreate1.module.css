@@ -3,7 +3,7 @@
 }
 
 .container {
-    margin: 0 0 0 239px;
+    margin-left: var(--sidebar-width);
     background: #f9f9f9;
     min-height: 100vh;
 }
@@ -44,13 +44,77 @@
 /* === 메인 콘텐츠 === */
 .companyManagementWrap {
     padding: 30px 60px;
+    padding-bottom: 140px;
     background: #f9f9f9;
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
 }
 
+/* === 저장/취소 버튼 (고정) === */
+.buttonFooter {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #e0e0e0;
+    padding: 20px 60px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    z-index: 100;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
 
+.buttonContainer {
+    display: flex;
+    gap: 12px;
+}
+
+.saveBtn,
+.cancelBtn {
+    padding: 20px 80px;
+    border: none;
+    border-radius: 100px;
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.saveBtn {
+    background: #1c283c;
+    color: #fff;
+}
+
+.saveBtn:hover:not(:disabled) {
+    background: #0f1a2e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(28, 40, 60, 0.3);
+}
+
+.saveBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cancelBtn {
+    background: #fff;
+    color: #1c283c;
+    border: 1.5px solid #1c283c;
+}
+
+.cancelBtn:hover:not(:disabled) {
+    border-color: #1c283c;
+    transform: translateY(-2px);
+}
+
+.cancelBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 /* === 반응형 === */
 @media (max-width: 1200px) {
@@ -74,8 +138,24 @@
 
     .companyManagementWrap {
         padding: 20px;
+        padding-bottom: 140px;
         grid-template-columns: 1fr;
         gap: 16px;
+    }
+
+    .buttonFooter {
+        left: 0;
+        padding: 16px 20px;
+    }
+
+    .buttonContainer {
+        width: 100%;
+    }
+
+    .saveBtn,
+    .cancelBtn {
+        flex: 1;
+        padding: 12px 16px;
     }
 }
 
@@ -97,5 +177,16 @@
 
     .companyManagementWrap {
         padding: 15px;
+        padding-bottom: 140px;
+    }
+
+    .buttonFooter {
+        padding: 12px 15px;
+    }
+
+    .saveBtn,
+    .cancelBtn {
+        padding: 10px 12px;
+        font-size: 13px;
     }
 }

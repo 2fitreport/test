@@ -2,7 +2,7 @@
     position: fixed;
     left: 0;
     top: 0;
-    width: 240px;
+    width: var(--sidebar-width);
     height: 100vh;
     background-color: #fff;
     border-right: 1px solid #e0e0e0;
@@ -19,19 +19,21 @@
 }
 
 .logoWrapper {
-    border-bottom: 1px solid #e0e0e0;
-    padding: 12px 20px;
+
+    padding: 16px 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: none;
     border: none;
     cursor: default;
+    height: 142px;
 }
 
 .logoImage {
     object-fit: contain;
-    max-height: 80px;
+    max-height: 120px;
+    max-width: 200px;
     pointer-events: auto;
     cursor: pointer;
     transition: opacity 0.2s ease;
@@ -57,12 +59,16 @@
     flex: 1;
     padding: 0;
     overflow-y: auto;
+    margin-top: 20px;
 }
 
 .menuList {
 list-style: none;
 margin: 0;
 padding: 0;
+display: flex;
+flex-direction: column;
+gap: 10px;
 }
 
 .menuList li {
@@ -74,28 +80,32 @@ margin: 0;
 }
 
 .menuItem {
-    width: 100%;
-    padding: 12px 20px;
+    width: 85%;
+    padding: 14px 20px;
     text-align: left;
     background: none;
     border: none;
-    font-size: 15px;
+    font-size: 17px;
+    font-weight: 500;
     color: var(--black-color);
     cursor: pointer;
     transition: background-color 0.2s;
     display: flex;
     align-items: center;
     gap: 12px;
+    border-radius: 10px;
 }
 
 .menuIcon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     flex-shrink: 0;
 }
 
 .menuItemWrapper {
     position: relative;
+    display: flex;
+    justify-content: center;
 }
 
 .notificationBadge {
@@ -131,7 +141,7 @@ margin: 0;
 position: fixed;
 bottom: 24px;
 left: 20px;
-width: calc(240px - 40px);
+width: calc(var(--sidebar-width) - 40px);
 display: flex;
 flex-direction: column;
 gap: 12px;
@@ -140,6 +150,7 @@ background: linear-gradient(135deg, #f5f7fa 0%, #eef2f7 100%);
 border: 1px solid #e8eef5;
 border-radius: 12px;
 box-shadow: 0 2px 8px rgba(15, 26, 77, 0.08);
+align-items: center;
 }
 
 .userName {

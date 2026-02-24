@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import styles from './CompanyInfoCard.module.css';
 
 interface CompanyFormData {
-    companyName: string;
-    companyNumber: string;
-    companyPersonName: string;
-    companyPhone: string;
+    company_name: string;
+    business_number: string;
+    representative_name: string;
+    phone: string;
     companyIndustry: string;
     companyRevenue: string;
     companyCreditRating: string;
@@ -15,12 +15,21 @@ interface CompanyFormData {
     companyCreditRatingNICE: string;
 }
 
-export default function CompanyInfoCard() {
+export interface CompanyInfoCardHandle {
+    getFormData: () => CompanyFormData;
+    setFormData: (data: Partial<CompanyFormData>) => void;
+}
+
+interface CompanyInfoCardProps {
+    isViewMode?: boolean;
+}
+
+const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(function CompanyInfoCard({ isViewMode = false }, ref) {
     const [formData, setFormData] = useState<CompanyFormData>({
-        companyName: '',
-        companyNumber: '',
-        companyPersonName: '',
-        companyPhone: '',
+        company_name: '',
+        business_number: '',
+        representative_name: '',
+        phone: '',
         companyIndustry: '',
         companyRevenue: '',
         companyCreditRating: '',
@@ -28,13 +37,62 @@ export default function CompanyInfoCard() {
         companyCreditRatingNICE: '',
     });
 
+    const formatBusinessNumber = (value: string): string => {
+        // 숫자만 추출 (최대 10자리)
+        const numbers = value.replace(/\D/g, '').slice(0, 10);
+
+        // XXX-XX-XXXXX 형식으로 변환
+        if (numbers.length <= 3) {
+            return numbers;
+        } else if (numbers.length <= 5) {
+            return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+        } else {
+            return `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5)}`;
+        }
+    };
+
+    const formatPhoneNumber = (value: string): string => {
+        // 숫자만 추출 (최대 11자리)
+        const numbers = value.replace(/\D/g, '').slice(0, 11);
+
+        // 010-0000-0000 또는 02-000-0000 형식으로 변환
+        if (numbers.length <= 2) {
+            return numbers;
+        } else if (numbers.length <= 6) {
+            return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
+        } else if (numbers.length <= 10) {
+            return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+        } else {
+            // 011, 016, 017 등의 경우
+            return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
+        let formattedValue = value;
+
+        // 사업자 등록번호 포맷팅
+        if (name === 'business_number') {
+            formattedValue = formatBusinessNumber(value);
+        }
+        // 연락처 포맷팅
+        else if (name === 'phone') {
+            formattedValue = formatPhoneNumber(value);
+        }
+
         setFormData((prev) => ({
             ...prev,
-            [name]: value,
+            [name]: formattedValue,
         }));
     };
+
+    useImperativeHandle(ref, () => ({
+        getFormData: () => formData,
+        setFormData: (data: Partial<CompanyFormData>) => {
+            setFormData(prev => ({ ...prev, ...data }));
+        },
+    }));
 
     return (
         <div className={styles.companyInfo}>
@@ -47,58 +105,62 @@ export default function CompanyInfoCard() {
                 {/* 좌측 정보 */}
                 <ul className={styles.leftBox}>
                     <li className={styles.fieldItem}>
-                        <label htmlFor="companyName" className={styles.label}>
-                            기업명
+                        <label htmlFor="company_name" className={styles.label}>
+                            기업명 <span style={{ color: '#ef5350', marginLeft: '4px' }}>*</span>
                         </label>
                         <input
                             type="text"
-                            id="companyName"
-                            name="companyName"
+                            id="company_name"
+                            name="company_name"
                             className={styles.input}
-                            value={formData.companyName}
+                            value={formData.company_name}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
                     <li className={styles.fieldItem}>
-                        <label htmlFor="companyNumber" className={styles.label}>
-                            사업자등록번호
+                        <label htmlFor="business_number" className={styles.label}>
+                            사업자등록번호 <span style={{ color: '#ef5350', marginLeft: '4px' }}>*</span>
                         </label>
                         <input
                             type="text"
-                            id="companyNumber"
-                            name="companyNumber"
+                            id="business_number"
+                            name="business_number"
                             className={styles.input}
-                            value={formData.companyNumber}
+                            value={formData.business_number}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
                     <li className={styles.fieldItem}>
-                        <label htmlFor="companyPersonName" className={styles.label}>
-                            대표자명
+                        <label htmlFor="representative_name" className={styles.label}>
+                            대표자명 <span style={{ color: '#ef5350', marginLeft: '4px' }}>*</span>
                         </label>
                         <input
                             type="text"
-                            id="companyPersonName"
-                            name="companyPersonName"
+                            id="representative_name"
+                            name="representative_name"
                             className={styles.input}
-                            value={formData.companyPersonName}
+                            value={formData.representative_name}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
                     <li className={styles.fieldItem}>
-                        <label htmlFor="companyPhone" className={styles.label}>
-                            연락처
+                        <label htmlFor="phone" className={styles.label}>
+                            연락처 <span style={{ color: '#ef5350', marginLeft: '4px' }}>*</span>
                         </label>
                         <input
                             type="text"
-                            id="companyPhone"
-                            name="companyPhone"
+                            id="phone"
+                            name="phone"
                             className={styles.input}
-                            value={formData.companyPhone}
+                            value={formData.phone}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
                 </ul>
@@ -116,6 +178,7 @@ export default function CompanyInfoCard() {
                             className={styles.input}
                             value={formData.companyIndustry}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
@@ -130,6 +193,7 @@ export default function CompanyInfoCard() {
                             className={styles.input}
                             value={formData.companyRevenue}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
@@ -144,6 +208,7 @@ export default function CompanyInfoCard() {
                             className={styles.input}
                             value={formData.companyCreditRating}
                             onChange={handleChange}
+                            disabled={isViewMode}
                         />
                     </li>
 
@@ -161,6 +226,7 @@ export default function CompanyInfoCard() {
                                     className={styles.input}
                                     value={formData.companyCreditRatingKCB}
                                     onChange={handleChange}
+                                    disabled={isViewMode}
                                 />
                             </div>
                         </div>
@@ -177,6 +243,7 @@ export default function CompanyInfoCard() {
                                     className={styles.input}
                                     value={formData.companyCreditRatingNICE}
                                     onChange={handleChange}
+                                    disabled={isViewMode}
                                 />
                                 </div>
                         </div>
@@ -185,4 +252,8 @@ export default function CompanyInfoCard() {
             </div>
         </div>
     );
-}
+});
+
+CompanyInfoCard.displayName = 'CompanyInfoCard';
+
+export default CompanyInfoCard;
