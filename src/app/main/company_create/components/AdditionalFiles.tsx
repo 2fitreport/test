@@ -99,7 +99,9 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
     }));
 
     const handleUploadClick = () => {
-        fileInputRef.current?.click();
+        if (!isViewMode) {
+            fileInputRef.current?.click();
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,11 +122,22 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                 fileSize: formatFileSize(file.size),
             };
             setUploadedFiles((prev) => [...prev, newFile]);
+
+            // input 초기화 (setTimeout으로 지연)
+            setTimeout(() => {
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            }, 0);
         }
     };
 
     const handleRemoveFile = (id: string) => {
         setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+    };
+
+    const handleRemoveExistingFile = (index: number) => {
+        setExistingFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     const handleOpenPreview = (file: UploadedFile) => {
@@ -236,8 +249,15 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
             )}
 
             <div className={styles.fileList}>
-                {uploadedFiles.length === 0 && existingFiles.length === 0 && !isViewMode ? (
-                    <div className={styles.docItem} onClick={handleUploadClick}>
+                {uploadedFiles.length === 0 && existingFiles.length === 0 ? (
+                    <div
+                        className={styles.docItem}
+                        onClick={handleUploadClick}
+                        style={{
+                            cursor: isViewMode ? 'default' : 'pointer',
+                            pointerEvents: isViewMode ? 'none' : 'auto'
+                        }}
+                    >
                         <div className={styles.docContent}>
                             <File className={styles.docIcon} />
                             <div className={styles.docInfo}>
@@ -250,6 +270,11 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleUploadClick();
+                            }}
+                            disabled={isViewMode}
+                            style={{
+                                pointerEvents: isViewMode ? 'none' : 'auto',
+                                display: isViewMode ? 'none' : 'block'
                             }}
                         >
                             업로드
@@ -272,7 +297,6 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                             >
                                 <div
                                     className={styles.uploadedContent}
-                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     <CheckCircle2 className={styles.checkIcon} />
                                     <div className={styles.uploadedInfo}>
@@ -320,7 +344,6 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                             >
                                 <div
                                     className={styles.uploadedContent}
-                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     <CheckCircle2 className={styles.checkIcon} />
                                     <div className={styles.uploadedInfo}>
@@ -328,14 +351,17 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                                         <p className={styles.uploadedMeta}>{formatFileSize(existingFile.size)}</p>
                                     </div>
                                 </div>
-                                <button
-                                    className={styles.removeIcon}
-                                    disabled
-                                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                                    onClick={(e) => e.stopPropagation()}
-                                >
-                                    <CheckCircle2 size={20} />
-                                </button>
+                                {!isViewMode && (
+                                    <button
+                                        className={styles.removeIcon}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemoveExistingFile(idx);
+                                        }}
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                )}
                             </div>
                         ))}
                         {!isViewMode && (

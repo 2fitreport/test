@@ -31,9 +31,6 @@
 
 /* === 정보 레이아웃 === */
 .companyWrap {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 40px;
 }
 
 .leftBox,
@@ -91,6 +88,11 @@
 
 .input::placeholder {
     color: #bbb;
+}
+
+.input:disabled {
+    color: #999;
+    cursor: not-allowed;
 }
 
 .ratingWrap {

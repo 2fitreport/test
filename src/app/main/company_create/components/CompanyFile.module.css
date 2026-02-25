@@ -316,7 +316,7 @@
     transition: all 0.3s ease;
 }
 
-.typeBtn:hover {
+.typeBtn:not(:disabled):hover {
     border-color: #1c283c;
     color: #1c283c;
 }
@@ -329,10 +329,14 @@
 
 /* === 문서 목록 === */
 .docList {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     min-height: 280px;
+}
+
+.docList.empty {
+    grid-template-columns: 1fr;
 }
 
 .emptyPlaceholder {
@@ -357,7 +361,6 @@
     background: #f9f9f9;
     border-radius: 8px;
     border: 1px solid #e0e0e0;
-    transition: all 0.3s ease;
     height: 70px;
     cursor: pointer;
 }
@@ -415,7 +418,6 @@
     font-weight: 600;
     color: #fff;
     cursor: pointer;
-    transition: all 0.2s ease;
     white-space: nowrap;
 }
 
@@ -434,7 +436,6 @@
     background: #f0fdf4;
     border-radius: 8px;
     border: 1.5px solid #52ea9b;
-    transition: all 0.2s ease;
     height: 70px;
 }
 
@@ -451,8 +452,8 @@
 }
 
 .checkIcon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     color: #52ea9b;
     flex-shrink: 0;
 }
@@ -485,7 +486,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
     flex-shrink: 0;
 }
 

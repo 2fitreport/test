@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
-import { File, CheckCircle2, X, Check, Paperclip, Download, AlertCircle } from 'lucide-react';
+import { File, CheckCircle2, X, Paperclip, Download, AlertCircle } from 'lucide-react';
 import JSZip from 'jszip';
 import styles from './CompanyFile.module.css';
 
@@ -21,39 +21,40 @@ interface UploadedFile {
     uploading?: boolean;
 }
 
-interface CretabFile {
-    file?: File;
-    fileName: string;
-    fileSize: string;
-    storagePath?: string;
-    uploading?: boolean;
-}
-
 export interface CompanyFileHandle {
     getFilesForUpload: () => Array<{ docId: string; file: File; fileName: string }>;
     getExistingFiles: () => Array<{ name: string; path: string; size: number }>;
-    getCretabFileForUpload: () => { file: File; fileName: string } | null;
     getBusinessType: () => 'business' | 'individual' | null;
     setBusinessType: (type: 'business' | 'individual') => void;
-    setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => void;
+    setExistingFiles: (files: Array<{ name: string; path: string; size: number }>, type?: 'business' | 'individual') => void;
 }
 
 interface CompanyFileProps {
     isViewMode?: boolean;
+    viewId?: string | null;
+    progressDetails?: string | null;
+    isAuthor?: boolean;
+    isEditMode?: boolean;
+    userPositionLevel?: number;
 }
 
-const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false }, ref) {
+const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false, viewId = null, progressDetails = null, isAuthor = false, isEditMode = false, userPositionLevel = 0 }, ref) {
     const [businessType, setBusinessType] = useState<BusinessType>(null);
-    const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile>>({});
-    const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
-    const [cretabStatus, setCretabStatus] = useState<'none' | 'file' | null>(null);
-    const [cretabFile, setCretabFile] = useState<CretabFile | null>(null);
-    const [previewFile, setPreviewFile] = useState<CretabFile | UploadedFile | null>(null);
+    const [uploadedFilesByType, setUploadedFilesByType] = useState<Record<'business' | 'individual', Record<string, UploadedFile>>>({
+        business: {},
+        individual: {}
+    });
+    const [existingFilesByType, setExistingFilesByType] = useState<Record<'business' | 'individual', Array<{ name: string; path: string; size: number }>>>({
+        business: [],
+        individual: []
+    });
+    const uploadedFiles = businessType && businessType in uploadedFilesByType ? uploadedFilesByType[businessType] : {};
+    const existingFiles = businessType && businessType in existingFilesByType ? existingFilesByType[businessType] : [];
+    const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-    const cretabFileInputRef = useRef<HTMLInputElement | null>(null);
 
     const businessDocuments: Document[] = [
         {
@@ -154,15 +155,18 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                 }));
         },
         getExistingFiles: () => existingFiles,
-        getCretabFileForUpload: () => {
-            return cretabFile && cretabFile.file ? { file: cretabFile.file, fileName: cretabFile.fileName } : null;
-        },
         getBusinessType: () => businessType,
         setBusinessType: (type: 'business' | 'individual') => {
             setBusinessType(type);
         },
-        setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => {
-            setExistingFiles(files);
+        setExistingFiles: (files: Array<{ name: string; path: string; size: number }>, type?: 'business' | 'individual') => {
+            const targetType = type || businessType;
+            if (targetType) {
+                setExistingFilesByType((prev) => ({
+                    ...prev,
+                    [targetType]: files
+                }));
+            }
         },
     }));
 
@@ -172,7 +176,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
         const file = e.target.files?.[0];
-        if (file) {
+        if (file && businessType) {
             // 파일 크기 검증 (5GB 제한)
             if (file.size > 5 * 1024 * 1024 * 1024) {
                 setUploadError('파일 크기는 5GB 이하여야 합니다.');
@@ -180,25 +184,49 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
             }
 
             // 메모리에만 저장 (저장 시 업로드)
-            setUploadedFiles((prev) => ({
+            setUploadedFilesByType((prev) => ({
                 ...prev,
-                [docId]: {
-                    file,
-                    fileName: file.name,
-                    fileSize: formatFileSize(file.size),
-                },
+                [businessType]: {
+                    ...prev[businessType],
+                    [docId]: {
+                        file,
+                        fileName: file.name,
+                        fileSize: formatFileSize(file.size),
+                    },
+                }
             }));
+
+            // input 초기화 (setTimeout으로 지연)
+            setTimeout(() => {
+                if (fileInputRefs.current[docId]) {
+                    fileInputRefs.current[docId]!.value = '';
+                }
+            }, 0);
         }
     };
 
     const handleRemoveFile = (docId: string) => {
-        setUploadedFiles((prev) => {
-            const newFiles = { ...prev };
-            delete newFiles[docId];
-            return newFiles;
-        });
-        if (fileInputRefs.current[docId]) {
-            fileInputRefs.current[docId]!.value = '';
+        if (businessType) {
+            setUploadedFilesByType((prev) => {
+                const newTypeFiles = { ...prev[businessType] };
+                delete newTypeFiles[docId];
+                return {
+                    ...prev,
+                    [businessType]: newTypeFiles
+                };
+            });
+            if (fileInputRefs.current[docId]) {
+                fileInputRefs.current[docId]!.value = '';
+            }
+        }
+    };
+
+    const handleRemoveExistingFile = (docId: string) => {
+        if (businessType) {
+            setExistingFilesByType((prev) => ({
+                ...prev,
+                [businessType]: prev[businessType].filter(f => !(f.name?.includes(docId) || f.path?.includes(docId)))
+            }));
         }
     };
 
@@ -210,41 +238,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
         return existingFiles.find(f => f.name?.includes(docId) || f.path?.includes(docId));
     };
 
-    const handleCretabFileClick = () => {
-        cretabFileInputRef.current?.click();
-    };
-
-    const handleCretabFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // 파일 크기 검증 (5GB 제한)
-            if (file.size > 5 * 1024 * 1024 * 1024) {
-                setUploadError('파일 크기는 5GB 이하여야 합니다.');
-                return;
-            }
-
-            // 메모리에만 저장 (저장 시 업로드)
-            setCretabFile({
-                file,
-                fileName: file.name,
-                fileSize: formatFileSize(file.size),
-            });
-            setCretabStatus('file');
-        }
-    };
-
-    const handleCretabNoneClick = () => {
-        setCretabStatus('none');
-        setCretabFile(null);
-    };
-
-    const handleRemoveCretabFile = () => {
-        setCretabFile(null);
-        setCretabStatus(null);
-        if (cretabFileInputRef.current) {
-            cretabFileInputRef.current.value = '';
-        }
-    };
 
     const handleOpenPreview = (file: CretabFile | UploadedFile) => {
         setPreviewFile(file);
@@ -275,32 +268,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
         return fileName.toLowerCase().endsWith('.pdf');
     };
 
-    const handleDownloadCretabZip = async () => {
-        if (!cretabFile) {
-            alert('다운로드할 크레탑 파일이 없습니다.');
-            return;
-        }
-
-        try {
-            const zip = new JSZip();
-            if (cretabFile.file) {
-                zip.file(cretabFile.fileName, cretabFile.file);
-            }
-
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `크레탑파일_${new Date().getTime()}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('ZIP 생성 실패:', error);
-            alert('파일 다운로드에 실패했습니다.');
-        }
-    };
 
     const handleDownloadFilesZip = async () => {
         if (Object.keys(uploadedFiles).length === 0) {
@@ -346,56 +313,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     </div>
                     <h3>필요한 서류를 선택하여 업로드해주세요</h3>
                 </div>
-                <div className={styles.fileTitleRight}>
-                    {cretabStatus === 'none' && (
-                        <div className={styles.cretabStatusBadge}>
-                            <Check size={16} />
-                            크레탑 정보 없음
-                        </div>
-                    )}
-                    {cretabFile && (
-                        <div
-                            className={styles.cretabFileInfo}
-                            onClick={() => handleOpenPreview(cretabFile)}
-                            style={{ cursor: 'pointer' }}
-                        >
-                            <CheckCircle2 className={styles.cretabCheckIcon} />
-                            <div
-                                className={styles.cretabFileDetail}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <p className={styles.cretabFileName}>{cretabFile.fileName}</p>
-                                <p className={styles.cretabFileSize}>{cretabFile.fileSize}</p>
-                            </div>
-                            <button
-                                className={styles.cretabRemoveBtn}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleRemoveCretabFile();
-                                }}
-                                title="삭제"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-                    )}
-                    {!isViewMode && (
-                        <>
-                            <button className={styles.cretabFileBtn} onClick={handleCretabFileClick}>
-                                크레탑 파일 등록
-                            </button>
-                            <button className={styles.cretabNoneBtn} onClick={handleCretabNoneClick}>
-                                크레탑 정보 없음
-                            </button>
-                        </>
-                    )}
-                    <input
-                        type="file"
-                        ref={cretabFileInputRef}
-                        onChange={handleCretabFileChange}
-                        style={{ display: 'none' }}
-                    />
-                </div>
             </div>
 
             {uploadError && (
@@ -434,7 +351,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                         className={`${styles.typeBtn} ${businessType === 'business' ? styles.active : ''}`}
                         onClick={() => {
                             setBusinessType('business');
-                            setUploadedFiles({});
                         }}
                         disabled={isViewMode}
                     >
@@ -444,7 +360,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                         className={`${styles.typeBtn} ${businessType === 'individual' ? styles.active : ''}`}
                         onClick={() => {
                             setBusinessType('individual');
-                            setUploadedFiles({});
                         }}
                         disabled={isViewMode}
                     >
@@ -452,16 +367,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     </button>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {cretabFile && (
-                        <button
-                            className={styles.downloadBtn}
-                            onClick={handleDownloadCretabZip}
-                            title="크레탑 파일 다운로드"
-                        >
-                            <Download size={18} />
-                            크레탑 다운
-                        </button>
-                    )}
                     {(Object.keys(uploadedFiles).length > 0 || existingFiles.length > 0) && (
                         <button
                             className={styles.downloadBtn}
@@ -475,7 +380,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                 </div>
             </div>
 
-            <div className={styles.docList}>
+            <div className={`${styles.docList} ${!businessType ? styles.empty : ''}`}>
                 {!businessType ? (
                     <div className={styles.emptyPlaceholder}>
                         <p className={styles.placeholderText}>사업자를 선택해주세요</p>
@@ -519,7 +424,6 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                     >
                                         <div
                                             className={styles.uploadedContent}
-                                            onClick={(e) => e.stopPropagation()}
                                         >
                                             <CheckCircle2 className={styles.checkIcon} />
                                             <div className={styles.uploadedInfo}>
@@ -529,15 +433,21 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                                 </p>
                                             </div>
                                         </div>
-                                        <button
-                                            className={styles.removeIcon}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                isUploaded && handleRemoveFile(doc.id);
-                                            }}
-                                        >
-                                            {isUploaded ? <X size={20} /> : <Check size={20} />}
-                                        </button>
+                                        {!isViewMode && (
+                                            <button
+                                                className={styles.removeIcon}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isUploaded) {
+                                                        handleRemoveFile(doc.id);
+                                                    } else if (existingFile) {
+                                                        handleRemoveExistingFile(doc.id);
+                                                    }
+                                                }}
+                                            >
+                                                <X size={20} />
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className={styles.docItem} onClick={() => handleUploadClick(doc.id)}>

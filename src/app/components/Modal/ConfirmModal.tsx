@@ -1,12 +1,13 @@
 'use client';
 
 import Image from 'next/image';
+import { ReactNode } from 'react';
 import styles from './Modal.module.css';
 
 interface ConfirmModalProps {
   isOpen: boolean;
   title?: string;
-  message: string;
+  message: string | ReactNode;
   onConfirm: () => void;
   onCancel?: () => void;
   type?: 'success' | 'error' | 'warning' | 'info';

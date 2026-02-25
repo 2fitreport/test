@@ -1,0 +1,371 @@
+.cretabInfo {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
+}
+
+.titleWrap {
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.titleContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 8px 0;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+    font-weight: 400;
+}
+
+.cretabWrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.fieldList {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.fieldItem {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.label {
+    font-size: 15px;
+    font-weight: 500;
+    color: #333;
+    display: block;
+}
+
+.input {
+    padding: 8px 0;
+    border: none;
+    border-bottom: 1px solid #e0e0e0 !important;
+    border-radius: 0;
+    font-size: 13px;
+    color: #333;
+    font-weight: 400;
+    background: transparent;
+    transition: border-color 0.2s;
+    outline: none;
+    font-family: inherit;
+}
+
+.input:focus {
+    border-bottom-color: #1c283c;
+}
+
+.input::placeholder {
+    color: #bbb;
+}
+
+.input:disabled {
+    color: #999;
+    cursor: not-allowed;
+}
+
+/* === 크레탑 파일 섹션 === */
+.cretabFileSection {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cretabFileBtn,
+.cretabNoneBtn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    white-space: nowrap;
+}
+
+.cretabFileBtn {
+    background: #1c283c;
+    color: #fff;
+}
+
+.cretabFileBtn:hover {
+    background: #0f1a2e;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.cretabNoneBtn {
+    background: #f0f0f0;
+    color: #666;
+    border: 1.5px solid #ddd;
+}
+
+.cretabNoneBtn:hover {
+    background: #e8e8e8;
+    border-color: #bbb;
+    transform: translateY(-2px);
+}
+
+/* === 크레탑 상태 배지 === */
+.cretabStatusBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #f0fdf4;
+    border: 1.5px solid #52ea9b;
+    border-radius: 8px;
+    color: #052e16;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* === 크레탑 파일 정보 === */
+.cretabFileInfo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: #f0fdf4;
+    border: 1.5px solid #52ea9b;
+    border-radius: 8px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.cretabFileInfo:hover {
+    background: #e8fce2;
+    border-color: #40d987;
+}
+
+.cretabCheckIcon {
+    width: 20px;
+    height: 20px;
+    color: #52ea9b;
+    flex-shrink: 0;
+}
+
+.cretabFileDetail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cretabFileName {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cretabFileSize {
+    font-size: 12px;
+    color: #999;
+    margin: 0;
+}
+
+.cretabRemoveBtn {
+    padding: 4px;
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.cretabRemoveBtn:hover {
+    color: #ef5350;
+    transform: scale(1.1);
+}
+
+/* === 다운로드 버튼 === */
+.downloadBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #42a5f5;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.downloadBtn:hover {
+    background: #1565c0;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.downloadBtn:active {
+    transform: translateY(0);
+}
+
+/* === 미리보기 모달 === */
+.previewModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.previewContent {
+    position: relative;
+    background: #fff;
+    border-radius: 12px;
+    width: 95%;
+    height: 95vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.previewCloseBtn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #fff;
+    border: none;
+    color: #333;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.previewCloseBtn:hover {
+    background: #f0f0f0;
+    transform: scale(1.1);
+}
+
+.previewBody {
+    padding: 20px;
+    overflow: auto;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.previewImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.previewPdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 8px;
+}
+
+.previewOther {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px;
+    color: #999;
+}
+
+.previewOther svg {
+    color: #ddd;
+}
+
+.previewFileName {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+    word-break: break-all;
+    max-width: 400px;
+}
+
+.previewFileSize {
+    font-size: 14px;
+    color: #999;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .cretabInfo {
+        padding: 20px 25px;
+    }
+
+    .title {
+        font-size: 18px;
+    }
+
+    .subtitle {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .cretabInfo {
+        padding: 16px 20px;
+    }
+
+    .title {
+        font-size: 16px;
+    }
+
+    .subtitle {
+        font-size: 12px;
+    }
+}

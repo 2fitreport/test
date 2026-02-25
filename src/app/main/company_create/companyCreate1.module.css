@@ -10,9 +10,9 @@
 
 /* === 헤더 === */
 .companyTitle {
-    background: #1c283c;
     padding: 40px 60px;
     color: #fff;
+    background: var(--main-color);
 }
 
 .companyTitle h2 {
@@ -24,7 +24,7 @@
 }
 
 .companyTitle p {
-    font-size: 14px;
+    font-size: 18px;
     color: #ccc;
     margin: 0;
 }
@@ -39,6 +39,42 @@
     color: #00b276;
     background: #096b4a;
     font-weight: 500;
+}
+
+.progressBadge {
+    margin-left: 10px;
+    display: inline-block;
+    font-size: 14px;
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-weight: 600;
+    border: none;
+}
+
+/* 진행 단계별 색상 */
+.progress_상담 {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.progress_서류요청 {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.progress_분석 {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.progress_진행 {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.progress_승인 {
+    background: #fce4ec;
+    color: #c2185b;
 }
 
 /* === 메인 콘텐츠 === */

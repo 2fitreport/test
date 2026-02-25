@@ -8,11 +8,6 @@ interface CompanyFormData {
     business_number: string;
     representative_name: string;
     phone: string;
-    companyIndustry: string;
-    companyRevenue: string;
-    companyCreditRating: string;
-    companyCreditRatingKCB: string;
-    companyCreditRatingNICE: string;
 }
 
 export interface CompanyInfoCardHandle {
@@ -30,11 +25,6 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
         business_number: '',
         representative_name: '',
         phone: '',
-        companyIndustry: '',
-        companyRevenue: '',
-        companyCreditRating: '',
-        companyCreditRatingKCB: '',
-        companyCreditRatingNICE: '',
     });
 
     const formatBusinessNumber = (value: string): string => {
@@ -55,15 +45,12 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
         // 숫자만 추출 (최대 11자리)
         const numbers = value.replace(/\D/g, '').slice(0, 11);
 
-        // 010-0000-0000 또는 02-000-0000 형식으로 변환
-        if (numbers.length <= 2) {
+        // 3글자부터 첫 -, 8글자부터 두 번째 -
+        if (numbers.length <= 3) {
             return numbers;
-        } else if (numbers.length <= 6) {
-            return `${numbers.slice(0, 2)}-${numbers.slice(2)}`;
-        } else if (numbers.length <= 10) {
-            return `${numbers.slice(0, 3)}-${numbers.slice(3, 6)}-${numbers.slice(6)}`;
+        } else if (numbers.length <= 7) {
+            return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
         } else {
-            // 011, 016, 017 등의 경우
             return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
         }
     };
@@ -71,6 +58,8 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         let formattedValue = value;
+        const currentValue = formData[name as keyof CompanyFormData] as string;
+        const isDeleting = value.length < currentValue.length;
 
         // 사업자 등록번호 포맷팅
         if (name === 'business_number') {
@@ -78,7 +67,8 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
         }
         // 연락처 포맷팅
         else if (name === 'phone') {
-            formattedValue = formatPhoneNumber(value);
+            const numbers = value.replace(/\D/g, '').slice(0, 11);
+            formattedValue = formatPhoneNumber(numbers);
         }
 
         setFormData((prev) => ({
@@ -116,6 +106,7 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
                             value={formData.company_name}
                             onChange={handleChange}
                             disabled={isViewMode}
+                            placeholder="기업명을 입력하세요"
                         />
                     </li>
 
@@ -131,6 +122,7 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
                             value={formData.business_number}
                             onChange={handleChange}
                             disabled={isViewMode}
+                            placeholder="123-45-67890"
                         />
                     </li>
 
@@ -146,6 +138,7 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
                             value={formData.representative_name}
                             onChange={handleChange}
                             disabled={isViewMode}
+                            placeholder="대표자명을 입력하세요"
                         />
                     </li>
 
@@ -161,92 +154,8 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
                             value={formData.phone}
                             onChange={handleChange}
                             disabled={isViewMode}
+                            placeholder="010-0000-0000"
                         />
-                    </li>
-                </ul>
-
-                {/* 우측 정보 */}
-                <ul className={styles.rightBox}>
-                    <li className={styles.fieldItem}>
-                        <label htmlFor="companyIndustry" className={styles.label}>
-                            업종
-                        </label>
-                        <input
-                            type="text"
-                            id="companyIndustry"
-                            name="companyIndustry"
-                            className={styles.input}
-                            value={formData.companyIndustry}
-                            onChange={handleChange}
-                            disabled={isViewMode}
-                        />
-                    </li>
-
-                    <li className={styles.fieldItem}>
-                        <label htmlFor="companyRevenue" className={styles.label}>
-                            연매출
-                        </label>
-                        <input
-                            type="text"
-                            id="companyRevenue"
-                            name="companyRevenue"
-                            className={styles.input}
-                            value={formData.companyRevenue}
-                            onChange={handleChange}
-                            disabled={isViewMode}
-                        />
-                    </li>
-
-                    <li className={styles.fieldItem}>
-                        <label htmlFor="companyCreditRating" className={styles.label}>
-                            기업신용등급
-                        </label>
-                        <input
-                            type="text"
-                            id="companyCreditRating"
-                            name="companyCreditRating"
-                            className={styles.input}
-                            value={formData.companyCreditRating}
-                            onChange={handleChange}
-                            disabled={isViewMode}
-                        />
-                    </li>
-
-                    <li className={`${styles.fieldItem} ${styles.CreditRating}`}>
-                        <div>
-                        <label htmlFor="companyCreditRatingKCB" className={styles.label}>
-                            대표자신용점수
-                        </label>
-                            <div className={styles.ratingWrap}>
-                                <b>KCB : </b>
-                                <input
-                                    type="text"
-                                    id="companyCreditRatingKCB"
-                                    name="companyCreditRatingKCB"
-                                    className={styles.input}
-                                    value={formData.companyCreditRatingKCB}
-                                    onChange={handleChange}
-                                    disabled={isViewMode}
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label htmlFor="companyCreditRatingNICE" className={styles.label}>
-                            대표자신용점수
-                            </label>
-                            <div className={styles.ratingWrap}>
-                                <b>NICE :</b>
-                                <input
-                                    type="text"
-                                    id="companyCreditRatingNICE"
-                                    name="companyCreditRatingNICE"
-                                    className={styles.input}
-                                    value={formData.companyCreditRatingNICE}
-                                    onChange={handleChange}
-                                    disabled={isViewMode}
-                                />
-                                </div>
-                        </div>
                     </li>
                 </ul>
             </div>

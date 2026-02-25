@@ -83,15 +83,16 @@
 }
 
 .memoItem {
-    padding: 14px;
-    background: #f9f9f9;
+    padding: 16px;
+    background: #fff;
     border-radius: 8px;
     border: 1px solid #e0e0e0;
     transition: all 0.2s ease;
+    margin-bottom: 4px;
 }
 
 .memoItem:hover {
-    background: #f5f5f5;
+    background: #fff;
     border-color: #d0d0d0;
 }
 
@@ -105,7 +106,7 @@
 .memoAuthor {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 .authorIcon {
@@ -121,16 +122,240 @@
     color: #1a1a1a;
 }
 
+.authorId {
+    font-size: 14px;
+    font-weight: 400;
+    color: #999;
+    margin-left: 2px;
+}
+
+.memoHeaderRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .timestamp {
     font-size: 13px;
     color: #999;
+    white-space: nowrap;
+}
+
+.memoDeleteBtn {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 24px;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.memoDeleteBtn:hover {
+    color: #ef5350;
+    transform: scale(1.2);
 }
 
 .memoContent {
-    font-size: 14px;
+    font-size: 18px;
     color: #666;
+    margin: 20px 0;
+    line-height: 1.5;
+}
+
+/* === 답글 섹션 === */
+.repliesContainer {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #e8e8e8;
+}
+
+.expandButton {
+    background: none;
+    border: none;
+    color: #1c283c;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    margin-left: -8px;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.expandButton:hover {
+    color: #0f1a2e;
+    background: rgba(28, 40, 60, 0.06);
+}
+
+.repliesList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-left: 20px;
+    padding-top: 10px;
+}
+
+.reply {
+    padding: 12px 14px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.reply:hover {
+    background: transparent;
+    border-color: #d0d0d0;
+}
+
+.replyHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 8px;
+}
+
+.replyAuthorWrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.replyAuthor {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f1a2e;
+}
+
+.replyAuthorId {
+    font-size: 12px;
+    font-weight: 400;
+    color: #999;
+}
+
+.replyHeaderRight {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.replyTime {
+    font-size: 12px;
+    color: #999;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.replyDeleteBtn {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.replyDeleteBtn:hover {
+    color: #ef5350;
+    transform: scale(1.2);
+}
+
+.replyContent {
+    font-size: 13px;
+    color: #333;
     margin: 0;
     line-height: 1.5;
+    word-break: break-word;
+}
+
+/* === 답글 입력 === */
+.replyInputWrap {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.replyInput {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #333;
+    resize: none;
+    height: 38px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.replyInput:focus {
+    outline: none;
+    border-color: #1c283c;
+    box-shadow: 0 0 0 2px rgba(28, 40, 60, 0.08);
+}
+
+.replyBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: #1c283c;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    height: 38px;
+    font-size: 12px;
+}
+
+.replyBtn:hover:not(:disabled) {
+    background: #0f1a2e;
+    transform: translateY(-1px);
+}
+
+.replyBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* === 메모 입력 === */
@@ -193,6 +418,11 @@
 
 .submitBtn:active {
     transform: translateY(0);
+}
+
+.submitBtn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* === 반응형 === */
