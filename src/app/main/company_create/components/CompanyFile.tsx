@@ -239,7 +239,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
     };
 
 
-    const handleOpenPreview = (file: CretabFile | UploadedFile) => {
+    const handleOpenPreview = (file: UploadedFile) => {
         setPreviewFile(file);
         if (file.file) {
             const reader = new FileReader();

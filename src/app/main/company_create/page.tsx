@@ -7,7 +7,7 @@ import styles from './companyCreate1.module.css';
 import Modal from '@/app/components/Modal/Modal';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import CompanyInfoCard, { CompanyInfoCardHandle } from './components/CompanyInfoCard';
-import CretabInfo, { CretabInfoHandle } from './components/CretabInfo';
+import CretabInfo, { CretabInfoHandle, CretabFormData } from './components/CretabInfo';
 import ProgressStepsSection from './components/ProgressStepsSection';
 import CompanyFile, { CompanyFileHandle } from './components/CompanyFile';
 import MemoSection from './components/MemoSection';
@@ -304,11 +304,18 @@ function Company1Content() {
             }
 
             // 2. 크레탑 정보 데이터 수집 (CretabInfo가 있는 경우에만)
-            let cretabFormData = {};
+            let cretabFormData: CretabFormData = {
+                companyCreditRatingKCB: '',
+                companyCreditRatingNICE: '',
+                companyType: '',
+                standardClassification: '',
+                establishmentDate: '',
+                companyAddress: ''
+            };
             let cretabFileObj = null;
             let cretabStatus = null;
             if (viewId && currentUserPosition?.level !== 4) {
-                cretabFormData = cretabInfoRef.current?.getFormData() || {};
+                cretabFormData = cretabInfoRef.current?.getFormData() || cretabFormData;
                 cretabFileObj = cretabInfoRef.current?.getCretabFileForUpload() || null;
                 cretabStatus = cretabInfoRef.current?.getCretabStatus() || null;
             }

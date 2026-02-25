@@ -13,7 +13,7 @@ interface CretabFile {
     uploading?: boolean;
 }
 
-interface CretabFormData {
+export interface CretabFormData {
     companyCreditRatingKCB: string;
     companyCreditRatingNICE: string;
     companyType: string;
