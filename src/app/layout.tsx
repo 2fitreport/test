@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { QueryProvider } from '@/components/QueryProvider';
 
 import './globals.css';
@@ -6,7 +6,13 @@ import './globals.css';
 export const metadata: Metadata = {
     title: '2FitReport',
     description: 'User management dashboard',
-    viewport: 'width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover',
+};
+
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    viewportFit: 'cover',
 };
 
 export default function RootLayout({
