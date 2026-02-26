@@ -80,8 +80,8 @@
 }
 
 .stepCircle {
-    width: 70px;
-    height: 70px;
+    width: clamp(40px, 10vw, 70px);
+    height: clamp(40px, 10vw, 70px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -91,18 +91,18 @@
 }
 
 .stepItem.current .stepCircle {
-    width: 105px;
-    height: 105px;
+    width: clamp(60px, 15vw, 105px);
+    height: clamp(60px, 15vw, 105px);
 }
 
 .stepLine {
     flex: 1;
-    min-width: 120px;
-    max-width: 120px;
+    min-width: clamp(40px, 8vw, 120px);
+    max-width: clamp(40px, 8vw, 120px);
     height: 4px;
     background: #e0e0e0;
     z-index: 1;
-    margin: 0 10px;
+    margin: 0 clamp(5px, 2vw, 10px);
     align-self: center;
     position: relative;
     top: -15px;
