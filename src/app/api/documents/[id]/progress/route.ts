@@ -13,7 +13,7 @@ export async function PUT(
     try {
         const { id } = await params;
         const docId = parseInt(id);
-        const { progress_details } = await request.json();
+        const { progress_details, progress_start_date } = await request.json();
 
         if (!progress_details?.trim()) {
             return NextResponse.json(
@@ -31,14 +31,22 @@ export async function PUT(
             );
         }
 
+        // 업데이트할 데이터 구성
+        const updateData: any = {
+            progress_details: progress_details,
+            progress_status: 'in_progress',
+            updated_at: new Date().toISOString()
+        };
+
+        // progress_start_date가 제공되면 포함
+        if (progress_start_date) {
+            updateData.progress_start_date = progress_start_date;
+        }
+
         // DB에서 업데이트
         const { data, error: updateError } = await supabase
             .from('documents')
-            .update({
-                progress_details: progress_details,
-                progress_status: 'in_progress',
-                updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', docId)
             .select()
             .single();

@@ -26,6 +26,7 @@ interface ProgressStepsSectionProps {
     managerId?: string | null;
     onProgressUpdate?: (progressDetails: string) => void;
     onValidateAndNext?: () => Promise<boolean>;
+    onSave?: (skipSuccessModal?: boolean) => Promise<void>;
 }
 
 export default function ProgressStepsSection({
@@ -34,7 +35,8 @@ export default function ProgressStepsSection({
     progressDetails,
     managerId,
     onProgressUpdate,
-    onValidateAndNext
+    onValidateAndNext,
+    onSave
 }: ProgressStepsSectionProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [revisionModalOpen, setRevisionModalOpen] = useState(false);
@@ -73,8 +75,9 @@ export default function ProgressStepsSection({
     };
 
     const stepOrder = ['상담', '서류요청', '분석', '진행', '승인'];
-    // isViewMode가 false면(기업 생성 모드) progressDetails를 null로 처리 → 모든 단계가 pending
-    const currentProgress = isViewMode ? progressDetails : null;
+    // progressDetails가 있으면 사용 (뷰 모드, 수정 모드 모두)
+    // 없으면 (신규 등록 모드) 모든 단계가 pending
+    const currentProgress = progressDetails || null;
     const currentStepIndex = stepOrder.indexOf(currentProgress || '');
 
     const steps: Step[] = [
@@ -124,12 +127,6 @@ export default function ProgressStepsSection({
 
     const handleNext = async () => {
         if (currentStepIndex < stepOrder.length - 1) {
-            // 유효성 검사 수행
-            const isValid = onValidateAndNext ? await onValidateAndNext() : true;
-            if (!isValid) {
-                return;
-            }
-
             const nextStep = stepOrder[currentStepIndex + 1];
 
             // 분석 단계에서 다음 단계(진행)로 이동할 때 실무자 배정 확인
@@ -144,10 +141,34 @@ export default function ProgressStepsSection({
     };
 
     const handleNextConfirm = async () => {
-        setNextStepModalOpen(false);
         setIsLoading(true);
         try {
+            // 1. 먼저 유효성 검사 수행
+            const isValid = onValidateAndNext ? await onValidateAndNext() : true;
+            if (!isValid) {
+                // 유효성 검사 실패 시 모달을 다시 열지 않음 (경고 모달이 이미 떴음)
+                setIsLoading(false);
+                return;
+            }
+
+            // 2. 유효성 검사 성공 후 모달 닫기
+            setNextStepModalOpen(false);
+
+            console.log('다음 단계 이동:', { isViewMode, onSave: !!onSave, nextStepName });
+            // 3. 뷰모드가 아닌 경우(수정 모드)에만 데이터 저장
+            if (!isViewMode && onSave) {
+                console.log('저장 시작...');
+                // 성공 모달을 띄우지 않고 저장 (다음 단계로 진행할 예정)
+                await onSave(true);
+                console.log('저장 완료');
+            }
+            // 4. 저장 완료 후 진행 상태 업데이트
+            console.log('진행 단계 업데이트:', nextStepName);
             await updateProgress(nextStepName);
+        } catch (error) {
+            console.error('다음 단계 이동 실패:', error);
+            // 저장 실패 시 모달을 다시 열어서 사용자에게 알림
+            setNextStepModalOpen(true);
         } finally {
             setIsLoading(false);
         }
@@ -155,13 +176,20 @@ export default function ProgressStepsSection({
 
     const updateProgress = async (newProgressDetails: string) => {
         try {
-            // 기업 생성 모드에서는 업데이트하지 않음
-            if (!isViewMode || !documentId) return;
+            // documentId가 없으면 (신규 등록 모드) 업데이트하지 않음
+            if (!documentId) return;
+
+            const updateData: any = { progress_details: newProgressDetails };
+
+            // 서류요청 → 분석으로 변경될 때 시간 경과 시작
+            if (newProgressDetails === '분석') {
+                updateData.progress_start_date = String(Date.now());
+            }
 
             const response = await fetch(`/api/documents/${documentId}/progress`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ progress_details: newProgressDetails })
+                body: JSON.stringify(updateData)
             });
 
             if (response.ok) {
@@ -240,6 +268,12 @@ export default function ProgressStepsSection({
 
         setIsLoading(true);
         try {
+            // 1. 수정 모드인 경우 먼저 데이터 저장
+            if (!isViewMode && onSave) {
+                await onSave();
+            }
+
+            // 2. 저장 완료 후 실무자 배정
             const selectedWorker = workers.find(w => w.user_id === selectedManager);
             const response = await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
@@ -290,7 +324,7 @@ export default function ProgressStepsSection({
                 <h3>현재 진행 상태를 확인하고 관리할 수 있습니다.</h3>
             </div>
 
-            <div className={`${styles.contentWrapper} ${isViewMode ? styles.withDirection : ''}`}>
+            <div className={`${styles.contentWrapper} ${documentId ? styles.withDirection : ''}`}>
                 <div className={styles.stepsContainer}>
                 <div className={styles.stepsList}>
                     {steps.map((step, index) => (
@@ -317,7 +351,7 @@ export default function ProgressStepsSection({
                 </div>
             </div>
 
-                {isViewMode && (
+                {documentId && (
                     <div className={styles.actionButtons}>
                     <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
                         <span>●</span> 보완요청

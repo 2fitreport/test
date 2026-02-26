@@ -250,14 +250,7 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
 
             <div className={styles.fileList}>
                 {uploadedFiles.length === 0 && existingFiles.length === 0 ? (
-                    <div
-                        className={styles.docItem}
-                        onClick={handleUploadClick}
-                        style={{
-                            cursor: isViewMode ? 'default' : 'pointer',
-                            pointerEvents: isViewMode ? 'none' : 'auto'
-                        }}
-                    >
+                    <div className={styles.docItem}>
                         <div className={styles.docContent}>
                             <File className={styles.docIcon} />
                             <div className={styles.docInfo}>
@@ -267,13 +260,9 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                         </div>
                         <button
                             className={styles.uploadBtn}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleUploadClick();
-                            }}
+                            onClick={handleUploadClick}
                             disabled={isViewMode}
                             style={{
-                                pointerEvents: isViewMode ? 'none' : 'auto',
                                 display: isViewMode ? 'none' : 'block'
                             }}
                         >

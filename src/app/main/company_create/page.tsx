@@ -26,7 +26,8 @@ function Company1Content() {
     const [errorMessage, setErrorMessage] = useState('');
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const [isViewMode, setIsViewMode] = useState(!!viewId);
-    const [isEditMode, setIsEditMode] = useState(false);
+    // 초기값을 URL에서 직접 받기 (editParam === 'true')
+    const [isEditMode, setIsEditMode] = useState(editParam === 'true' && !!viewId);
     const [documentData, setDocumentData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(!!viewId);
     const [accessDenied, setAccessDenied] = useState(false);
@@ -39,6 +40,7 @@ function Company1Content() {
     const cretabInfoRef = useRef<CretabInfoHandle>(null);
     const companyFileRef = useRef<CompanyFileHandle>(null);
     const additionalFilesRef = useRef<AdditionalFilesHandle>(null);
+    const isFirstLoadRef = useRef(true);
 
     // 문서 조회 함수
     const fetchDocumentData = async (docId: number) => {
@@ -86,16 +88,15 @@ function Company1Content() {
 
     // edit 파라미터 감시 - 수정 모드 활성화
     useEffect(() => {
-        if (editParam === 'true' && viewId) {
-            setIsEditMode(true);
-        } else {
-            setIsEditMode(false);
-        }
+        setIsEditMode(editParam === 'true' && !!viewId);
     }, [editParam, viewId]);
 
-    // 조회한 문서 데이터를 폼에 반영
+    // 조회한 문서 데이터를 폼에 반영 (처음 진입할 때만)
     useEffect(() => {
-        if (documentData) {
+        // 수정 모드에서는 폼을 reset하지 않음 (사용자가 입력한 데이터 보호)
+        // 처음 진입할 때만 폼을 로드하고, 그 다음부터는 사용자 입력 데이터 유지
+        if (documentData && !isEditMode && isFirstLoadRef.current) {
+            isFirstLoadRef.current = false;
             // 기본 정보 설정
             if (companyInfoRef.current) {
                 companyInfoRef.current.setFormData({
@@ -106,21 +107,21 @@ function Company1Content() {
                 });
             }
 
-            // 파일 정보 설정
+            // 파일 정보 설정 (수정 모드에서도 기존 파일은 표시)
             if (companyFileRef.current) {
-                // 사업자 유형 설정
-                if (documentData.type) {
+                // 사업자 유형 설정 (수정 모드에서는 설정하지 않음)
+                if (documentData.type && !isEditMode) {
                     companyFileRef.current.setBusinessType(documentData.type);
                 }
-                // 기존 파일 설정
+                // 기존 파일 설정 (수정 모드에서도 표시)
                 if (documentData.files && Array.isArray(documentData.files)) {
                     companyFileRef.current.setExistingFiles(documentData.files, documentData.type);
                 }
             }
 
-            // 크레탑 정보 설정
+            // 크레탑 정보 설정 (수정 모드에서도 기존 데이터는 표시)
             if (cretabInfoRef.current) {
-                // 크레탑 폼 데이터 설정
+                // 크레탑 폼 데이터 설정 (기본 정보 + 테이블 데이터)
                 cretabInfoRef.current.setFormData({
                     companyCreditRatingKCB: documentData.company_credit_rating_kcb || '',
                     companyCreditRatingNICE: documentData.company_credit_rating_nice || '',
@@ -128,6 +129,18 @@ function Company1Content() {
                     standardClassification: documentData.standard_classification || '',
                     establishmentDate: documentData.establishment_date || '',
                     companyAddress: documentData.company_address || '',
+                    assessmentDate: documentData.assessment_date || '',
+                    settlementDate: documentData.settlement_date || '',
+                    // 재무 테이블 데이터
+                    years: documentData.financial_data?.years || [],
+                    assetTotal: documentData.financial_data?.assetTotal || [],
+                    debtTotal: documentData.financial_data?.debtTotal || [],
+                    capital: documentData.financial_data?.capital || [],
+                    equityTotal: documentData.financial_data?.equityTotal || [],
+                    // 손익 테이블 데이터
+                    sales: documentData.income_data?.sales || [],
+                    netIncome: documentData.income_data?.netIncome || [],
+                    cashFlowGrade: documentData.income_data?.cashFlowGrade || [],
                 });
                 // 크레탑 파일 설정
                 if (documentData.cretop_file) {
@@ -140,6 +153,13 @@ function Company1Content() {
                 } else if (documentData.cretop_none) {
                     cretabInfoRef.current.setCretabStatus('none');
                 }
+                // 추출된 이미지 설정
+                if (documentData.extracted_images) {
+                    cretabInfoRef.current.setExtractedImages({
+                        first: documentData.extracted_images.first || null,
+                        second: documentData.extracted_images.second || null,
+                    });
+                }
             }
 
             // 추가 서류 설정
@@ -149,12 +169,12 @@ function Company1Content() {
                 }
             }
 
-            // 메모 설정
-            if (documentData.memos && Array.isArray(documentData.memos)) {
+            // 메모 설정 (수정 모드에서는 설정하지 않음)
+            if (documentData.memos && Array.isArray(documentData.memos) && !isEditMode) {
                 setMemos(documentData.memos);
             }
         }
-    }, [documentData]);
+    }, [documentData, isEditMode, viewId]);
 
     const uploadFileToStorage = async (file: File, path: string): Promise<string | null> => {
         try {
@@ -250,7 +270,7 @@ function Company1Content() {
         return styleMap[progress || '상담'] || styleMap['상담'];
     };
 
-    const handleSave = async () => {
+    const handleSave = async (skipSuccessModal?: boolean) => {
         try {
             setIsSaving(true);
 
@@ -298,7 +318,9 @@ function Company1Content() {
                 // 크레탑 파일 또는 정보없음 선택 검증
                 const cretabFile = cretabInfoRef.current?.getCretabFileForUpload();
                 const cretabStatus = cretabInfoRef.current?.getCretabStatus();
-                if (!cretabFile && cretabStatus !== 'none') {
+                // 수정 모드: 새 파일이 없으면 기존 파일 확인
+                const hasExistingFile = isEditMode && documentData?.cretop_file;
+                if (!cretabFile && !hasExistingFile && cretabStatus !== 'none') {
                     throw new Error('크레탑 파일을 업로드하거나\n정보없음을 선택해주세요.');
                 }
             }
@@ -310,7 +332,9 @@ function Company1Content() {
                 companyType: '',
                 standardClassification: '',
                 establishmentDate: '',
-                companyAddress: ''
+                companyAddress: '',
+                assessmentDate: '',
+                settlementDate: ''
             };
             let cretabFileObj = null;
             let cretabStatus = null;
@@ -334,38 +358,36 @@ function Company1Content() {
             const isCompany = businessType === 'business';
             const isIndividual = businessType === 'individual';
 
-            // 5. 필수 서류 검증 (기업 생성 모드일 때만)
-            if (!isEditMode || !viewId) {
-                const requiredDocs = isCompany
-                    ? ['business_license', 'financial_statement', 'vat_certificate']
-                    : ['business_license', 'id_copy'];
+            // 5. 필수 서류 검증 (하나씩 체크)
+            const requiredDocs = isCompany
+                ? ['business_license', 'financial_statement', 'vat_certificate']
+                : ['business_license', 'id_copy'];
 
-                const uploadedDocIds = companyFiles.map((f: any) => f.docId);
-                // existingFiles의 path에서 docId 추출 (예: 'documents/business_license/...' 형식)
-                const existingDocIds = existingFiles.map((f: any) => {
-                    const pathParts = f.path?.split('/') || [];
-                    // path 구조: documents/{docId}/... 또는 company_create1/{userId}/{docType}/{filename}
-                    const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
-                    for (const part of pathParts) {
-                        const match = part.match(docIdPattern);
-                        if (match) return match[0];
-                    }
-                    return null;
-                }).filter(Boolean);
-                const allDocIds = [...uploadedDocIds, ...existingDocIds];
+            const uploadedDocIds = companyFiles.map((f: any) => f.docId);
+            // existingFiles의 path에서 docId 추출 (예: 'documents/business_license/...' 형식)
+            const existingDocIds = existingFiles.map((f: any) => {
+                const pathParts = f.path?.split('/') || [];
+                // path 구조: documents/{docId}/... 또는 company_create1/{userId}/{docType}/{filename}
+                const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
+                for (const part of pathParts) {
+                    const match = part.match(docIdPattern);
+                    if (match) return match[0];
+                }
+                return null;
+            }).filter(Boolean);
+            const allDocIds = [...uploadedDocIds, ...existingDocIds];
 
-                const docNameMap: Record<string, string> = {
-                    'business_license': '사업자등록증',
-                    'financial_statement': '재무제표',
-                    'vat_certificate': '부가세증명원',
-                    'id_copy': '신분증사본',
-                };
+            const docNameMap: Record<string, string> = {
+                'business_license': '사업자등록증',
+                'financial_statement': '재무제표',
+                'vat_certificate': '부가세증명원',
+                'id_copy': '신분증사본',
+            };
 
-                // 첫 번째 누락된 서류만 에러 표시
-                for (const docId of requiredDocs) {
-                    if (!allDocIds.includes(docId)) {
-                        throw new Error(`필수 서류: ${docNameMap[docId]}를 업로드해주세요.`);
-                    }
+            // 첫 번째 누락된 서류만 에러 표시
+            for (const docId of requiredDocs) {
+                if (!allDocIds.includes(docId)) {
+                    throw new Error(`${docNameMap[docId]} 서류를 업로드해주세요.`);
                 }
             }
 
@@ -395,6 +417,9 @@ function Company1Content() {
                         size: cretabFileObj.file.size,
                     };
                 }
+            } else if (isEditMode && documentData?.cretop_file) {
+                // 수정 모드: 새 파일을 업로드하지 않으면 기존 파일 유지
+                cretabFileData = documentData.cretop_file;
             }
 
             // 추가서류 업로드
@@ -416,6 +441,19 @@ function Company1Content() {
             const allFiles = [...existingFiles, ...uploadedFiles];
             const additionalFilesCombined = [...existingFiles?.filter((f: any) => !f.path?.includes('documents')) || [], ...additionalFilesPaths];
 
+            // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 신규면 '서류요청')
+            let progressDetails = '서류요청';
+            let progressStartDate: string | null = null;
+            if (isEditMode && viewId && documentData?.progress_details) {
+                progressDetails = documentData.progress_details;
+                // 서류요청 → 분석으로 변경되는 경우 시간 경과 시작
+                if (progressDetails === '분석' && !documentData.progress_start_date) {
+                    progressStartDate = String(Date.now());
+                } else if (documentData.progress_start_date) {
+                    progressStartDate = documentData.progress_start_date;
+                }
+            }
+
             const saveData: any = {
                 user_id: userId,
                 user_name: adminData.name || userId,
@@ -428,7 +466,8 @@ function Company1Content() {
                 representative_name: formData.representative_name,
                 phone: formData.phone,
                 manager_name: '',
-                progress_details: '서류요청',
+                progress_details: progressDetails,
+                ...(progressStartDate && { progress_start_date: progressStartDate }),
                 type: businessType,
                 // 파일 경로들 (DB 컬럼명과 맞춰야 함)
                 files: allFiles, // 첨부파일
@@ -446,7 +485,30 @@ function Company1Content() {
                 saveData.standard_classification = cretabFormData.standardClassification || '';
                 saveData.establishment_date = cretabFormData.establishmentDate || '';
                 saveData.company_address = cretabFormData.companyAddress || '';
+                saveData.assessment_date = cretabFormData.assessmentDate || '';
+                saveData.settlement_date = cretabFormData.settlementDate || '';
                 saveData.cretop_none = cretabStatus === 'none'; // 정보 없음 여부
+
+                // 테이블 데이터 추가 (재무 & 손익 정보)
+                saveData.financial_data = {
+                    years: cretabFormData.years || [],
+                    assetTotal: cretabFormData.assetTotal || [],
+                    debtTotal: cretabFormData.debtTotal || [],
+                    capital: cretabFormData.capital || [],
+                    equityTotal: cretabFormData.equityTotal || [],
+                };
+                saveData.income_data = {
+                    sales: cretabFormData.sales || [],
+                    netIncome: cretabFormData.netIncome || [],
+                    cashFlowGrade: cretabFormData.cashFlowGrade || [],
+                };
+
+                // 추출된 이미지 저장
+                const cretabImages = cretabInfoRef.current?.getExtractedImages?.() || { first: null, second: null };
+                saveData.extracted_images = {
+                    first: cretabImages.first || null,
+                    second: cretabImages.second || null,
+                };
             }
 
             const response = await fetch(isEditMode && viewId ? `/api/documents/${viewId}` : '/api/documents', {
@@ -462,8 +524,11 @@ function Company1Content() {
 
             const result = await response.json();
             console.log('저장 완료:', result);
-            setSuccessMessage(viewId ? '기업 정보가 수정되었습니다.' : '기업이 등록되었습니다.');
-            setSuccessModalOpen(true);
+            // skipSuccessModal이 false(또는 undefined)일 때만 성공 모달 표시
+            if (!skipSuccessModal) {
+                setSuccessMessage(viewId ? '기업 정보가 수정되었습니다.' : '기업이 등록되었습니다.');
+                setSuccessModalOpen(true);
+            }
             // 모달 닫을 때 뷰 페이지로 이동하도록 documentId 저장
             const documentId = result.id || result.document_id;
             // successModalOpen이 false가 되면 이동하도록 useEffect 추가 필요
@@ -484,6 +549,55 @@ function Company1Content() {
 
     const handleCancelConfirm = () => {
         setCancelModalOpen(false);
+
+        // 크레탑 정보 초기화
+        if (cretabInfoRef.current && documentData) {
+            // 기본 정보 복원
+            cretabInfoRef.current.setFormData({
+                companyCreditRatingKCB: documentData.company_credit_rating_kcb || '',
+                companyCreditRatingNICE: documentData.company_credit_rating_nice || '',
+                companyType: documentData.company_type || '',
+                standardClassification: documentData.standard_classification || '',
+                establishmentDate: documentData.establishment_date || '',
+                companyAddress: documentData.company_address || '',
+                assessmentDate: documentData.assessment_date || '',
+                settlementDate: documentData.settlement_date || '',
+                // 재무 테이블 데이터 복원
+                years: documentData.financial_data?.years || [],
+                assetTotal: documentData.financial_data?.assetTotal || [],
+                debtTotal: documentData.financial_data?.debtTotal || [],
+                capital: documentData.financial_data?.capital || [],
+                equityTotal: documentData.financial_data?.equityTotal || [],
+                // 손익 테이블 데이터 복원
+                sales: documentData.income_data?.sales || [],
+                netIncome: documentData.income_data?.netIncome || [],
+                cashFlowGrade: documentData.income_data?.cashFlowGrade || [],
+            });
+
+            // 크레탑 파일 상태 복원
+            if (documentData.cretop_file) {
+                cretabInfoRef.current.setCretabFile({
+                    fileName: documentData.cretop_file.name || '',
+                    fileSize: documentData.cretop_file.size ? `${(documentData.cretop_file.size / 1024).toFixed(2)} KB` : '0 KB',
+                    storagePath: documentData.cretop_file.path,
+                });
+                cretabInfoRef.current.setCretabStatus('file');
+            } else if (documentData.cretop_none) {
+                cretabInfoRef.current.setCretabStatus('none');
+            } else {
+                cretabInfoRef.current.setCretabFile(null);
+                cretabInfoRef.current.setCretabStatus(null);
+            }
+
+            // 추출된 이미지 복원
+            if (documentData.extracted_images) {
+                cretabInfoRef.current.setExtractedImages({
+                    first: documentData.extracted_images.first || null,
+                    second: documentData.extracted_images.second || null,
+                });
+            }
+        }
+
         // 첨부파일 초기화 (저장되지 않은 변경사항 폐기)
         if (companyFileRef.current) {
             if (documentData?.type) {
@@ -547,12 +661,13 @@ function Company1Content() {
             <div className={styles.companyManagementWrap}>
                 <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode} />
                 <ProgressStepsSection
-                    isViewMode={isViewMode}
+                    isViewMode={isViewMode && !isEditMode}
                     documentId={viewId}
                     progressDetails={documentData?.progress_details}
                     managerId={documentData?.manager_id}
                     onValidateAndNext={handleValidateAndNext}
                     onProgressUpdate={handleProgressUpdate}
+                    onSave={handleSave}
                 />
                 {viewId && currentUserPosition?.level !== 4 && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode} viewId={viewId} isEditMode={isEditMode} onEditClick={handleEditCretabFile} />}
                 <MemoSection
@@ -605,7 +720,7 @@ function Company1Content() {
                             </button>
                             <button
                                 className={styles.saveBtn}
-                                onClick={handleSave}
+                                onClick={() => handleSave()}
                                 disabled={isSaving}
                             >
                                 {isSaving ? (viewId ? '저장 중...' : '등록 중...') : (viewId ? '저장' : '등록하기')}

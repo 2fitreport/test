@@ -16,14 +16,14 @@
 }
 
 .title {
-    font-size: 22px;
+    font-size: 25px;
     font-weight: 600;
     color: #1a1a1a;
     margin: 0;
 }
 
 .subtitle {
-    font-size: 15px;
+    font-size: 18px;
     color: #999;
     margin: 0;
     font-weight: 400;
@@ -64,8 +64,8 @@
 
 
 .label {
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 20px;
+    font-weight: 700;
     color: #333;
     display: block;
 }
@@ -73,7 +73,7 @@
 .input {
     padding: 8px 0;
     border: none;
-    font-size: 13px;
+    font-size: 18px !important;
     color: #333;
     background: transparent;
     transition: border-color 0.2s ease;

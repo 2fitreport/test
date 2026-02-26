@@ -35,14 +35,14 @@
 }
 
 .fileTitle h2 {
-    font-size: 20px;
-    font-weight: 700;
-    color: #333;
+    font-size: 25px;
+    font-weight: 600;
+    color: #1a1a1a;
     margin: 0;
 }
 
 .fileTitle h3 {
-    font-size: 14px;
+    font-size: 18px;
     color: #999;
     margin: 0;
     font-weight: 400;
