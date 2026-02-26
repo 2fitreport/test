@@ -334,36 +334,38 @@ function Company1Content() {
             const isCompany = businessType === 'business';
             const isIndividual = businessType === 'individual';
 
-            // 5. 필수 서류 검증 (하나씩 체크)
-            const requiredDocs = isCompany
-                ? ['business_license', 'financial_statement', 'vat_certificate']
-                : ['business_license', 'id_copy'];
+            // 5. 필수 서류 검증 (기업 생성 모드일 때만)
+            if (!isEditMode || !viewId) {
+                const requiredDocs = isCompany
+                    ? ['business_license', 'financial_statement', 'vat_certificate']
+                    : ['business_license', 'id_copy'];
 
-            const uploadedDocIds = companyFiles.map((f: any) => f.docId);
-            // existingFiles의 path에서 docId 추출 (예: 'documents/business_license/...' 형식)
-            const existingDocIds = existingFiles.map((f: any) => {
-                const pathParts = f.path?.split('/') || [];
-                // path 구조: documents/{docId}/... 또는 company_create1/{userId}/{docType}/{filename}
-                const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
-                for (const part of pathParts) {
-                    const match = part.match(docIdPattern);
-                    if (match) return match[0];
-                }
-                return null;
-            }).filter(Boolean);
-            const allDocIds = [...uploadedDocIds, ...existingDocIds];
+                const uploadedDocIds = companyFiles.map((f: any) => f.docId);
+                // existingFiles의 path에서 docId 추출 (예: 'documents/business_license/...' 형식)
+                const existingDocIds = existingFiles.map((f: any) => {
+                    const pathParts = f.path?.split('/') || [];
+                    // path 구조: documents/{docId}/... 또는 company_create1/{userId}/{docType}/{filename}
+                    const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
+                    for (const part of pathParts) {
+                        const match = part.match(docIdPattern);
+                        if (match) return match[0];
+                    }
+                    return null;
+                }).filter(Boolean);
+                const allDocIds = [...uploadedDocIds, ...existingDocIds];
 
-            const docNameMap: Record<string, string> = {
-                'business_license': '사업자등록증',
-                'financial_statement': '재무제표',
-                'vat_certificate': '부가세증명원',
-                'id_copy': '신분증사본',
-            };
+                const docNameMap: Record<string, string> = {
+                    'business_license': '사업자등록증',
+                    'financial_statement': '재무제표',
+                    'vat_certificate': '부가세증명원',
+                    'id_copy': '신분증사본',
+                };
 
-            // 첫 번째 누락된 서류만 에러 표시
-            for (const docId of requiredDocs) {
-                if (!allDocIds.includes(docId)) {
-                    throw new Error(`${docNameMap[docId]} 서류를 업로드해주세요.`);
+                // 첫 번째 누락된 서류만 에러 표시
+                for (const docId of requiredDocs) {
+                    if (!allDocIds.includes(docId)) {
+                        throw new Error(`필수 서류: ${docNameMap[docId]}를 업로드해주세요.`);
+                    }
                 }
             }
 
