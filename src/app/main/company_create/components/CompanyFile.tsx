@@ -450,7 +450,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                         )}
                                     </div>
                                 ) : (
-                                    <div className={styles.docItem} onClick={() => handleUploadClick(doc.id)}>
+                                    <div className={styles.docItem}>
                                         <div className={styles.docContent}>
                                             <File className={styles.docIcon} />
                                             <div className={styles.docInfo}>
