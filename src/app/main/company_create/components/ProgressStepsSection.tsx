@@ -298,7 +298,11 @@ export default function ProgressStepsSection({
                             <div className={`${styles.stepItem} ${styles[step.status]}`}>
                                 <div className={styles.stepCircle}>
                                     <img
-                                        src={step.status === 'current' ? '/step2.png' : '/step1.png'}
+                                        src={
+                                            step.status === 'current' ? '/step2.png' :
+                                            step.status === 'completed' ? '/step1.png' :
+                                            '/step3.png'
+                                        }
                                         alt={step.label}
                                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                     />
