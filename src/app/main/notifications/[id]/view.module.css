@@ -1,0 +1,128 @@
+.container {
+    box-sizing: border-box;
+    background-color: #f9fafb;
+    min-height: 100vh;
+    margin-left: var(--sidebar-width);
+    padding: 0px 0px 80px 0px;
+}
+
+.titleWrap {
+    padding: 40px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mainTitle {
+    color: var(--black-color);
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 15px;
+}
+
+.subTitle {
+    color: #777;
+    font-size: 18px;
+}
+
+.contentWrap {
+    padding: 40px;
+}
+
+.viewCard {
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+}
+
+.header {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+    margin-bottom: 30px;
+}
+
+.notificationType {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 100px;
+    display: inline-block;
+    margin-bottom: 15px;
+}
+
+.typeGlobal {
+    background-color: #e7f5ff;
+    color: #1971c2;
+}
+
+.typePersonal {
+    background-color: #f3f0ff;
+    color: #6741d9;
+}
+
+.title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #212529;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.metaInfo {
+    display: flex;
+    gap: 20px;
+    font-size: 15px;
+    color: #868e96;
+}
+
+.content {
+    font-size: 16px;
+    line-height: 1.8;
+    color: #333;
+    min-height: 200px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.btnWrap {
+    display: flex;
+    justify-content: center;
+    margin-top: 50px;
+}
+
+.listBtn {
+    padding: 15px 50px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 18px;
+    cursor: pointer;
+    background: var(--main-color);
+    color: #fff;
+    border: none;
+    transition: 0.2s;
+    text-decoration: none;
+}
+
+.listBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+@media (max-width: 1080px) {
+    .container {
+        margin-left: 0;
+        padding-top: 100px;
+    }
+    
+    .viewCard {
+        padding: 24px;
+    }
+    
+    .title {
+        font-size: 22px;
+    }
+}

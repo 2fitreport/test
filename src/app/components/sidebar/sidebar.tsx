@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase, FiBarChart2 } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase, FiBarChart2, FiBell } from 'react-icons/fi';
 import { clearAuthToken, getAdminData, type AdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
     { path: '/main/home', label: '메인홈' },
     { path: '/main/clients', label: '고객사' },
     { path: '/main/document_submission', label: '기업관리' },
+    { path: '/main/notifications', label: '알림' },
     { path: '/main/performance_settlement', label: '성과 정산' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
@@ -27,6 +28,7 @@ export default function Sidebar() {
     const [adminData, setAdminData] = useState<AdminData | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [notificationCount, setNotificationCount] = useState(0);
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
     const fetchNotificationCount = async () => {
@@ -47,6 +49,23 @@ export default function Sidebar() {
             }
         } catch (error) {
             console.error('알림 건수 조회 실패:', error);
+        }
+    };
+
+    const fetchUnreadNotificationCount = async () => {
+        try {
+            const adminData = getAdminData();
+            if (!adminData) return;
+            const userIdParam = adminData.id ? adminData.id : adminData.user_id;
+
+            const res = await fetch(`/api/notifications?userId=${userIdParam}`);
+            if (res.ok) {
+                const data = await res.json();
+                const unread = data.filter((n: any) => !n.is_read).length;
+                setUnreadNotificationCount(unread);
+            }
+        } catch (error) {
+            console.error('알림 갯수 조회 실패:', error);
         }
     };
 
@@ -90,6 +109,7 @@ export default function Sidebar() {
                 }
             }
             fetchNotificationCount();
+            fetchUnreadNotificationCount();
         };
 
         initAdminData();
@@ -97,6 +117,7 @@ export default function Sidebar() {
         // 알림 업데이트 이벤트 리스닝
         const handleNotificationUpdate = () => {
             fetchNotificationCount();
+            fetchUnreadNotificationCount();
         };
 
         window.addEventListener('notificationUpdate', handleNotificationUpdate);
@@ -181,7 +202,8 @@ export default function Sidebar() {
                         const isActive = pathname === item.path ||
                             (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create')) ||
                             (item.path === '/main/performance_settlement' && pathname.startsWith('/main/performance_settlement')) ||
-                            (item.path === '/main/user_management' && pathname.startsWith('/main/user_create'));
+                            (item.path === '/main/user_management' && pathname.startsWith('/main/user_create')) ||
+                            (item.path === '/main/notifications' && pathname.startsWith('/main/notifications'));
 
                         return (
                             <li key={item.path} className={styles.menuItemWrapper}>
@@ -199,12 +221,17 @@ export default function Sidebar() {
                                         <FiClock className={styles.menuIcon} />
                                     ) : item.path === '/main/home' ? (
                                         <FiHome className={styles.menuIcon} />
+                                    ) : item.path === '/main/notifications' ? (
+                                        <FiBell className={styles.menuIcon} />
                                     ) : (
                                         <FiFile className={styles.menuIcon} />
                                     )}
                                     {item.label}
                                     {item.path === '/main/document_submission' && notificationCount > 0 && (
                                         <span className={styles.notificationBadge}>{notificationCount}</span>
+                                    )}
+                                    {item.path === '/main/notifications' && unreadNotificationCount > 0 && (
+                                        <span className={styles.notificationBadge} style={{ backgroundColor: '#e03131' }}>{unreadNotificationCount}</span>
                                     )}
                                 </button>
                             </li>
