@@ -27,6 +27,7 @@ export interface CompanyFileHandle {
     getBusinessType: () => 'business' | 'individual' | null;
     setBusinessType: (type: 'business' | 'individual') => void;
     setExistingFiles: (files: Array<{ name: string; path: string; size: number }>, type?: 'business' | 'individual') => void;
+    validateFormData: () => { valid: boolean; message?: string };
 }
 
 interface CompanyFileProps {
@@ -167,6 +168,26 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     [targetType]: files
                 }));
             }
+        },
+        validateFormData: () => {
+            // 사업자 유형 확인
+            if (!businessType) {
+                return { valid: false, message: '사업자 유형을 선택해주세요.' };
+            }
+
+            const docs = businessType === 'business' ? businessDocuments : individualDocuments;
+
+            // 각 필수 문서가 업로드되었거나 기존 파일이 있는지 확인
+            for (const doc of docs) {
+                const hasUploadedFile = !!uploadedFiles[doc.id];
+                const hasExistingFile = existingFiles.some(f => f.name?.includes(doc.id) || f.path?.includes(doc.id));
+
+                if (!hasUploadedFile && !hasExistingFile) {
+                    return { valid: false, message: `${doc.name}을(를) 업로드해주세요.` };
+                }
+            }
+
+            return { valid: true };
         },
     }));
 

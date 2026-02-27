@@ -16,6 +16,7 @@ import AdditionalFiles, { AdditionalFilesHandle } from './components/AdditionalF
 function Company1Content() {
     const router = useRouter();
     const searchParams = useSearchParams();
+    const createParam = searchParams.get('create');
     const viewId = searchParams.get('view');
     const editParam = searchParams.get('edit');
 
@@ -25,7 +26,8 @@ function Company1Content() {
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
-    const [isViewMode, setIsViewMode] = useState(!!viewId);
+    const [isCreateMode, setIsCreateMode] = useState(createParam === 'true');
+    const [isViewMode, setIsViewMode] = useState(!!viewId && !createParam);
     // 초기값을 URL에서 직접 받기 (editParam === 'true')
     const [isEditMode, setIsEditMode] = useState(editParam === 'true' && !!viewId);
     const [documentData, setDocumentData] = useState<any>(null);
@@ -35,12 +37,14 @@ function Company1Content() {
     const [currentUserName, setCurrentUserName] = useState('');
     const [currentUserPosition, setCurrentUserPosition] = useState<any>(null);
     const [memos, setMemos] = useState<any[]>([]);
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
 
     const companyInfoRef = useRef<CompanyInfoCardHandle>(null);
     const cretabInfoRef = useRef<CretabInfoHandle>(null);
     const companyFileRef = useRef<CompanyFileHandle>(null);
     const additionalFilesRef = useRef<AdditionalFilesHandle>(null);
-    const isFirstLoadRef = useRef(true);
+    // 저장 완료 후 최신 document 즉시 참조용 (setState 비동기 문제 해결)
+    const latestSavedDocumentRef = useRef<any>(null);
 
     // 문서 조회 함수
     const fetchDocumentData = async (docId: number) => {
@@ -83,6 +87,8 @@ function Company1Content() {
     useEffect(() => {
         if (viewId) {
             fetchDocumentData(parseInt(viewId));
+            // viewId가 변경될 때마다 isFirstLoad 리셋
+            setIsFirstLoad(true);
         }
     }, [viewId]);
 
@@ -93,10 +99,10 @@ function Company1Content() {
 
     // 조회한 문서 데이터를 폼에 반영 (처음 진입할 때만)
     useEffect(() => {
-        // 수정 모드에서는 폼을 reset하지 않음 (사용자가 입력한 데이터 보호)
         // 처음 진입할 때만 폼을 로드하고, 그 다음부터는 사용자 입력 데이터 유지
-        if (documentData && !isEditMode && isFirstLoadRef.current) {
-            isFirstLoadRef.current = false;
+        // (수정 모드에서도 처음에는 데이터를 로드해야 함)
+        if (documentData && isFirstLoad) {
+            setIsFirstLoad(false);
             // 기본 정보 설정
             if (companyInfoRef.current) {
                 companyInfoRef.current.setFormData({
@@ -106,18 +112,19 @@ function Company1Content() {
                     phone: documentData.phone || '',
                 });
             }
+        }
 
-            // 파일 정보 설정 (수정 모드에서도 기존 파일은 표시)
-            if (companyFileRef.current) {
-                // 사업자 유형 설정 (수정 모드에서는 설정하지 않음)
-                if (documentData.type && !isEditMode) {
-                    companyFileRef.current.setBusinessType(documentData.type);
-                }
-                // 기존 파일 설정 (수정 모드에서도 표시)
-                if (documentData.files && Array.isArray(documentData.files)) {
-                    companyFileRef.current.setExistingFiles(documentData.files, documentData.type);
-                }
+        // 파일 정보 설정 (isFirstLoad 밖으로 이동 - 항상 표시)
+        if (documentData && companyFileRef.current) {
+            // 사업자 유형 설정 (항상 설정 - 파일 로드에 필요)
+            if (documentData.type) {
+                companyFileRef.current.setBusinessType(documentData.type);
             }
+            // 기존 파일 설정 (항상 표시)
+            if (documentData.files && Array.isArray(documentData.files)) {
+                companyFileRef.current.setExistingFiles(documentData.files, documentData.type);
+            }
+        }
 
             // 크레탑 정보 설정 (수정 모드에서도 기존 데이터는 표시)
             if (cretabInfoRef.current) {
@@ -162,17 +169,16 @@ function Company1Content() {
                 }
             }
 
-            // 추가 서류 설정
-            if (additionalFilesRef.current) {
-                if (documentData.supplement_files && Array.isArray(documentData.supplement_files)) {
-                    additionalFilesRef.current.setExistingFiles(documentData.supplement_files);
-                }
+        // 추가 서류 설정 (항상 표시)
+        if (documentData && additionalFilesRef.current) {
+            if (documentData.supplement_files && Array.isArray(documentData.supplement_files)) {
+                additionalFilesRef.current.setExistingFiles(documentData.supplement_files);
             }
+        }
 
-            // 메모 설정 (수정 모드에서는 설정하지 않음)
-            if (documentData.memos && Array.isArray(documentData.memos) && !isEditMode) {
-                setMemos(documentData.memos);
-            }
+        // 메모 설정 (수정 모드에서는 설정하지 않음)
+        if (documentData && documentData.memos && Array.isArray(documentData.memos) && !isEditMode && isFirstLoad) {
+            setMemos(documentData.memos);
         }
     }, [documentData, isEditMode, viewId]);
 
@@ -223,7 +229,23 @@ function Company1Content() {
 
     const handleValidateAndNext = async (): Promise<boolean> => {
         try {
-            // CretabInfo 유효성 검사
+            // 1. CompanyInfo 유효성 검사 (기본정보)
+            const companyValidation = companyInfoRef.current?.validateFormData();
+            if (!companyValidation?.valid) {
+                setErrorMessage(companyValidation?.message || '기업정보를 모두 입력해주세요.');
+                setErrorModalOpen(true);
+                return false;
+            }
+
+            // 2. CompanyFile 유효성 검사 (첨부파일)
+            const companyFileValidation = companyFileRef.current?.validateFormData();
+            if (!companyFileValidation?.valid) {
+                setErrorMessage(companyFileValidation?.message || '첨부파일을 모두 업로드해주세요.');
+                setErrorModalOpen(true);
+                return false;
+            }
+
+            // 3. CretabInfo 유효성 검사
             const cretabValidation = cretabInfoRef.current?.validateFormData();
             if (!cretabValidation?.valid) {
                 setErrorMessage(cretabValidation?.message || '크레탑 정보를 모두 입력해주세요.');
@@ -231,12 +253,13 @@ function Company1Content() {
                 return false;
             }
 
-            // 크레탑 파일 확인
+            // 4. 크레탑 파일 확인
             const businessType = companyFileRef.current?.getBusinessType();
             const cretabFile = cretabInfoRef.current?.getCretabFileForUpload();
             const cretabStatus = cretabInfoRef.current?.getCretabStatus();
 
-            if (!cretabFile && cretabStatus !== 'none') {
+            // 새로 업로드된 파일이 있거나, 기존 파일이 로드되었거나, 정보없음이 선택되면 OK
+            if (!cretabFile && cretabStatus !== 'file' && cretabStatus !== 'none') {
                 setErrorMessage('크레탑 파일을 업로드하거나\n정보없음을 선택해주세요.');
                 setErrorModalOpen(true);
                 return false;
@@ -250,8 +273,22 @@ function Company1Content() {
     };
 
     const handleProgressUpdate = (progressDetails: string) => {
-        if (documentData) {
-            setDocumentData({ ...documentData, progress_details: progressDetails });
+        // latestSavedDocumentRef 우선 사용 (setState 비동기 문제 - 저장 직후 최신 데이터)
+        const baseData = latestSavedDocumentRef.current || documentData;
+        if (baseData) {
+            setIsFirstLoad(true);
+            setDocumentData({ ...baseData, progress_details: progressDetails });
+        }
+        // 수정 모드에서 단계 이동 완료 시 조회 페이지로 이동
+        if (isEditMode && viewId) {
+            router.push(`?view=${viewId}`);
+        }
+    };
+
+    const handleStaffAssignSuccess = () => {
+        // 수정 모드에서 실무자 배정 완료 시 조회 페이지로 이동
+        if (isEditMode && viewId) {
+            router.push(`?view=${viewId}`);
         }
     };
 
@@ -524,6 +561,16 @@ function Company1Content() {
 
             const result = await response.json();
             console.log('저장 완료:', result);
+
+            // 저장된 데이터로 documentData 업데이트 (최신 상태 유지)
+            // PUT API는 data[0]을 직접 반환 (result.id로 확인)
+            const savedDocument = result.document || (result.id ? result : null);
+            if (savedDocument) {
+                // ref에 즉시 저장 (setState 비동기 문제 해결 - handleProgressUpdate에서 사용)
+                latestSavedDocumentRef.current = savedDocument;
+                setDocumentData(savedDocument);
+            }
+
             // skipSuccessModal이 false(또는 undefined)일 때만 성공 모달 표시
             if (!skipSuccessModal) {
                 setSuccessMessage(viewId ? '기업 정보가 수정되었습니다.' : '기업이 등록되었습니다.');
@@ -538,6 +585,7 @@ function Company1Content() {
             console.error('저장 중 오류:', error);
             setErrorMessage(message);
             setErrorModalOpen(true);
+            throw error; // 호출한 쪽에서 중단할 수 있도록 re-throw
         } finally {
             setIsSaving(false);
         }
@@ -640,7 +688,7 @@ function Company1Content() {
 
     return (
         <div className={styles.container}>
-            <div className={styles.companyTitle}>
+            <div className={isCreateMode ? styles.companyTitle : styles.companyTitleView}>
                 {viewId ? (
                     <>
                         <h2>
@@ -664,10 +712,12 @@ function Company1Content() {
                     isViewMode={isViewMode && !isEditMode}
                     documentId={viewId}
                     progressDetails={documentData?.progress_details}
+                    progressStartDate={documentData?.progress_start_date}
                     managerId={documentData?.manager_id}
                     onValidateAndNext={handleValidateAndNext}
                     onProgressUpdate={handleProgressUpdate}
                     onSave={handleSave}
+                    onStaffAssignSuccess={handleStaffAssignSuccess}
                 />
                 {viewId && currentUserPosition?.level !== 4 && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode} viewId={viewId} isEditMode={isEditMode} onEditClick={handleEditCretabFile} />}
                 <MemoSection

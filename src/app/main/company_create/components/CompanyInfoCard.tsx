@@ -13,6 +13,7 @@ interface CompanyFormData {
 export interface CompanyInfoCardHandle {
     getFormData: () => CompanyFormData;
     setFormData: (data: Partial<CompanyFormData>) => void;
+    validateFormData: () => { valid: boolean; message?: string };
 }
 
 interface CompanyInfoCardProps {
@@ -81,6 +82,31 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
         getFormData: () => formData,
         setFormData: (data: Partial<CompanyFormData>) => {
             setFormData(prev => ({ ...prev, ...data }));
+        },
+        validateFormData: () => {
+            // 기업명 확인
+            if (!formData.company_name?.trim()) {
+                return { valid: false, message: '기업명을 입력해주세요.' };
+            }
+
+            // 사업자등록번호 확인 (XXX-XX-XXXXX 형식, 숫자 10개)
+            const businessNumberDigits = formData.business_number.replace(/\D/g, '');
+            if (!businessNumberDigits || businessNumberDigits.length !== 10) {
+                return { valid: false, message: '사업자등록번호를 정확히 입력해주세요.' };
+            }
+
+            // 대표자명 확인
+            if (!formData.representative_name?.trim()) {
+                return { valid: false, message: '대표자명을 입력해주세요.' };
+            }
+
+            // 연락처 확인 (10-11자리 숫자)
+            const phoneDigits = formData.phone.replace(/\D/g, '');
+            if (!phoneDigits || phoneDigits.length < 10 || phoneDigits.length > 11) {
+                return { valid: false, message: '연락처를 정확히 입력해주세요.' };
+            }
+
+            return { valid: true };
         },
     }));
 

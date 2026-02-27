@@ -212,36 +212,43 @@ export default function DocumentSubmissionList() {
         // 전체 삭제 모드 처리
         if (isDeleteAllMode) {
             const allDocs = getFilteredAndSortedDocuments();
+            const ids = allDocs.map(doc => doc.id);
 
-            // 데이터베이스에서 모두 삭제
-            for (const doc of allDocs) {
-                await deleteDocumentFromDatabase(doc.id);
+            const response = await fetch('/api/documents/bulk-delete', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+
+            if (response.ok) {
+                setDocuments(docs => docs.filter(doc => !ids.includes(doc.id)));
+                setSelectedDocuments(new Set());
+                setIsDeleteAllMode(false);
+                setSuccessMessage(`${allDocs.length}건의 기업이 삭제되었습니다.`);
+                setConfirmModalOpen(false);
+                setSuccessModalOpen(true);
             }
-
-            setDocuments(docs => docs.filter(doc => !allDocs.some(d => d.id === doc.id)));
-            setSelectedDocuments(new Set());
-            setIsDeleteAllMode(false);
-            setSuccessMessage(`${allDocs.length}건의 기업이 삭제되었습니다.`);
-            setConfirmModalOpen(false);
-            setSuccessModalOpen(true);
             return;
         }
 
         // 선택 삭제 모드 처리
         if (selectedDocuments.size > 0 && !pendingAction) {
             const count = selectedDocuments.size;
-            const docIds = Array.from(selectedDocuments);
+            const ids = Array.from(selectedDocuments);
 
-            // 데이터베이스에서 선택된 문서 삭제
-            for (const docId of docIds) {
-                await deleteDocumentFromDatabase(docId);
+            const response = await fetch('/api/documents/bulk-delete', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+
+            if (response.ok) {
+                setDocuments(docs => docs.filter(doc => !ids.includes(doc.id)));
+                setSelectedDocuments(new Set());
+                setSuccessMessage(`${count}건의 기업이 삭제되었습니다.`);
+                setConfirmModalOpen(false);
+                setSuccessModalOpen(true);
             }
-
-            setDocuments(docs => docs.filter(doc => !selectedDocuments.has(doc.id)));
-            setSelectedDocuments(new Set());
-            setSuccessMessage(`${count}건의 기업이 삭제되었습니다.`);
-            setConfirmModalOpen(false);
-            setSuccessModalOpen(true);
             return;
         }
 
@@ -1113,7 +1120,7 @@ export default function DocumentSubmissionList() {
                                         <td className={styles.timeAgo}>
                                             {doc.progress_status === 'stopped' && doc.stopped_time ? (
                                                 <span>{doc.stopped_time}</span>
-                                            ) : (doc.progress_details === '분석' || doc.progress_details === '진행') && doc.progress_start_date ? (
+                                            ) : (doc.progress_details === '분석' || doc.progress_details === '심사' || doc.progress_details === '진행') && doc.progress_start_date ? (
                                                 <TimeAgo dateString={doc.progress_start_date} />
                                             ) : doc.progress_details === '승인' && doc.progress_end_time ? (
                                                 <span>{doc.progress_end_time}</span>

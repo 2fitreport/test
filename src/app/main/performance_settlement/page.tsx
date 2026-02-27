@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import styles from './performanceSettlement.module.css';
 import SalesPerformanceTable from './components/SalesPerformanceTable';
 import StaffPerformanceTable from './components/StaffPerformanceTable';
@@ -91,8 +90,8 @@ export default function PerformanceSettlementPage() {
                     <p className={styles.subTitle}>성과 관리 및 정산</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <Link href="#">상담 신청</Link>
-                    <Link href="#">기업 등록</Link>
+                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true">기업 생성</a>
                 </div>
             </div>
 

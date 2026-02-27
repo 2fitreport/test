@@ -55,7 +55,7 @@ export default function RevenueChart({
                 {
                     label: '년별 매출',
                     data: [2.5, 3.2, 2.8, 4.1, 3.5, 2.9, 4.3, 3.8, 2.6, 3.9, 4.2, 3.1],
-                    backgroundColor: ['#553be9', '#7c5cfc', '#00d26a', '#f8e71c', '#ff2e63', '#3b82f6', '#a855f7', '#10b981', '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b'],
+                    backgroundColor: '#0f1a4d',
                     borderRadius: 8,
                 }
             ]

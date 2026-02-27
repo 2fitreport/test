@@ -38,14 +38,19 @@
 }
 
 .btnWrap a {
-    background: #553be9;
+    background: var(--main-color);
     color: #fff;
     display: flex;
-    border-radius: 5px;
+    border-radius: 100px;
     padding: 15px 30px;
     font-weight: 700;
     cursor: pointer;
     font-size: 20px;
+    transition: 0.3s;
+}
+
+.btnWrap a:hover {
+    transform: translateY(-1.2px);
 }
 
 .contentWrap {

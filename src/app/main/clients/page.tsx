@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import styles from './clients.module.css';
 import ClientCard from './components/ClientCard';
 import StatCard from './components/StatCard';
@@ -111,8 +110,8 @@ export default function ClientsPage() {
                     <p className={styles.subTitle}>등록된 고객사 현황을 한눈에 확인하세요.</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <Link href="">상담 신청</Link>
-                    <Link href="">기업 등록</Link>
+                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true">기업 생성</a>
                 </div>
             </div>
 

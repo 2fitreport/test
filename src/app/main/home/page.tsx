@@ -4,7 +4,6 @@ import LogWrap from './components/LogWrap';
 import RevisionRejectedWrap from './components/RevisionRejectedWrap';
 import SalesWrap from './components/SalesWrap';
 import ProgressWrap from './components/ProgressWrap';
-import Link from 'next/link';
 
 export const revalidate = 0;
 
@@ -17,8 +16,8 @@ export default function Home() {
                     <p className={styles.subTitle}>오늘의 회사 현황을 한눈에 확인하세요.</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <Link href="">지원 요청</Link>
-                    <Link href="">기업 등록</Link>
+                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true">기업 생성</a>
                 </div>
             </div>
             <div className={styles.homeWrap}>

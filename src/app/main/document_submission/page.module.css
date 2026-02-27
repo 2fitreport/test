@@ -1,48 +1,59 @@
 .container {
-    padding: 40px;
-    padding-bottom: 80px;
-    margin-left: var(--sidebar-width);
+    box-sizing: border-box;
     background-color: #f9fafb;
     min-height: 100vh;
-    box-sizing: border-box;
+    margin-left: var(--sidebar-width);
+    padding: 0px 0px 80px 0px;
 }
 
 .titleWrapper {
+    padding: 40px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 30px;
-    gap: 20px;
+    justify-content: space-between;
 }
 
 .title {
     font-size: 28px;
     font-weight: 700;
     color: var(--black-color);
-    margin: 0 !important;
+    margin: 0 0 15px 0;
 }
 
-.createButton {
-    padding: 10px 20px;
-    background-color: var(--main-color);
+.subTitle {
+    color: #777;
+    font-size: 18px;
+    margin: 0;
+}
+
+.btnWrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btnWrap a {
+    background: var(--main-color);
     color: #fff;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
+    display: flex;
+    border-radius: 100px;
+    padding: 15px 30px;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(15, 26, 77, 0.1);
+    font-size: 20px;
+    transition: 0.3s;
+    text-decoration: none;
 }
 
-.createButton:hover {
-    background-color: #0a1140;
-    box-shadow: 0 4px 8px rgba(15, 26, 77, 0.15);
-    transform: translateY(-1px);
+.btnWrap a:hover {
+    transform: translateY(-1.2px);
 }
 
 .contentWrapper {
     width: 100%;
+    padding: 40px;
 }
 
 /* 반응형 */

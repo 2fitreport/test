@@ -23,20 +23,24 @@ interface ProgressStepsSectionProps {
     isViewMode?: boolean;
     documentId?: string | null;
     progressDetails?: string | null;
+    progressStartDate?: string | null;
     managerId?: string | null;
     onProgressUpdate?: (progressDetails: string) => void;
     onValidateAndNext?: () => Promise<boolean>;
     onSave?: (skipSuccessModal?: boolean) => Promise<void>;
+    onStaffAssignSuccess?: () => void;
 }
 
 export default function ProgressStepsSection({
     isViewMode = false,
     documentId,
     progressDetails,
+    progressStartDate,
     managerId,
     onProgressUpdate,
     onValidateAndNext,
-    onSave
+    onSave,
+    onStaffAssignSuccess
 }: ProgressStepsSectionProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [revisionModalOpen, setRevisionModalOpen] = useState(false);
@@ -47,20 +51,20 @@ export default function ProgressStepsSection({
     const [endModalOpen, setEndModalOpen] = useState(false);
     const [staffAssignModalOpen, setStaffAssignModalOpen] = useState(false);
     const [securityCompleteModalOpen, setSecurityCompleteModalOpen] = useState(false);
-    const [revisionProcessModalOpen, setRevisionProcessModalOpen] = useState(false);
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [selectedManager, setSelectedManager] = useState('');
     const [staffRequiredModalOpen, setStaffRequiredModalOpen] = useState(false);
     const [assignedManagerId, setAssignedManagerId] = useState('');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [resetModalOpen, setResetModalOpen] = useState(false);
 
-    // 실무자 목록 조회
+    // 실무자 목록 조회 (뷰 모드 및 수정 모드 모두)
     useEffect(() => {
-        if (isViewMode) {
+        if (documentId) {
             fetchWorkers();
         }
-    }, [isViewMode]);
+    }, [documentId]);
 
     const fetchWorkers = async () => {
         try {
@@ -74,7 +78,8 @@ export default function ProgressStepsSection({
         }
     };
 
-    const stepOrder = ['상담', '서류요청', '분석', '진행', '승인'];
+    const allSteps = ['상담', '서류요청', '분석', '심사', '진행', '승인'];
+    const stepOrder = allSteps.slice(0, -1); // '승인' 단계를 진행 단계 목록에서 제외
     // progressDetails가 있으면 사용 (뷰 모드, 수정 모드 모두)
     // 없으면 (신규 등록 모드) 모든 단계가 pending
     const currentProgress = progressDetails || null;
@@ -84,9 +89,44 @@ export default function ProgressStepsSection({
         { id: 1, label: '상담', status: currentStepIndex > 0 ? 'completed' : currentStepIndex === 0 ? 'current' : 'pending' },
         { id: 2, label: '서류요청', status: currentStepIndex > 1 ? 'completed' : currentStepIndex === 1 ? 'current' : 'pending' },
         { id: 3, label: '분석', status: currentStepIndex > 2 ? 'completed' : currentStepIndex === 2 ? 'current' : 'pending' },
-        { id: 4, label: '진행', status: currentStepIndex > 3 ? 'completed' : currentStepIndex === 3 ? 'current' : 'pending' },
-        { id: 5, label: '승인', status: currentStepIndex > 4 ? 'completed' : currentStepIndex === 4 ? 'current' : 'pending' },
+        { id: 4, label: '심사', status: currentStepIndex > 3 ? 'completed' : currentStepIndex === 3 ? 'current' : 'pending' },
+        { id: 5, label: '진행', status: currentStepIndex > 4 ? 'completed' : currentStepIndex === 4 ? 'current' : 'pending' },
     ];
+
+    const handleReset = () => {
+        setResetModalOpen(true);
+    };
+
+    const handleResetConfirm = async () => {
+        setResetModalOpen(false);
+        if (!documentId) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch(`/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    progress_details: '서류요청',
+                    manager_id: null,
+                    manager_name: null,
+                    progress_start_date: null
+                })
+            });
+
+            if (response.ok) {
+                if (onProgressUpdate) {
+                    onProgressUpdate('서류요청');
+                }
+                setSuccessMessage('진행 단계가 초기화되었습니다.');
+                setSuccessModalOpen(true);
+            }
+        } catch (error) {
+            console.error('초기화 실패:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handlePrevious = () => {
         if (currentStepIndex > 0) {
@@ -127,11 +167,25 @@ export default function ProgressStepsSection({
 
     const handleNext = async () => {
         if (currentStepIndex < stepOrder.length - 1) {
+            // 1. 먼저 유효성 검사 수행 (뷰 모드에서도)
+            const isValid = onValidateAndNext ? await onValidateAndNext() : true;
+            if (!isValid) {
+                return;
+            }
+
             const nextStep = stepOrder[currentStepIndex + 1];
 
-            // 분석 단계에서 다음 단계(진행)로 이동할 때 실무자 배정 확인
-            if (currentProgress === '분석' && nextStep === '진행' && !managerId && !assignedManagerId) {
-                setStaffRequiredModalOpen(true);
+            // 분석 단계에서 다음 단계(심사)로 이동할 때 실무자 배정 필수
+            if (currentProgress === '분석' && nextStep === '심사' && !managerId && !assignedManagerId) {
+                setSelectedManager('');
+                setStaffAssignModalOpen(true);
+                return;
+            }
+
+            // 심사 단계에서 다음 단계(진행)로 이동할 때 실무자 배정 필수
+            if (currentProgress === '심사' && nextStep === '진행' && !managerId && !assignedManagerId) {
+                setSelectedManager('');
+                setStaffAssignModalOpen(true);
                 return;
             }
 
@@ -141,28 +195,21 @@ export default function ProgressStepsSection({
     };
 
     const handleNextConfirm = async () => {
+        setNextStepModalOpen(false);
         setIsLoading(true);
         try {
-            // 1. 먼저 유효성 검사 수행
-            const isValid = onValidateAndNext ? await onValidateAndNext() : true;
-            if (!isValid) {
-                // 유효성 검사 실패 시 모달을 다시 열지 않음 (경고 모달이 이미 떴음)
-                setIsLoading(false);
-                return;
-            }
-
-            // 2. 유효성 검사 성공 후 모달 닫기
-            setNextStepModalOpen(false);
+            // 유효성 검사는 handleNext에서 이미 수행됨
+            // 여기서는 저장 및 단계 이동만 진행
 
             console.log('다음 단계 이동:', { isViewMode, onSave: !!onSave, nextStepName });
-            // 3. 뷰모드가 아닌 경우(수정 모드)에만 데이터 저장
+            // 1. 뷰모드가 아닌 경우(수정 모드)에만 데이터 저장
             if (!isViewMode && onSave) {
                 console.log('저장 시작...');
                 // 성공 모달을 띄우지 않고 저장 (다음 단계로 진행할 예정)
                 await onSave(true);
                 console.log('저장 완료');
             }
-            // 4. 저장 완료 후 진행 상태 업데이트
+            // 2. 저장 완료 후 진행 상태 업데이트
             console.log('진행 단계 업데이트:', nextStepName);
             await updateProgress(nextStepName);
         } catch (error) {
@@ -184,6 +231,9 @@ export default function ProgressStepsSection({
             // 서류요청 → 분석으로 변경될 때 시간 경과 시작
             if (newProgressDetails === '분석') {
                 updateData.progress_start_date = String(Date.now());
+            } else if (progressStartDate) {
+                // 이미 시작 시간이 있으면 다른 단계로 이동할 때도 유지 (API로 명시적으로 전달)
+                updateData.progress_start_date = progressStartDate;
             }
 
             const response = await fetch(`/api/documents/${documentId}/progress`, {
@@ -212,15 +262,21 @@ export default function ProgressStepsSection({
 
         try {
             setIsLoading(true);
-            const response = await fetch(`/api/documents/${documentId}/progress`, {
+            const response = await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: '보완' })
             });
 
             if (response.ok) {
-                // 성공 처리
-                console.log('보완 요청 완료');
+                // 성공 메시지 표시
+                setSuccessMessage('보완 요청이 완료되었습니다.');
+                setSuccessModalOpen(true);
+                
+                // 페이지 새로고침 또는 상위 상태 업데이트 (onProgressUpdate 재사용 가능 여부 확인)
+                if (onProgressUpdate && progressDetails) {
+                    onProgressUpdate(progressDetails); // 현재 단계를 다시 보내서 갱신 유도
+                }
             }
         } catch (error) {
             console.error('보완 요청 실패:', error);
@@ -255,7 +311,14 @@ export default function ProgressStepsSection({
         }
     };
 
-    const handleStaffAssign = () => {
+    const handleStaffAssign = async () => {
+        // 수정 모드에서는 유효성 검사 먼저
+        if (!isViewMode && onValidateAndNext) {
+            const isValid = await onValidateAndNext();
+            if (!isValid) {
+                return;
+            }
+        }
         setSelectedManager('');
         setStaffAssignModalOpen(true);
     };
@@ -268,9 +331,9 @@ export default function ProgressStepsSection({
 
         setIsLoading(true);
         try {
-            // 1. 수정 모드인 경우 먼저 데이터 저장
+            // 1. 수정 모드인 경우 먼저 데이터 저장 (성공 모달 없이)
             if (!isViewMode && onSave) {
-                await onSave();
+                await onSave(true);  // skipSuccessModal=true
             }
 
             // 2. 저장 완료 후 실무자 배정
@@ -287,6 +350,14 @@ export default function ProgressStepsSection({
             if (response.ok) {
                 console.log('실무자 배정 완료');
                 setAssignedManagerId(selectedManager);
+
+                // 실무자 배정 후 다음 단계로 즉시 업데이트
+                if (currentProgress === '분석') {
+                    updateProgress('심사');
+                } else if (currentProgress === '심사') {
+                    updateProgress('진행');
+                }
+
                 setSuccessMessage('실무자가 배정되었습니다.');
                 setSuccessModalOpen(true);
             }
@@ -308,15 +379,6 @@ export default function ProgressStepsSection({
         console.log('보안 완료 처리');
     };
 
-    const handleRevisionProcess = () => {
-        setRevisionProcessModalOpen(true);
-    };
-
-    const handleRevisionProcessConfirm = () => {
-        setRevisionProcessModalOpen(false);
-        console.log('보완 처리 완료');
-    };
-
     return (
         <div className={styles.progressWrap}>
             <div className={styles.progressTitle}>
@@ -328,8 +390,8 @@ export default function ProgressStepsSection({
                 <div className={styles.stepsContainer}>
                 <div className={styles.stepsList}>
                     {steps.map((step, index) => (
-                        <div key={step.id} className={styles.stepItemWrapper}>
-                            <div className={`${styles.stepItem} ${styles[step.status]}`}>
+                        <div key={step.id} className={`${styles.stepItemWrapper} ${styles[step.status]}`}>
+                            <div className={styles.stepCircleWrapper}>
                                 <div className={styles.stepCircle}>
                                     <img
                                         src={
@@ -341,11 +403,13 @@ export default function ProgressStepsSection({
                                         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                     />
                                 </div>
+                                {index < steps.length - 1 && (
+                                    <div className={`${styles.stepLine} ${(step.status === 'current' || step.status === 'completed') ? styles.active : ''}`} />
+                                )}
+                            </div>
+                            <div className={`${styles.stepItem} ${styles[step.status]}`}>
                                 <p className={styles.stepLabel}>{step.label}</p>
                             </div>
-                            {index < steps.length - 1 && (
-                                <div className={`${styles.stepLine} ${(step.status === 'current' || step.status === 'completed') ? styles.active : ''}`} />
-                            )}
                         </div>
                     ))}
                 </div>
@@ -353,29 +417,48 @@ export default function ProgressStepsSection({
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                    <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
-                        <span>●</span> 보완요청
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
-                        <ChevronLeft size={18} /> 이전 단계로 이동
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleNext} disabled={isLoading || currentStepIndex === stepOrder.length - 1}>
-                        {isLoading ? <Loader size={18} className={styles.spinner} /> : <ChevronRight size={18} />}
-                        다음 단계로 이동
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
-                        <XCircle size={18} /> 진행불가
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
-                        실무자배정
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                        보안완료
-                    </button>
-                    <button className={`${styles.btn} ${styles.btnPending}`} onClick={handleRevisionProcess} disabled={isLoading}>
-                        보완처리
-                    </button>
-                </div>
+                        <div className={styles.buttonGroup}>
+                            <h4>단계 관리</h4>
+                            <div className={styles.groupButtons}>
+                                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
+                                    이전 단계로 이동
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleNext} disabled={isLoading || currentStepIndex === stepOrder.length - 1}>
+                                    {isLoading ? '처리 중...' : '다음 단계로 이동'}
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnProceed}`} onClick={() => console.log('진행')} disabled={isLoading}>
+                                    진행
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnReset}`} onClick={handleReset} disabled={isLoading}>
+                                    초기화
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className={styles.buttonGroup}>
+                            <h4>진행 상태</h4>
+                            <div className={styles.groupButtons}>
+                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                    보완요청
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={() => console.log('검수완료')} disabled={isLoading}>
+                                    검수완료
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnApprove}`} onClick={() => console.log('승인')} disabled={isLoading}>
+                                    승인
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
+                                    실무자배정
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                    보안완료
+                                </button>
+                                <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
+                                    진행불가
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -423,23 +506,23 @@ export default function ProgressStepsSection({
                 type="error"
             />
 
+            {/* 초기화 모달 */}
+            <ConfirmModal
+                isOpen={resetModalOpen}
+                message="진행 단계를 초기화하시겠습니까?<br>(단계가 서류요청으로 변경되며 실무자 배정이 취소됩니다)"
+                onConfirm={handleResetConfirm}
+                onCancel={() => setResetModalOpen(false)}
+                confirmButtonText="확인"
+                hideCancel={false}
+                type="error"
+            />
+
             {/* 보안 완료 모달 */}
             <ConfirmModal
                 isOpen={securityCompleteModalOpen}
                 message="보안 검사를 완료하시겠습니까?"
                 onConfirm={handleSecurityCompleteConfirm}
                 onCancel={() => setSecurityCompleteModalOpen(false)}
-                confirmButtonText="확인"
-                hideCancel={false}
-                type="success"
-            />
-
-            {/* 보완 처리 모달 */}
-            <ConfirmModal
-                isOpen={revisionProcessModalOpen}
-                message="보완을 처리하시겠습니까?"
-                onConfirm={handleRevisionProcessConfirm}
-                onCancel={() => setRevisionProcessModalOpen(false)}
                 confirmButtonText="확인"
                 hideCancel={false}
                 type="success"
@@ -558,7 +641,12 @@ export default function ProgressStepsSection({
             <ConfirmModal
                 isOpen={successModalOpen}
                 message={successMessage}
-                onConfirm={() => setSuccessModalOpen(false)}
+                onConfirm={() => {
+                    setSuccessModalOpen(false);
+                    if (onStaffAssignSuccess) {
+                        onStaffAssignSuccess();
+                    }
+                }}
                 confirmButtonText="확인"
                 hideCancel={true}
                 type="success"

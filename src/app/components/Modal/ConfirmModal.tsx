@@ -48,7 +48,11 @@ export default function ConfirmModal({
               <Image src={iconSrc} alt={type} width={48} height={48} className={styles.icon} />
             </div>
           )}
-          <p className={styles.message}>{message}</p>
+          {typeof message === 'string' ? (
+            <p className={styles.message} dangerouslySetInnerHTML={{ __html: message }} />
+          ) : (
+            <div className={styles.message}>{message}</div>
+          )}
         </div>
         <div className={styles.footer}>
           {!hideCancel && (

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { getAdminData } from '@/lib/auth';
 import DocumentSubmissionList from './DocumentSubmissionList';
 import styles from './page.module.css';
@@ -23,14 +22,16 @@ export default function DocumentSubmissionPage() {
     return (
         <div className={styles.container}>
             <div className={styles.titleWrapper}>
-                <h1 className={styles.title}>기업관리</h1>
-                {userLevel !== 6 && (
-                    <Link href="/main/company_create">
-                        <button className={styles.createButton}>
-                            + 기업 생성
-                        </button>
-                    </Link>
-                )}
+                <div>
+                    <h1 className={styles.title}>기업관리</h1>
+                    <p className={styles.subTitle}>고객사 정보를 관리하고 진행 현황을 확인하세요.</p>
+                </div>
+                <div className={styles.btnWrap}>
+                    <a href="">상담신청</a>
+                    {userLevel !== 6 && (
+                        <a href="/main/company_create?create=true">기업 생성</a>
+                    )}
+                </div>
             </div>
 
             <div className={styles.contentWrapper}>

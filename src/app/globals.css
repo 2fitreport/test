@@ -26,10 +26,10 @@
 
     /* 진행단계 색상 (Progress Stages) */
     --color-consultation: #b0b9c6;      /* 상담: 초기 상담 단계 */
-    --color-document-request: #f2e7a2;  /* 서류요청: 필요 서류 요청 */
-    --color-analysis: #d8c9f1;          /* 분석: 서류 분석 중 */
-    --color-progress: #82cbc4;          /* 진행: 진행 중 */
-    --color-approval: #a0c4ff;          /* 승인: 최종 승인 */
+    --color-document-request: #ffd54f;  /* 서류요청: 필요 서류 요청 */
+    --color-analysis: #4fc3f7;          /* 분석(심사): 서류 분석 중 */
+    --color-progress: #66bb6a;          /* 진행: 진행 중 */
+    --color-approval: #42a5f5;          /* 승인: 최종 승인 */
 
     /* 상태 색상 (Status) */
     --color-normal: #52ea9b;            /* 정상: 정상 상태 */
