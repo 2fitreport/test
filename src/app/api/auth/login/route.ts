@@ -41,6 +41,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 계정 활성 상태 확인
+    if (user.status === 'pending') {
+      return NextResponse.json(
+        { message: '관리자 승인 대기 중입니다.' },
+        { status: 403 }
+      );
+    }
+
+    if (user.status === 'rejected') {
+      return NextResponse.json(
+        { message: '가입 신청이 거절되었습니다. 관리자에게 문의하세요.' },
+        { status: 403 }
+      );
+    }
+
     if (user.status !== 'active') {
       return NextResponse.json(
         { message: '비활성화된 계정입니다.' },

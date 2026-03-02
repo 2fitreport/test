@@ -48,8 +48,10 @@ export async function GET(request: NextRequest) {
     const userLevel = currentUser.position?.level;
     const userIdNumber = currentUser.id;
 
+    const statusFilter = request.nextUrl.searchParams.get('status');
+
     // 사용자 조회
-    const query = supabase
+    let queryBuilder = supabase
       .from('users')
       .select(`
         id,
@@ -73,7 +75,11 @@ export async function GET(request: NextRequest) {
       .order('position_id', { ascending: true })
       .order('created_at', { ascending: false });
 
-    let { data, error } = await query;
+    if (statusFilter) {
+      queryBuilder = queryBuilder.eq('status', statusFilter);
+    }
+
+    let { data, error } = await queryBuilder;
 
     if (error) throw error;
 

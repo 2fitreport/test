@@ -74,6 +74,23 @@
     cursor: pointer;
     user-select: none;
 }
+.signupLinkWrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 12px;
+}
+.signupLinkButton {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 5px;
+}
+.signupLinkButton:hover {
+    color: var(--main-color);
+}
 @media (max-width: 768px) {
     .container {
         padding: 16px;

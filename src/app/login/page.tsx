@@ -134,6 +134,16 @@ export default function LoginPage() {
                 <button className={styles.button} type="submit" disabled={isLoading}>
                     {isLoading ? '로그인 중...' : '로그인'}
                 </button>
+                <div className={styles.signupLinkWrapper}>
+                    <button 
+                        type="button" 
+                        onClick={() => router.push('/signup')} 
+                        className={styles.signupLinkButton}
+                        disabled={isLoading}
+                    >
+                        계정이 없으신가요? 회원가입 신청
+                    </button>
+                </div>
             </form>
 
             <Modal

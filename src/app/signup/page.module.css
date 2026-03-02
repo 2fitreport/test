@@ -1,0 +1,252 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 40px 20px;
+    background-color: #fff;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.logoWrapper {
+    position: relative;
+    width: 360px;
+    height: 160px;
+    margin-bottom: 40px;
+}
+
+.logo {
+    object-fit: contain;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 480px;
+    gap: 16px;
+}
+
+.title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.subtitle {
+    font-size: 15px;
+    color: #666;
+    margin-bottom: 32px;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.inputGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    padding-left: 4px;
+}
+
+.input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 8px !important;
+    font-size: 16px;
+    transition: border-color 0.2s;
+    background-color: #fff;
+}
+
+.input:focus {
+    border-color: var(--main-color) !important;
+    outline: none;
+}
+
+.input::placeholder {
+    color: #bbb;
+}
+
+.button {
+    width: 100%;
+    padding: 18px;
+    background-color: var(--main-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: opacity 0.2s;
+}
+
+.button:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+.button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.linkWrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.linkButton {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 5px;
+}
+
+.linkButton:hover {
+    color: var(--main-color);
+}
+
+.inputRow {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.inputWithButton {
+    flex: 1;
+    min-width: 0;
+}
+
+.checkButton {
+    padding: 0 16px;
+    background-color: var(--main-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.2s;
+}
+
+.checkButton:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.availabilityMessage {
+    font-size: 13px;
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+.available {
+    color: #22a84a;
+}
+
+.unavailable {
+    color: #d32f2f;
+}
+
+.required {
+    color: #e03131;
+    margin-left: 4px;
+}
+
+.errorMessage {
+    font-size: 13px;
+    color: #e03131;
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+.termsWrapper {
+    margin-top: 24px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+
+.termsTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.checkboxGroup {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.checkbox {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    cursor: pointer;
+    accent-color: var(--main-color);
+}
+
+.checkboxLabel {
+    font-size: 14px;
+    color: #555;
+    line-height: 1.5;
+    user-select: none;
+    cursor: pointer;
+}
+
+.helperText {
+    font-size: 12px;
+    color: #e03131;
+    margin-top: 6px;
+    font-weight: 500;
+}
+
+.sectionDivider {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--black-color);
+    margin: 32px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eee;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 30px 16px;
+    }
+    .logoWrapper {
+        width: 240px;
+        height: 100px;
+        margin-bottom: 30px;
+    }
+    .form {
+        max-width: 100%;
+    }
+    .input {
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+    .button {
+        padding: 16px;
+    }
+}

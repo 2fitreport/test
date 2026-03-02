@@ -61,9 +61,57 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 인증 토큰 검증
+    const authToken = request.cookies.get('auth_token')?.value;
+    if (!authToken) {
+      return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+    }
+
+    let requesterId: number;
+    try {
+      const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+      requesterId = tokenData.id;
+    } catch {
+      return NextResponse.json({ message: '유효하지 않은 토큰입니다.' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const userId = parseInt(id, 10);
+
+    // 자기 자신의 비밀번호 변경인 경우 별도 처리 (모든 직급 허용)
+    if (requesterId === userId && body.password !== undefined && Object.keys(body).filter(k => k !== 'currentPassword').length === 1) {
+      // 현재 비밀번호 검증
+      const { data: userCheck } = await supabase
+        .from('users')
+        .select('password')
+        .eq('id', userId)
+        .single();
+
+      if (!body.currentPassword || userCheck?.password !== body.currentPassword) {
+        return NextResponse.json({ message: '현재 비밀번호가 올바르지 않습니다.' }, { status: 400 });
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ password: body.password })
+        .eq('id', userId);
+
+      if (error) throw error;
+      return NextResponse.json({ message: '비밀번호가 변경되었습니다.' }, { status: 200 });
+    }
+
+    // 그 외 수정은 level 1: 대표, level 2: 대표실무자만 허용
+    const { data: requester } = await supabase
+      .from('users')
+      .select('position(level)')
+      .eq('id', requesterId)
+      .single();
+
+    const requesterLevel = (requester?.position as any)?.level;
+    if (requesterLevel !== 1 && requesterLevel !== 2) {
+      return NextResponse.json({ message: '권한이 없습니다.' }, { status: 403 });
+    }
 
     // status만 변경하는 경우
     if (Object.keys(body).length === 1 && body.status) {
@@ -102,11 +150,21 @@ export async function PATCH(
       );
     }
 
-    // 전체 정보 수정
-    const { name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, is_affiliation_representative, bank_name, account_holder, account_number } = body;
+    // status와 함께 다른 정보(소속, 소속대표 여부 등)를 업데이트하는 경우
+    const { status, company_name, is_affiliation_representative, affiliations, name, position_id, password, phone, email_display, address, address_detail, bank_name, account_holder, account_number } = body;
+
+    // 소속대표로 선임하는 경우 기존 소속대표 해임 처리
+    if (status === 'active' && is_affiliation_representative === true && company_name) {
+      const { error: resetError } = await supabase
+        .from('users')
+        .update({ is_affiliation_representative: false })
+        .eq('company_name', company_name)
+        .eq('is_affiliation_representative', true);
+      
+      if (resetError) throw resetError;
+    }
 
     const updateData: Record<string, unknown> = {};
-    // user_id는 수정 불가 (documents 테이블에서 참조됨)
     if (name !== undefined) updateData.name = name;
     if (position_id !== undefined) updateData.position_id = position_id;
     if (password !== undefined) updateData.password = password;

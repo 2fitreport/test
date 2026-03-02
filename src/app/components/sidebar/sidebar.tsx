@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase, FiBarChart2, FiBell } from 'react-icons/fi';
+import { FiUser, FiUsers, FiLogOut, FiFile, FiClock, FiHome, FiBriefcase, FiBarChart2, FiBell, FiCheckCircle } from 'react-icons/fi';
 import { clearAuthToken, getAdminData, type AdminData } from '@/lib/auth';
 import styles from './sidebar.module.css';
 
@@ -14,10 +14,12 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
     { path: '/main/home', label: '메인홈' },
+    { path: '/main/profile', label: '마이페이지' },
     { path: '/main/clients', label: '고객사' },
     { path: '/main/document_submission', label: '기업관리' },
     { path: '/main/notifications', label: '알림' },
     { path: '/main/performance_settlement', label: '성과 정산' },
+    { path: '/main/admin/approvals', label: '가입 승인' },
     { path: '/main/user_management', label: '사용자 관리' },
     { path: '/main/history', label: '히스토리' },
 ];
@@ -29,6 +31,7 @@ export default function Sidebar() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [notificationCount, setNotificationCount] = useState(0);
     const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+    const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
     const fetchNotificationCount = async () => {
@@ -66,6 +69,23 @@ export default function Sidebar() {
             }
         } catch (error) {
             console.error('알림 갯수 조회 실패:', error);
+        }
+    };
+
+    const fetchPendingApprovalCount = async () => {
+        try {
+            const adminData = getAdminData();
+            // 대표(level 1), 대표실무자(level 2)만 조회 가능
+            const level = adminData?.position?.level;
+            if (level !== 1 && level !== 2) return;
+
+            const res = await fetch('/api/users?status=pending');
+            if (res.ok) {
+                const data = await res.json();
+                setPendingApprovalCount(data.length || 0);
+            }
+        } catch (error) {
+            console.error('승인 대기 수 조회 실패:', error);
         }
     };
 
@@ -110,6 +130,7 @@ export default function Sidebar() {
             }
             fetchNotificationCount();
             fetchUnreadNotificationCount();
+            fetchPendingApprovalCount();
         };
 
         initAdminData();
@@ -118,6 +139,7 @@ export default function Sidebar() {
         const handleNotificationUpdate = () => {
             fetchNotificationCount();
             fetchUnreadNotificationCount();
+            fetchPendingApprovalCount();
         };
 
         window.addEventListener('notificationUpdate', handleNotificationUpdate);
@@ -164,7 +186,11 @@ export default function Sidebar() {
                 >
                     <Image src="/logo.png" alt="로고" width={220} height={120} className={styles.logoImage} priority />
                 </button>
-                <div className={styles.headerUserName}>
+                <div 
+                    className={styles.headerUserName}
+                    onClick={() => router.push('/main/profile')}
+                    style={{ cursor: 'pointer' }}
+                >
                     <FiUser className={styles.headerUserIcon} />
                     <div className={styles.headerUserInfo}>
                         <p className={styles.headerUserText}>{getNameDisplay()}</p>
@@ -186,6 +212,10 @@ export default function Sidebar() {
             <nav className={`${styles.nav} ${isMenuOpen ? styles.open : ''}`}>
                 <ul className={styles.menuList}>
                     {menuItems.map((item) => {
+                        // 가입 승인은 대표(level=1), 대표실무자(level=2)만 접근 가능
+                        if (item.path === '/main/admin/approvals' && adminData?.position?.level !== 1 && adminData?.position?.level !== 2) {
+                            return null;
+                        }
                         // 사용자 관리는 대표자(level=1)만 접근 가능
                         if (item.path === '/main/user_management' && adminData?.position?.level !== 1) {
                             return null;
@@ -213,6 +243,10 @@ export default function Sidebar() {
                                 >
                                     {item.path === '/main/user_management' ? (
                                         <FiUsers className={styles.menuIcon} />
+                                    ) : item.path === '/main/admin/approvals' ? (
+                                        <FiCheckCircle className={styles.menuIcon} />
+                                    ) : item.path === '/main/profile' ? (
+                                        <FiUser className={styles.menuIcon} />
                                     ) : item.path === '/main/clients' ? (
                                         <FiBriefcase className={styles.menuIcon} />
                                     ) : item.path === '/main/performance_settlement' ? (
@@ -229,6 +263,9 @@ export default function Sidebar() {
                                     {item.label}
                                     {item.path === '/main/document_submission' && notificationCount > 0 && (
                                         <span className={styles.notificationBadge}>{notificationCount}</span>
+                                    )}
+                                    {item.path === '/main/admin/approvals' && pendingApprovalCount > 0 && (
+                                        <span className={styles.notificationBadge} style={{ backgroundColor: '#e03131' }}>{pendingApprovalCount}</span>
                                     )}
                                     {item.path === '/main/notifications' && unreadNotificationCount > 0 && (
                                         <span className={styles.notificationBadge} style={{ backgroundColor: '#e03131' }}>{unreadNotificationCount}</span>

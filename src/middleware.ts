@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 로그인 페이지는 항상 접근 가능
-  if (pathname === '/login') {
+  // 로그인 및 회원가입 페이지는 항상 접근 가능
+  if (pathname === '/login' || pathname === '/signup') {
     return NextResponse.next();
   }
 
@@ -17,7 +17,7 @@ export function middleware(request: NextRequest) {
   const authToken = request.cookies.get('auth_token')?.value;
 
   // 로그인되지 않은 상태에서 다른 페이지 접근 시 로그인 페이지로 리다이렉트
-  if (!authToken && pathname !== '/login') {
+  if (!authToken && pathname !== '/login' && pathname !== '/signup') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

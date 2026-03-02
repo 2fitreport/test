@@ -1,0 +1,243 @@
+.container {
+    box-sizing: border-box;
+    background-color: #f9fafb;
+    min-height: 100vh;
+    padding: 0px 0px 80px 0px;
+    margin-left: var(--sidebar-width);
+    position: relative;
+}
+
+/* 프로젝트 표준 타이틀 레이아웃 */
+.titleWrap {
+    padding: 40px;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+    margin-bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.mainTitle {
+    color: var(--black-color);
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.subTitle {
+    color: #777;
+    font-size: 16px;
+}
+
+.contentWrap {
+    padding: 0 40px;
+}
+
+.layout {
+    display: flex;
+    gap: 30px;
+    align-items: start;
+}
+
+/* 좌측 프로필 카드 - 크기 최적화 */
+.profileCard {
+    width: 320px;
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 20px;
+    padding: 40px 24px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+}
+
+.avatarCircle {
+    width: 80px;
+    height: 80px;
+    background: #f1f3f5;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--main-color);
+}
+
+.userName {
+    font-size: 22px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.userRole {
+    font-size: 13px;
+    color: #888;
+    background: #f8f9fa;
+    padding: 4px 12px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 24px;
+}
+
+.quickStats {
+    border-top: 1px solid #f1f3f5;
+    padding-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: left;
+}
+
+.statItem {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.statLabel {
+    font-size: 11px;
+    color: #aaa;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.statValue {
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+}
+
+/* 우측 상세 콘텐츠 - 더 넓게 확보 */
+.mainContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-width: 0;
+}
+
+.infoSection {
+    background: #fff;
+    border-radius: 16px;
+    padding: 30px;
+    border: 1px solid #eee;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.sectionHeader h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+.infoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.infoItem {
+    padding: 15px;
+    background-color: #fcfcfc;
+    border-radius: 10px;
+    border: 1px solid #f1f3f5;
+}
+
+.label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #999;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+    display: flex;
+    align-items: center;
+}
+
+/* 비밀번호 폼 최적화 */
+.passwordForm {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.fullWidth { grid-column: span 2; }
+
+.inputGroup label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #666;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.inputWrapper input {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.inputWrapper input:focus {
+    border-color: var(--main-color);
+    box-shadow: 0 0 0 3px rgba(var(--main-color-rgb), 0.05);
+    outline: none;
+}
+
+.submitBtn {
+    grid-column: span 2;
+    padding: 16px;
+    background-color: var(--main-color);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.submitBtn:hover { opacity: 0.9; }
+
+@media (max-width: 1080px) {
+    .container {
+        margin-left: 0;
+        padding-top: 120px;
+    }
+    
+    .layout {
+        flex-direction: column;
+    }
+    
+    .profileCard {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .infoGrid, .passwordForm {
+        grid-template-columns: 1fr;
+    }
+    .fullWidth { grid-column: span 1; }
+    .submitBtn { grid-column: span 1; }
+    .contentWrap { padding: 0 20px; }
+}
