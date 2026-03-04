@@ -5,7 +5,6 @@
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    overflow-x: hidden;
     position: fixed;
     top: 0;
     bottom: 0;
@@ -16,7 +15,8 @@
 
 @media (min-width: 1081px) {
     .formContainer {
-        left: 240px;
+        left: var(--sidebar-width);
+        right: 0;
     }
 }
 
@@ -109,18 +109,17 @@
 .pageContainer {
     position: fixed;
     top: 0;
-    right: 0;
     bottom: 0;
     left: 0;
-    background-color: rgba(0, 0, 0, 0.5);
+    right: 0;
+    z-index: 999;
     display: flex;
     flex-direction: column;
-    z-index: 999;
 }
 
 @media (min-width: 1081px) {
     .pageContainer {
-        left: 240px;
+        left: var(--sidebar-width);
     }
 }
 
@@ -236,6 +235,9 @@
     gap: 0;
     flex: 1;
     padding: 0;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 @media (max-width: 1024px) {
@@ -248,7 +250,7 @@
 /* 폼 콘텐츠 */
 .formContent {
     flex: 1;
-    padding: 32px;
+    padding: 32px 32px 60px 32px;
     min-width: 0;
     border-right: 1px solid #e5e7eb;
 }
@@ -264,14 +266,15 @@
 
 /* 소속 섹션 */
 .affiliationSection {
-    width: 500px;
-    padding: 32px;
+    width: 350px;
+    padding: 32px 32px 60px 32px;
     background-color: #fafafa;
     flex-shrink: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 24px;
+    margin-left: auto;
 }
 
 @media (max-width: 1024px) {

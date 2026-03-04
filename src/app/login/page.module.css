@@ -75,7 +75,7 @@
     user-select: none;
 }
 .signupLinkWrapper {
-    display: flex;
+    display: none;
     justify-content: center;
     margin-top: 12px;
 }

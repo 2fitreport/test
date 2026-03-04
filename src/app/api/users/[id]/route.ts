@@ -215,22 +215,25 @@ export async function PATCH(
       );
     }
 
-    // 검수자인 경우 이미 사용 중인 소속 확인 (자신의 소속 제외)
+    // 검수자인 경우 이미 사용 중인 소속 확인 (자신의 소속 제외, '소속없음'은 중복 허용)
     if (isInspector && affiliations !== undefined && affiliations.length > 0) {
-      const { data: takenData, error: takenError } = await supabase
-        .from('user_affiliations')
-        .select('affiliations(name), user_id')
-        .in('affiliations.name', affiliations)
-        .neq('user_id', userId);
+      const affiliationsToCheck = affiliations.filter((a: string) => a !== '소속없음');
+      if (affiliationsToCheck.length > 0) {
+        const { data: takenData, error: takenError } = await supabase
+          .from('inspector_affiliations')
+          .select('affiliation_name, inspector_id')
+          .in('affiliation_name', affiliationsToCheck)
+          .neq('inspector_id', userId);
 
-      if (takenError) throw takenError;
+        if (takenError) throw takenError;
 
-      const takenAffiliations = takenData?.map((item: any) => item.affiliations?.name).filter(Boolean) || [];
-      if (takenAffiliations.length > 0) {
-        return NextResponse.json(
-          { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
-          { status: 400 }
-        );
+        const takenAffiliations = takenData?.map((item: any) => item.affiliation_name).filter(Boolean) || [];
+        if (takenAffiliations.length > 0) {
+          return NextResponse.json(
+            { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -260,8 +263,7 @@ export async function PATCH(
 
     if (error) throw error;
 
-    // 검수자인 경우만 inspector_affiliations에 소속 업데이트
-    // 영업자는 company_name으로 처리됨
+    // 검수자인 경우 inspector_affiliations에 소속 업데이트
     if (isInspector && affiliations !== undefined) {
       // 기존 소속 삭제
       const { error: deleteError } = await supabase
@@ -283,6 +285,45 @@ export async function PATCH(
           .insert(insertData);
 
         if (affError) throw affError;
+      }
+    }
+
+    // 영업자인 경우 user_affiliations에 소속 업데이트
+    if (isSalesPerson && affiliations !== undefined) {
+      // 기존 소속 삭제
+      const { error: deleteError } = await supabase
+        .from('user_affiliations')
+        .delete()
+        .eq('user_id', userId);
+
+      if (deleteError) throw deleteError;
+
+      // 새 소속 추가
+      if (affiliations.length > 0) {
+        // affiliations 이름으로 id 조회
+        const { data: affData, error: affQueryError } = await supabase
+          .from('affiliations')
+          .select('id, name')
+          .in('name', affiliations);
+
+        if (affQueryError) throw affQueryError;
+
+        // affiliation_id 매핑
+        const affMap = new Map(affData?.map((a: any) => [a.name, a.id]) || []);
+        const insertData = affiliations
+          .map((affName: string) => ({
+            user_id: userId,
+            affiliation_id: affMap.get(affName)
+          }))
+          .filter((item: any) => item.affiliation_id !== undefined);
+
+        if (insertData.length > 0) {
+          const { error: affError } = await supabase
+            .from('user_affiliations')
+            .insert(insertData);
+
+          if (affError) throw affError;
+        }
       }
     }
 

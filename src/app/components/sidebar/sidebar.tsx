@@ -29,31 +29,11 @@ export default function Sidebar() {
     const router = useRouter();
     const [adminData, setAdminData] = useState<AdminData | null>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [notificationCount, setNotificationCount] = useState(0);
     const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
     const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+    const [approvalRequestCount, setApprovalRequestCount] = useState(0);
     const [supervisorInfo, setSupervisorInfo] = useState<{ name: string; user_id: string } | null>(null);
 
-    const fetchNotificationCount = async () => {
-        try {
-            const adminData = getAdminData();
-            const isSalesManager = adminData?.position?.level === 4;
-            const userId = adminData?.user_id;
-
-            // 영업자는 자신의 반려/보완만, 다른 직급은 전체 반려/보완 조회
-            const url = isSalesManager && userId
-                ? `/api/documents/notification-count?user_id=${userId}`
-                : '/api/documents/notification-count';
-
-            const response = await fetch(url);
-            if (response.ok) {
-                const data = await response.json();
-                setNotificationCount(data.count || 0);
-            }
-        } catch (error) {
-            console.error('알림 건수 조회 실패:', error);
-        }
-    };
 
     const fetchUnreadNotificationCount = async () => {
         try {
@@ -61,7 +41,7 @@ export default function Sidebar() {
             if (!adminData) return;
             const userIdParam = adminData.id ? adminData.id : adminData.user_id;
 
-            const res = await fetch(`/api/notifications?userId=${userIdParam}`);
+            const res = await fetch(`/api/notifications?userId=${userIdParam}`, { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 const unread = data.filter((n: any) => !n.is_read).length;
@@ -79,13 +59,30 @@ export default function Sidebar() {
             const level = adminData?.position?.level;
             if (level !== 1 && level !== 2) return;
 
-            const res = await fetch('/api/users?status=pending');
+            const res = await fetch('/api/users?status=pending', { cache: 'no-store' });
             if (res.ok) {
                 const data = await res.json();
                 setPendingApprovalCount(data.length || 0);
             }
         } catch (error) {
             console.error('승인 대기 수 조회 실패:', error);
+        }
+    };
+
+    const fetchApprovalRequestCount = async () => {
+        try {
+            const adminData = getAdminData();
+            // 대표(level 1)만 조회 가능
+            const level = adminData?.position?.level;
+            if (level !== 1) return;
+
+            const res = await fetch('/api/documents/approval-request-count', { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                setApprovalRequestCount(data.count || 0);
+            }
+        } catch (error) {
+            console.error('승인요청 건수 조회 실패:', error);
         }
     };
 
@@ -128,18 +125,18 @@ export default function Sidebar() {
                     fetchSupervisorInfo(data.supervisor_id);
                 }
             }
-            fetchNotificationCount();
             fetchUnreadNotificationCount();
             fetchPendingApprovalCount();
         };
 
         initAdminData();
+        fetchApprovalRequestCount();
 
         // 알림 업데이트 이벤트 리스닝
         const handleNotificationUpdate = () => {
-            fetchNotificationCount();
             fetchUnreadNotificationCount();
             fetchPendingApprovalCount();
+            fetchApprovalRequestCount();
         };
 
         window.addEventListener('notificationUpdate', handleNotificationUpdate);
@@ -212,8 +209,8 @@ export default function Sidebar() {
             <nav className={`${styles.nav} ${isMenuOpen ? styles.open : ''}`}>
                 <ul className={styles.menuList}>
                     {menuItems.map((item) => {
-                        // 가입 승인은 대표(level=1), 대표실무자(level=2)만 접근 가능
-                        if (item.path === '/main/admin/approvals' && adminData?.position?.level !== 1 && adminData?.position?.level !== 2) {
+                        // 가입 승인은 대표(level=1)만 접근 가능
+                        if (item.path === '/main/admin/approvals' && adminData?.position?.level !== 1) {
                             return null;
                         }
                         // 사용자 관리는 대표자(level=1)만 접근 가능
@@ -261,8 +258,8 @@ export default function Sidebar() {
                                         <FiFile className={styles.menuIcon} />
                                     )}
                                     {item.label}
-                                    {item.path === '/main/document_submission' && notificationCount > 0 && (
-                                        <span className={styles.notificationBadge}>{notificationCount}</span>
+                                    {item.path === '/main/document_submission' && approvalRequestCount > 0 && (
+                                        <span className={styles.notificationBadge} style={{ backgroundColor: '#e03131' }}>{approvalRequestCount}</span>
                                     )}
                                     {item.path === '/main/admin/approvals' && pendingApprovalCount > 0 && (
                                         <span className={styles.notificationBadge} style={{ backgroundColor: '#e03131' }}>{pendingApprovalCount}</span>

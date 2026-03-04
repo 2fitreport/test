@@ -8,6 +8,7 @@
  * @param inspectorId - 과거 담당했던 검수자의 user_id (과거 담당자는 수정 불가)
  * @param managerId - 배정된 실무자 ID (Level 1, 2의 경우 필요)
  * @param progressDetails - 문서의 현재 처리 단계 (영업자는 '영업자' 상태일 때만 수정 가능)
+ * @param status - 문서의 상태 ('정상', '보완', '보류')
  * @returns 수정 권한 여부
  */
 export function canEditDocument(
@@ -18,7 +19,8 @@ export function canEditDocument(
   assignedSalesManagerIds?: string[],
   inspectorId?: string | null,
   managerId?: string | null,
-  progressDetails?: string | null
+  progressDetails?: string | null,
+  status?: string | null
 ): boolean {
   // Level 1 (대표자): 모든 글 수정 가능
   if (userRoleLevel === 1) {
@@ -35,12 +37,27 @@ export function canEditDocument(
     return userId === documentUserId && progressDetails === '영업자';
   }
 
-  // Level 6 (검수자): 자신의 소속과 일치하는 문서이면서 progress_details가 '검수자'일 때만 수정 가능
+  // Level 6 (검수자)
   if (userRoleLevel === 6) {
     const isAssignedDocument = assignedSalesManagerIds ? assignedSalesManagerIds.includes(documentUserId) : false;
     const isPastInspector = inspectorId === userId;
-    // 담당하는 영업자의 문서이면서, 과거 담당자가 아니며, progress_details가 '검수자'인 경우만 수정 가능
-    return isAssignedDocument && !isPastInspector && progressDetails === '검수자';
+
+    // 담당하는 영업자의 문서이면서 과거 담당자가 아닌 경우
+    if (!isAssignedDocument || isPastInspector) {
+      return false;
+    }
+
+    // '검수자' 단계에서는 수정 가능
+    if (progressDetails === '검수자') {
+      return true;
+    }
+
+    // '분석' 단계에서 상태가 '보완'인 경우 모든 항목 수정 가능
+    if (progressDetails === '분석' && status === '보완') {
+      return true;
+    }
+
+    return false;
   }
 
   // 기타: 수정 불가

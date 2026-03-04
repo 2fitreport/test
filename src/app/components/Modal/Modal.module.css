@@ -63,15 +63,22 @@ display: block;
 }
 
 .message {
-margin: 0;
-font-size: 16px;
-color: var(--black-color);
-line-height: 1.6;
-word-break: break-word;
-white-space: pre-line;
-text-align: center;
-font-weight: 700;
-max-width: 300px;
+  margin: 0;
+  font-size: 16px;
+  color: var(--black-color);
+  line-height: 1.6;
+  word-break: break-word;
+  text-align: center;
+  font-weight: 700;
+  max-width: 350px;
+  display: block !important;
+  white-space: pre-line !important;
+}
+
+.errorMessage {
+color: #e03131;
+font-size: 12px;
+font-weight: 500;
 }
 
 .footer {

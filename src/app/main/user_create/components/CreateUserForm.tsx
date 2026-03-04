@@ -18,6 +18,7 @@ interface CreateUserFormProps {
         email_display: string;
         address: string;
         address_detail: string;
+        resident_id: string;
         company_name: string;
         status: 'active' | 'inactive';
         affiliations?: string[];
@@ -344,6 +345,43 @@ export default function CreateUserForm({
                                             backgroundColor: '#fafafa',
                                             minHeight: '44px',
                                         }}>
+                                            {/* 검수자: 소속없음 옵션 (중복 허용) */}
+                                            {!isSalesPerson && (() => {
+                                                const isChecked = formData.affiliations?.includes('소속없음') || false;
+                                                return (
+                                                    <label
+                                                        key="소속없음"
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '4px',
+                                                            backgroundColor: isChecked ? '#9e9e9e' : '#fff',
+                                                            color: isChecked ? '#fff' : '#666',
+                                                            border: `1px solid ${isChecked ? '#9e9e9e' : '#ddd'}`,
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            fontWeight: isChecked ? '500' : '400'
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={() => {
+                                                                if (!isChecked) {
+                                                                    // 소속없음 선택 시 나머지 모두 해제
+                                                                    onUpdateField('affiliations', ['소속없음']);
+                                                                } else {
+                                                                    onToggleAffiliation('소속없음');
+                                                                }
+                                                            }}
+                                                            style={{ display: 'none' }}
+                                                        />
+                                                        <span style={{ cursor: 'pointer' }}>소속없음</span>
+                                                    </label>
+                                                );
+                                            })()}
                                             {allAffiliations.map(affName => {
                                                 const isChecked = isSalesPerson
                                                     ? selectedAffiliation === affName
@@ -380,8 +418,13 @@ export default function CreateUserForm({
                                                                         });
                                                                     }
                                                                 } else {
-                                                                    // 검수자: 복수선택
-                                                                    onToggleAffiliation(affName);
+                                                                    // 검수자: 복수선택 (소속없음 선택 중이면 해제)
+                                                                    if (formData.affiliations?.includes('소속없음')) {
+                                                                        const next = formData.affiliations.filter(a => a !== '소속없음');
+                                                                        onUpdateField('affiliations', next.includes(affName) ? next.filter(a => a !== affName) : [...next, affName]);
+                                                                    } else {
+                                                                        onToggleAffiliation(affName);
+                                                                    }
                                                                 }
                                                             }}
                                                             style={{ display: 'none' }}
@@ -529,6 +572,29 @@ export default function CreateUserForm({
                                 cursor: formData.address ? 'text' : 'not-allowed',
                                 backgroundColor: formData.address ? '#ffffff' : '#f5f5f5',
                             }}
+                        />
+                    </div>
+
+                    {/* 주민등록번호 */}
+                    <div className={styles.formGroup}>
+                        <label className={styles.label}>주민등록번호</label>
+                        <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="XXXXXX-XXXXXXX"
+                            value={formData.resident_id ?? ''}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                const formatted = value.replace(/[^0-9]/g, '').substring(0, 13);
+                                let result = '';
+                                if (formatted.length <= 6) {
+                                    result = formatted;
+                                } else {
+                                    result = `${formatted.substring(0, 6)}-${formatted.substring(6)}`;
+                                }
+                                onUpdateField('resident_id', result);
+                            }}
+                            maxLength={14}
                         />
                     </div>
 

@@ -91,7 +91,7 @@
     cursor: not-allowed;
 }
 
-/* === 크레탑 파일 섹션 === */
+/* === 기업상세정보 파일 섹션 === */
 .cretabFileSection {
     display: flex;
     gap: 10px;
@@ -135,7 +135,7 @@
     transform: translateY(-2px);
 }
 
-/* === 크레탑 상태 배지 === */
+/* === 기업상세정보 상태 배지 === */
 .cretabStatusBadge {
     display: flex;
     align-items: center;
@@ -152,7 +152,7 @@
     flex-shrink: 0;
 }
 
-/* === 크레탑 파일 정보 === */
+/* === 기업상세정보 파일 정보 === */
 .cretabFileInfo {
     display: flex;
     align-items: center;

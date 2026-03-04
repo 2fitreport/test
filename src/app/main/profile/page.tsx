@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiUser, FiMail, FiPhone, FiCreditCard, FiLock, FiShield, FiBriefcase } from 'react-icons/fi';
 import { getAdminData } from '@/lib/auth';
 import Modal from '@/components/Modal/Modal';
 import styles from './profile.module.css';
@@ -15,6 +14,8 @@ interface UserData {
   company_name: string;
   phone: string;
   email_display: string;
+  address: string;
+  resident_id: string;
   bank_name: string;
   account_holder: string;
   account_number: string;
@@ -112,116 +113,110 @@ export default function ProfilePage() {
   return (
     <div className={styles.container}>
       <div className={styles.titleWrap}>
-        <span className={styles.mainTitle}>마이페이지</span>
-        <p className={styles.subTitle}>회원님의 계정 보안 및 상세 정보를 관리합니다.</p>
+        <h1 className={styles.pageTitle}>마이페이지</h1>
+        <p className={styles.pageSubtitle}>회원님의 정보를 확인하고 보안 설정을 관리합니다.</p>
       </div>
 
       <div className={styles.contentWrap}>
-        <div className={styles.layout}>
-          
-          {/* 좌측 프로필 카드 */}
-          <div className={styles.profileCard}>
-            <div className={styles.avatarCircle}>
-              <FiUser />
-            </div>
-            <h2 className={styles.userName}>{userData.name}</h2>
-            <span className={styles.userRole}>{userData.position?.name || '일반 사용자'}</span>
             
-            <div className={styles.quickStats}>
-              <div className={styles.statItem}>
-                <span className={styles.statLabel}>아이디</span>
-                <span className={styles.statValue}>{userData.user_id}</span>
-              </div>
-              <div className={styles.statItem}>
-                <span className={styles.statLabel}>소속</span>
-                <span className={styles.statValue}>{userData.company_name || '미지정'}</span>
-              </div>
+        {/* 사용자 정보 */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>회원 정보</h2>
+          <div className={styles.infoTable}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>이름</div>
+              <div className={styles.infoValue}>{userData.name}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>아이디</div>
+              <div className={styles.infoValue}>{userData.user_id}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>주민등록번호</div>
+              <div className={styles.infoValue}>{userData.resident_id || '-'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>주소</div>
+              <div className={styles.infoValue}>{userData.address || '-'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>직책</div>
+              <div className={styles.infoValue}>{userData.position?.name || '미지정'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>소속</div>
+              <div className={styles.infoValue}>{userData.company_name || '미지정'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>연락처</div>
+              <div className={styles.infoValue}>{userData.phone}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>이메일</div>
+              <div className={styles.infoValue}>{userData.email_display || '-'}</div>
             </div>
           </div>
+        </section>
 
-          {/* 우측 상세 콘텐츠 */}
-          <div className={styles.mainContent}>
-            
-            {/* 상세 정보 섹션 */}
-            <section className={styles.infoSection}>
-              <div className={styles.sectionHeader}>
-                <FiShield style={{color: 'var(--main-color)', fontSize: '20px'}} />
-                <h3>상세 정보</h3>
-              </div>
-              
-              <div className={styles.infoGrid}>
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>연락처</span>
-                  <div className={styles.value}><FiPhone style={{marginRight: '8px'}} /> {userData.phone}</div>
-                </div>
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>이메일 주소</span>
-                  <div className={styles.value}><FiMail style={{marginRight: '8px'}} /> {userData.email_display || '-'}</div>
-                </div>
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>은행명</span>
-                  <div className={styles.value}><FiBriefcase style={{marginRight: '8px'}} /> {userData.bank_name || '-'}</div>
-                </div>
-                <div className={styles.infoItem}>
-                  <span className={styles.label}>계좌번호</span>
-                  <div className={styles.value}><FiCreditCard style={{marginRight: '8px'}} /> {userData.account_number || '-'}</div>
-                </div>
-                <div className={`${styles.infoItem} ${styles.fullWidth}`}>
-                  <span className={styles.label}>예금주</span>
-                  <div className={styles.value}>{userData.account_holder || '-'}</div>
-                </div>
-              </div>
-            </section>
-
-            {/* 비밀번호 변경 섹션 */}
-            <section className={styles.infoSection}>
-              <div className={styles.sectionHeader}>
-                <FiLock style={{color: 'var(--main-color)', fontSize: '20px'}} />
-                <h3>비밀번호 보안 설정</h3>
-              </div>
-              
-              <form className={styles.passwordForm} onSubmit={handlePasswordChange}>
-                <div className={`${styles.inputGroup} ${styles.fullWidth}`}>
-                  <label>현재 비밀번호</label>
-                  <div className={styles.inputWrapper}>
-                    <input 
-                      type="password" 
-                      value={passwords.currentPassword}
-                      onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
-                      placeholder="현재 사용 중인 비밀번호를 입력하세요"
-                    />
-                  </div>
-                </div>
-                <div className={styles.inputGroup}>
-                  <label>새 비밀번호</label>
-                  <div className={styles.inputWrapper}>
-                    <input 
-                      type="password" 
-                      value={passwords.newPassword}
-                      onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
-                      placeholder="신규 비밀번호 설정"
-                    />
-                  </div>
-                </div>
-                <div className={styles.inputGroup}>
-                  <label>비밀번호 재확인</label>
-                  <div className={styles.inputWrapper}>
-                    <input 
-                      type="password" 
-                      value={passwords.confirmPassword}
-                      onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
-                      placeholder="한 번 더 입력해주세요"
-                    />
-                  </div>
-                </div>
-                <button type="submit" className={styles.submitBtn}>
-                  안전하게 비밀번호 업데이트
-                </button>
-              </form>
-            </section>
-
+        {/* 계좌 정보 */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>계좌 정보</h2>
+          <div className={styles.infoTable}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>은행명</div>
+              <div className={styles.infoValue}>{userData.bank_name || '-'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>계좌번호</div>
+              <div className={styles.infoValue}>{userData.account_number || '-'}</div>
+            </div>
+            <div className={styles.infoRow}>
+              <div className={styles.infoLabel}>예금주</div>
+              <div className={styles.infoValue}>{userData.account_holder || '-'}</div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* 비밀번호 변경 */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>보안 설정</h2>
+              
+          <form className={styles.passwordForm} onSubmit={handlePasswordChange}>
+            <div className={styles.formGroup}>
+              <label>현재 비밀번호</label>
+              <input
+                type="password"
+                value={passwords.currentPassword}
+                onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
+                placeholder="현재 비밀번호를 입력하세요"
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>새 비밀번호</label>
+              <input
+                type="password"
+                value={passwords.newPassword}
+                onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
+                placeholder="새 비밀번호를 입력하세요"
+                className={styles.input}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label>비밀번호 재확인</label>
+              <input
+                type="password"
+                value={passwords.confirmPassword}
+                onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
+                placeholder="비밀번호를 다시 입력하세요"
+                className={styles.input}
+              />
+            </div>
+            <button type="submit" className={styles.submitBtn}>
+              비밀번호 변경
+            </button>
+          </form>
+        </section>
       </div>
 
       <Modal

@@ -1,15 +1,17 @@
 'use client';
 
+import { ReactNode } from 'react';
 import styles from './Modal.module.css';
 
 interface ModalProps {
   isOpen: boolean;
-  message: string;
+  message: string | ReactNode;
   onClose: () => void;
   type?: 'success' | 'error' | 'warning' | 'info';
   confirmText?: string;
   onConfirm?: () => void;
   showConfirmButton?: boolean;
+  showCancelButton?: boolean;
 }
 
 export default function Modal({
@@ -20,6 +22,7 @@ export default function Modal({
   confirmText = '확인',
   onConfirm,
   showConfirmButton = true,
+  showCancelButton = true,
 }: ModalProps) {
   if (!isOpen) return null;
 
@@ -48,12 +51,14 @@ export default function Modal({
               <img src={iconSrc} alt={type} className={styles.icon} />
             </div>
           )}
-          <p className={styles.message} dangerouslySetInnerHTML={{ __html: message }}></p>
+          <div className={styles.message} style={{ whiteSpace: 'pre-line' }}>
+            {message}
+          </div>
         </div>
         <div className={styles.footer}>
           {showConfirmButton ? (
             <>
-              {type !== 'success' && (
+              {type !== 'success' && showCancelButton && (
                 <button className={styles.cancelButton} onClick={onClose}>
                   닫기
                 </button>

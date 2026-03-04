@@ -465,6 +465,11 @@
 }
 
 /* 진행단계 배지 색상 */
+.progressBadgeConsultation {
+    background-color: var(--color-consultation) !important;
+    color: #ffffff !important;
+}
+
 .progressBadgeWaiting {
     background-color: var(--color-document-request) !important;
     color: #ffffff !important;
@@ -475,8 +480,18 @@
     color: #ffffff !important;
 }
 
+.progressBadgeInspection {
+    background-color: #9c27b0 !important;
+    color: #ffffff !important;
+}
+
 .progressBadgeProgress {
     background-color: var(--color-progress) !important;
+    color: #ffffff !important;
+}
+
+.progressBadgeApprovalRequest {
+    background-color: #ff9800 !important;
     color: #ffffff !important;
 }
 
@@ -506,7 +521,7 @@
 }
 
 .progressBadgeInspector {
-    background-color: var(--color-progress) !important;
+    background-color: #9c27b0 !important;
     color: #ffffff !important;
 }
 
@@ -628,6 +643,11 @@
 
 .rejected {
     background-color: var(--color-hold);
+    color: #fff;
+}
+
+.inspection {
+    background-color: var(--color-status-inspection);
     color: #fff;
 }
 

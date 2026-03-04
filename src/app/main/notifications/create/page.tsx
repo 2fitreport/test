@@ -19,7 +19,7 @@ export default function NotificationCreatePage() {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
@@ -57,7 +57,7 @@ export default function NotificationCreatePage() {
             return;
         }
 
-        if (type === 'personal' && !selectedUser) {
+        if (type === 'personal' && selectedUsers.length === 0) {
             setErrorModal({ open: true, message: '수신할 유저를 선택해주세요.' });
             return;
         }
@@ -78,7 +78,7 @@ export default function NotificationCreatePage() {
                     content,
                     type,
                     sender_id: adminData.id,
-                    receiver_id: type === 'personal' ? selectedUser?.id : null,
+                    receiver_ids: type === 'personal' ? selectedUsers.map(u => u.id) : [],
                 }),
             });
 
@@ -151,27 +151,36 @@ export default function NotificationCreatePage() {
                                 </div>
                                 <div className={styles.userList}>
                                     {filteredUsers.length > 0 ? (
-                                        filteredUsers.map(user => (
-                                            <div
-                                                key={user.id}
-                                                className={`${styles.userItem} ${selectedUser?.id === user.id ? styles.selected : ''}`}
-                                                onClick={() => setSelectedUser(user)}
-                                            >
-                                                <div className={styles.userInfo}>
-                                                    <span className={styles.userName}>{user.name} ({user.user_id})</span>
-                                                    <span className={styles.userDept}>{user.position.name}</span>
+                                        filteredUsers.map(user => {
+                                            const isSelected = selectedUsers.some(u => u.id === user.id);
+                                            return (
+                                                <div
+                                                    key={user.id}
+                                                    className={`${styles.userItem} ${isSelected ? styles.selected : ''}`}
+                                                    onClick={() => {
+                                                        setSelectedUsers(prev => {
+                                                            const exists = prev.some(u => u.id === user.id);
+                                                            if (exists) return prev.filter(u => u.id !== user.id);
+                                                            return [...prev, user];
+                                                        });
+                                                    }}
+                                                >
+                                                    <div className={styles.userInfo}>
+                                                        <span className={styles.userName}>{user.name} ({user.user_id})</span>
+                                                        <span className={styles.userDept}>{user.position.name}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
                                             검색된 유저가 없습니다.
                                         </div>
                                     )}
                                 </div>
-                                {selectedUser && (
+                                {selectedUsers.length > 0 && (
                                     <div style={{ marginTop: '10px', color: 'var(--main-color)', fontWeight: '700' }}>
-                                        선택됨: {selectedUser.name} ({selectedUser.user_id})
+                                        선택됨 ({selectedUsers.length}명): {selectedUsers.map(u => u.name).join(', ')}
                                     </div>
                                 )}
                             </div>

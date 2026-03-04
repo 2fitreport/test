@@ -18,14 +18,14 @@ interface User {
     phone: string;
     address: string;
     address_detail: string;
-    company_name: string;
+    affiliation_name?: string | null;
     email_display: string;
     created_at?: string;
     password?: string;
     supervisor_id?: number | null;
 }
 
-type SortColumn = 'user_id' | 'name' | 'position' | 'phone' | 'email_display' | 'address' | 'company_name' | 'status' | 'created_at';
+type SortColumn = 'user_id' | 'name' | 'position' | 'phone' | 'email_display' | 'address' | 'affiliation_name' | 'status' | 'created_at';
 type SortOrder = 'asc' | 'desc';
 
 interface Position {
@@ -176,7 +176,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 (user.email_display || '').toLowerCase().includes(query) ||
                 (user.address || '').toLowerCase().includes(query) ||
                 (user.address_detail || '').toLowerCase().includes(query) ||
-                (user.company_name || '').toLowerCase().includes(query)
+                (user.affiliation_name || '').toLowerCase().includes(query)
             );
         });
 
@@ -614,8 +614,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                                 <option value="phone-desc">전화번호 (Z-A)</option>
                                 <option value="email_display-asc">이메일 (A-Z)</option>
                                 <option value="email_display-desc">이메일 (Z-A)</option>
-                                <option value="company_name-asc">회사명 (A-Z)</option>
-                                <option value="company_name-desc">회사명 (Z-A)</option>
+                                <option value="affiliation_name-asc">소속 (A-Z)</option>
+                                <option value="affiliation_name-desc">소속 (Z-A)</option>
                                 <option value="status-asc">상태 (활성)</option>
                                 <option value="status-desc">상태 (비활성)</option>
                                 <option value="created_at-desc">가입순 (최신)</option>
@@ -695,8 +695,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                                 <th className={styles.sortableHeader} onClick={() => handleSort('address')}>
                                     주소{getSortIcon('address')}
                                 </th>
-                                <th className={styles.sortableHeader} onClick={() => handleSort('company_name')}>
-                                    소속{getSortIcon('company_name')}
+                                <th className={styles.sortableHeader} onClick={() => handleSort('affiliation_name')}>
+                                    소속{getSortIcon('affiliation_name')}
                                 </th>
                                 <th className={styles.sortableHeader} onClick={() => handleSort('status')}>
                                     상태{getSortIcon('status')}
@@ -728,7 +728,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                                                 : user.address || user.address_detail || '-'}
                                         </div>
                                     </td>
-                                    <td className={styles.company}>{user.company_name || '-'}</td>
+                                    <td className={styles.company}>{user.affiliation_name || '-'}</td>
                                     <td className={styles.status}>
                                         {user.position?.level === 1 ? (
                                             <span></span>
@@ -915,7 +915,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
 
                         <div className={styles.viewModalItem}>
                             <span className={styles.viewModalLabel}>소속</span>
-                            <span className={styles.viewModalValue}>{selectedUser.company_name || '-'}</span>
+                            <span className={styles.viewModalValue}>{selectedUser.affiliation_name || '-'}</span>
                         </div>
 
                         <div className={styles.viewModalItem}>

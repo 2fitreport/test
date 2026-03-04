@@ -21,7 +21,8 @@ export default function SignupPage() {
     name: '',
     phone: '',
     email: '',
-    company_name: '',
+    address: '',
+    resident_id: '',
     bank_name: '',
     account_holder: '',
     account_number: '',
@@ -80,9 +81,19 @@ export default function SignupPage() {
         processedValue = value.replace(/[^0-9]/g, '');
     }
 
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: processedValue 
+    // 주민등록번호 포맷팅 (XXXXXX-XXXXXXX)
+    if (name === 'resident_id') {
+        const number = value.replace(/[^0-9]/g, '').substring(0, 13);
+        if (number.length <= 6) {
+            processedValue = number;
+        } else {
+            processedValue = `${number.substring(0, 6)}-${number.substring(6)}`;
+        }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: processedValue
     }));
   };
 
@@ -134,25 +145,7 @@ export default function SignupPage() {
         setModal({ isOpen: true, message: '아이디 중복 확인을 해주세요.', type: 'error' });
         return;
     }
-    
-    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
-    if (!formData.password) {
-        setModal({ isOpen: true, message: '비밀번호를 입력해주세요.', type: 'error' });
-        return;
-    }
-    if (!passwordRegex.test(formData.password)) {
-        setModal({ isOpen: true, message: '영문, 숫자, 특수문자를 포함하여 8자 이상 입력해야 합니다.', type: 'error' });
-        return;
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-        setModal({ isOpen: true, message: '비밀번호가 일치하지 않습니다.', type: 'error' });
-        return;
-    }
-    if (!formData.name) {
-        setModal({ isOpen: true, message: '이름을 입력해주세요.', type: 'error' });
-        return;
-    }
+
     if (!formData.email) {
         setModal({ isOpen: true, message: '이메일을 입력해주세요.', type: 'error' });
         return;
@@ -162,12 +155,43 @@ export default function SignupPage() {
         setModal({ isOpen: true, message: '올바른 이메일 형식이 아닙니다.', type: 'error' });
         return;
     }
+
+    const passwordRegex = /^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    if (!formData.password) {
+        setModal({ isOpen: true, message: '비밀번호를 입력해주세요.', type: 'error' });
+        return;
+    }
+    if (!passwordRegex.test(formData.password)) {
+        setModal({ isOpen: true, message: '영문, 숫자, 특수문자를 포함하여\n8자 이상 입력해야 합니다.', type: 'error' });
+        return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+        setModal({ isOpen: true, message: '비밀번호가 일치하지 않습니다.', type: 'error' });
+        return;
+    }
+    if (!formData.name) {
+        setModal({ isOpen: true, message: '이름을 입력해주세요.', type: 'error' });
+        return;
+    }
     if (!formData.phone) {
         setModal({ isOpen: true, message: '연락처를 입력해주세요.', type: 'error' });
         return;
     }
-    if (formData.phone.length < 12) {
+    if (formData.phone.length !== 13) {
         setModal({ isOpen: true, message: '올바른 연락처 형식이 아닙니다.', type: 'error' });
+        return;
+    }
+    if (!formData.address) {
+        setModal({ isOpen: true, message: '주소를 입력해주세요.', type: 'error' });
+        return;
+    }
+    if (!formData.resident_id) {
+        setModal({ isOpen: true, message: '주민등록번호를 입력해주세요.', type: 'error' });
+        return;
+    }
+    if (formData.resident_id.length !== 14) {
+        setModal({ isOpen: true, message: '올바른 주민등록번호 형식이 아닙니다.', type: 'error' });
         return;
     }
 
@@ -197,7 +221,7 @@ export default function SignupPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setModal({ isOpen: true, message: data.message, type: 'success' });
+        setModal({ isOpen: true, message: '회원가입 신청이 완료되었습니다.', type: 'success' });
       } else {
         setModal({ isOpen: true, message: data.message || '가입 신청 중 오류가 발생했습니다.', type: 'error' });
       }
@@ -222,9 +246,6 @@ export default function SignupPage() {
       </div>
       
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <h2 className={styles.title}>회원가입 신청</h2>
-        <p className={styles.subtitle}>정확한 정보를 입력해 주세요. 관리자 승인 후 이용 가능합니다.</p>
-
         {/* 아이디 */}
         <div className={styles.inputGroup}>
           <label className={styles.label}>아이디 <span className={styles.required}>*</span></label>
@@ -250,6 +271,20 @@ export default function SignupPage() {
           {isIdChecked && isIdAvailable && (
             <p className={`${styles.availabilityMessage} ${styles.available}`}>✓ 사용 가능한 아이디입니다.</p>
           )}
+        </div>
+
+        {/* 이메일 */}
+        <div className={styles.inputGroup}>
+          <label className={styles.label}>이메일 <span className={styles.required}>*</span></label>
+          <input
+            className={styles.input}
+            name="email"
+            type="email"
+            placeholder="example@company.com"
+            value={formData.email}
+            onChange={handleChange}
+            disabled={isLoading}
+          />
         </div>
 
         {/* 비밀번호 */}
@@ -295,20 +330,6 @@ export default function SignupPage() {
           />
         </div>
 
-        {/* 이메일 */}
-        <div className={styles.inputGroup}>
-          <label className={styles.label}>이메일 <span className={styles.required}>*</span></label>
-          <input
-            className={styles.input}
-            name="email"
-            type="email"
-            placeholder="example@company.com"
-            value={formData.email}
-            onChange={handleChange}
-            disabled={isLoading}
-          />
-        </div>
-
         {/* 연락처 */}
         <div className={styles.inputGroup}>
           <label className={styles.label}>연락처 <span className={styles.required}>*</span></label>
@@ -320,21 +341,37 @@ export default function SignupPage() {
             value={formData.phone}
             onChange={handleChange}
             disabled={isLoading}
+            maxLength={13}
           />
         </div>
 
-        {/* 소속 */}
-        <div className={styles.inputGroup}>
-          <label className={styles.label}>소속 (선택)</label>
-          <input
-            className={styles.input}
-            name="company_name"
-            type="text"
-            placeholder="소속 회사명을 입력하세요"
-            value={formData.company_name}
-            onChange={handleChange}
-            disabled={isLoading}
-          />
+        {/* 주소 & 주민등록번호 */}
+        <div className={styles.inputRow}>
+          <div className={styles.inputGroup} style={{ flex: 1 }}>
+            <label className={styles.label}>주소 <span className={styles.required}>*</span></label>
+            <input
+              className={styles.input}
+              name="address"
+              type="text"
+              placeholder="주소를 입력하세요"
+              value={formData.address}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
+          </div>
+          <div className={styles.inputGroup} style={{ flex: 1 }}>
+            <label className={styles.label}>주민등록번호 <span className={styles.required}>*</span></label>
+            <input
+              className={styles.input}
+              name="resident_id"
+              type="text"
+              placeholder="XXXXXX-XXXXXXX"
+              value={formData.resident_id}
+              onChange={handleChange}
+              disabled={isLoading}
+              maxLength={14}
+            />
+          </div>
         </div>
 
         <div className={styles.sectionDivider}>계좌 정보</div>

@@ -50,7 +50,7 @@ export async function POST(
     try {
         const { id } = await params;
         const docId = parseInt(id);
-        const { content, author, author_id } = await request.json();
+        const { content, author, author_id, user_name, user_id } = await request.json();
 
         if (!content?.trim()) {
             return NextResponse.json(
@@ -73,8 +73,8 @@ export async function POST(
         // 새 메모 생성
         const newMemo = {
             id: `memo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            author: author || '현재사용자',
-            author_id: author_id || '0',
+            author: author || user_name || '현재사용자',
+            author_id: author_id || user_id || '0',
             content: content.trim(),
             created_at: new Date().toISOString(),
             replies: []

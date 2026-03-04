@@ -12,6 +12,8 @@ interface PendingUser {
   name: string;
   phone: string;
   email_display: string;
+  address: string;
+  resident_id: string;
   company_name: string;
   bank_name: string;
   account_holder: string;
@@ -186,7 +188,7 @@ export default function ApprovalsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.titleWrap}>
-            <span className={styles.mainTitle}>회원가입 승인 관리</span>
+            <span className={styles.mainTitle}>가입 승인 관리</span>
             <p className={styles.subTitle}>데이터를 불러오는 중입니다...</p>
         </div>
       </div>
@@ -196,7 +198,7 @@ export default function ApprovalsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.titleWrap}>
-          <span className={styles.mainTitle}>회원가입 승인 관리</span>
+          <span className={styles.mainTitle}>가입 승인 관리</span>
           <p className={styles.subTitle}>신규 가입 신청 내역입니다. 정보를 확인 후 소속을 지정하여 승인해주세요.</p>
       </div>
 
@@ -212,9 +214,10 @@ export default function ApprovalsPage() {
                             <th>가입일</th>
                             <th>아이디</th>
                             <th>이름</th>
+                            <th>주민등록번호</th>
+                            <th>주소</th>
                             <th>연락처</th>
                             <th>이메일</th>
-                            <th>신청소속</th>
                             <th>은행명</th>
                             <th>계좌번호</th>
                             <th>작업</th>
@@ -223,16 +226,17 @@ export default function ApprovalsPage() {
                         <tbody>
                         {users.map((user) => (
                             <tr key={user.id}>
-                            <td>{new Date(user.created_at).toLocaleDateString()}</td>
+                            <td>{new Date(user.created_at).toLocaleDateString().slice(0, -1)}</td>
                             <td>{user.user_id}</td>
                             <td>{user.name}</td>
+                            <td>{user.resident_id || '-'}</td>
+                            <td>{user.address || '-'}</td>
                             <td>{user.phone || '-'}</td>
                             <td>{user.email_display || '-'}</td>
-                            <td>{user.company_name || '-'}</td>
                             <td>{user.bank_name || '-'}</td>
                             <td>{user.account_number || '-'}</td>
                             <td className={styles.actions}>
-                                <button className={styles.approveBtn} onClick={() => openApprovalDialog(user)}>승인 설정</button>
+                                <button className={styles.approveBtn} onClick={() => openApprovalDialog(user)}>승인</button>
                                 <button className={styles.rejectBtn} onClick={() => handleReject(user.id)}>거절</button>
                             </td>
                             </tr>
@@ -244,21 +248,31 @@ export default function ApprovalsPage() {
           )}
       </div>
 
-      {/* 승인 설정 모달 */}
+      {/* 승인 모달 */}
       {isApprovalModalOpen && selectedUser && (
         <div className={styles.modalOverlay} onClick={() => setIsApprovalModalOpen(false)}>
           <div className={styles.approvalModal} onClick={(e) => e.stopPropagation()}>
-            <h3 className={styles.modalTitle}>가입 승인 설정</h3>
+            <h3 className={styles.modalTitle}>가입 승인</h3>
             
             <div className={styles.userInfoBox}>
                 <div className={`${styles.infoItem} ${styles.nameItem}`}>
-                    <span className={styles.infoLabel}>신청 유저</span>
-                    <span className={styles.infoValue}>{selectedUser.name} <span style={{fontSize: '13px', fontWeight: 500, color: '#888'}}>({selectedUser.user_id})</span></span>
+                    <span className={styles.infoLabel}>이름</span>
+                    <span className={styles.infoValue}>{selectedUser.name}</span>
                 </div>
                 <div className={styles.infoDivider} />
                 <div className={`${styles.infoItem} ${styles.compItem}`}>
-                    <span className={styles.infoLabel}>신청 소속</span>
-                    <span className={styles.infoValue}>{selectedUser.company_name || '미지정'}</span>
+                    <span className={styles.infoLabel}>아이디</span>
+                    <span className={styles.infoValue}>{selectedUser.user_id}</span>
+                </div>
+                <div className={styles.infoDivider} />
+                <div className={`${styles.infoItem} ${styles.compItem}`}>
+                    <span className={styles.infoLabel}>주민등록번호</span>
+                    <span className={styles.infoValue}>{selectedUser.resident_id || '-'}</span>
+                </div>
+                <div className={styles.infoDivider} />
+                <div className={`${styles.infoItem} ${styles.compItem}`}>
+                    <span className={styles.infoLabel}>주소</span>
+                    <span className={styles.infoValue}>{selectedUser.address || '-'}</span>
                 </div>
                 <div className={styles.infoDivider} />
                 <div className={`${styles.infoItem} ${styles.phoneItem}`}>
@@ -316,7 +330,7 @@ export default function ApprovalsPage() {
 
             <div className={styles.modalFooter}>
                 <button className={styles.cancelBtn} onClick={() => setIsApprovalModalOpen(false)}>취소</button>
-                <button className={styles.submitBtn} onClick={handleApprove}>승인 및 계정 활성화</button>
+                <button className={styles.submitBtn} onClick={handleApprove}>승인</button>
             </div>
           </div>
         </div>

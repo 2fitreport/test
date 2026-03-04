@@ -1,6 +1,7 @@
 @charset "UTF-8";
 
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@latest/dist/web/static/pretendard.css");
+@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap");
 
 :root {
     --main-color: #0f1a4d;
@@ -25,16 +26,18 @@
     --status-approved: #66bb6a;
 
     /* 진행단계 색상 (Progress Stages) */
-    --color-consultation: #b0b9c6;      /* 상담: 초기 상담 단계 */
-    --color-document-request: #ffd54f;  /* 서류요청: 필요 서류 요청 */
-    --color-analysis: #4fc3f7;          /* 분석(심사): 서류 분석 중 */
-    --color-progress: #66bb6a;          /* 진행: 진행 중 */
-    --color-approval: #42a5f5;          /* 승인: 최종 승인 */
+    --color-consultation: #9e9e9e;      /* 상담: 그레이 */
+    --color-document-request: #ffc107;  /* 서류요청: 황색 */
+    --color-analysis: #2196f3;          /* 분석: 파란색 */
+    --color-stage-inspection: #9c27b0;  /* 심사: 보라색 */
+    --color-progress: #e74c3c;          /* 진행: 빨강색 */
+    --color-approval: #4caf50;          /* 승인: 초록색 */
 
     /* 상태 색상 (Status) */
-    --color-normal: #52ea9b;            /* 정상: 정상 상태 */
-    --color-revision: #ffd6a5;          /* 보완: 보완 요청 상태 */
-    --color-hold: #ffadad;              /* 보류: 보류 상태 */
+    --color-normal: #4caf50;            /* 정상: 초록색 */
+    --color-revision: #ff9800;          /* 보완: 주황색 */
+    --color-hold: #ff6b6b;              /* 보류: 빨강색 */
+    --color-status-inspection: #2196f3; /* 검수: 파란색 */
 }
 
 html {

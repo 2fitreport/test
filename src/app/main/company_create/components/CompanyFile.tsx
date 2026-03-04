@@ -373,7 +373,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                         onClick={() => {
                             setBusinessType('business');
                         }}
-                        disabled={isViewMode}
+                        disabled={!!(isViewMode || (viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (viewId && progressDetails === '분석'))}
                     >
                         법인사업자
                     </button>
@@ -382,7 +382,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                         onClick={() => {
                             setBusinessType('individual');
                         }}
-                        disabled={isViewMode}
+                        disabled={!!(isViewMode || (viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (viewId && progressDetails === '분석'))}
                     >
                         개인사업자
                     </button>

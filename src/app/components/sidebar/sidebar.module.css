@@ -366,5 +366,8 @@ box-shadow: 0 2px 4px rgba(15, 26, 77, 0.2);
     }
 }
 
-
+/* 가입 승인 메뉴 숨기기 */
+.menuList li:nth-child(7) {
+    display: none;
+}
 

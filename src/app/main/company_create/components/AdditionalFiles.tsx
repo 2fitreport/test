@@ -21,9 +21,11 @@ export interface AdditionalFilesHandle {
 
 interface AdditionalFilesProps {
     isViewMode?: boolean;
+    progressDetails?: string;
+    userPositionLevel?: number;
 }
 
-const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false }, ref) {
+const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false, progressDetails = '', userPositionLevel = 0 }, ref) {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
     const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
@@ -261,9 +263,9 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                         <button
                             className={styles.uploadBtn}
                             onClick={handleUploadClick}
-                            disabled={isViewMode}
+                            disabled={isViewMode || (userPositionLevel === 4 && progressDetails !== '서류요청') || progressDetails === '분석'}
                             style={{
-                                display: isViewMode ? 'none' : 'block'
+                                display: isViewMode || (userPositionLevel === 4 && progressDetails !== '서류요청') || progressDetails === '분석' ? 'none' : 'block'
                             }}
                         >
                             업로드

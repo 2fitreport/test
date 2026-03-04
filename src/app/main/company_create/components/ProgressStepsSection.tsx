@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Check, ChevronLeft, ChevronRight, XCircle, Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Check, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
+import { getAdminData } from '@/lib/auth';
 import styles from './ProgressStepsSection.module.css';
 
 interface Worker {
@@ -25,7 +27,12 @@ interface ProgressStepsSectionProps {
     progressDetails?: string | null;
     progressStartDate?: string | null;
     managerId?: string | null;
+    documentStatus?: string | null;
+    currentUserName?: string;
+    currentUserId?: string;
+    currentUserPositionLevel?: number | null;
     onProgressUpdate?: (progressDetails: string) => void;
+    onMemoUpdate?: () => void;
     onValidateAndNext?: () => Promise<boolean>;
     onSave?: (skipSuccessModal?: boolean) => Promise<void>;
     onStaffAssignSuccess?: () => void;
@@ -37,27 +44,45 @@ export default function ProgressStepsSection({
     progressDetails,
     progressStartDate,
     managerId,
+    documentStatus,
+    currentUserName,
+    currentUserId,
+    currentUserPositionLevel,
     onProgressUpdate,
+    onMemoUpdate,
     onValidateAndNext,
     onSave,
     onStaffAssignSuccess
 }: ProgressStepsSectionProps) {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [revisionModalOpen, setRevisionModalOpen] = useState(false);
     const [nextStepModalOpen, setNextStepModalOpen] = useState(false);
     const [nextStepName, setNextStepName] = useState('');
+    const [nextStepMessage, setNextStepMessage] = useState('');
     const [prevStepModalOpen, setPrevStepModalOpen] = useState(false);
     const [prevStepName, setPrevStepName] = useState('');
-    const [endModalOpen, setEndModalOpen] = useState(false);
     const [staffAssignModalOpen, setStaffAssignModalOpen] = useState(false);
     const [securityCompleteModalOpen, setSecurityCompleteModalOpen] = useState(false);
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [selectedManager, setSelectedManager] = useState('');
+    const [isDirectProceed, setIsDirectProceed] = useState(false);
     const [staffRequiredModalOpen, setStaffRequiredModalOpen] = useState(false);
     const [assignedManagerId, setAssignedManagerId] = useState('');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [successModalType, setSuccessModalType] = useState<'success' | 'error'>('success');
     const [resetModalOpen, setResetModalOpen] = useState(false);
+    const [proceedModalOpen, setProceedModalOpen] = useState(false);
+    const [securityType, setSecurityType] = useState<'inspection' | 'security' | null>(null);
+    const [reason, setReason] = useState('');
+    const [reasonModalType, setReasonModalType] = useState<'revision' | 'end' | null>(null);
+    const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+    const [approvalAmount, setApprovalAmount] = useState('');
+    const [revenueAmount, setRevenueAmount] = useState('');
+    const [approvalPassword, setApprovalPassword] = useState('');
+    const [approvalApproved, setApprovalApproved] = useState(false);
+
+    const userLevel = getAdminData()?.position?.level;
 
     // 실무자 목록 조회 (뷰 모드 및 수정 모드 모두)
     useEffect(() => {
@@ -78,7 +103,13 @@ export default function ProgressStepsSection({
         }
     };
 
-    const allSteps = ['상담', '서류요청', '분석', '심사', '진행', '승인'];
+    // 숫자 포맷팅 함수 (쉼표 추가)
+    const formatNumberWithComma = (value: string) => {
+        const numbers = value.replace(/[^0-9]/g, '');
+        return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+
+    const allSteps = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
     const stepOrder = allSteps.slice(0, -1); // '승인' 단계를 진행 단계 목록에서 제외
     // progressDetails가 있으면 사용 (뷰 모드, 수정 모드 모두)
     // 없으면 (신규 등록 모드) 모든 단계가 pending
@@ -108,9 +139,14 @@ export default function ProgressStepsSection({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     progress_details: '서류요청',
+                    status: '정상',
                     manager_id: null,
                     manager_name: null,
-                    progress_start_date: null
+                    progress_start_date: null,
+                    progress_end_time: null,
+                    completed_date: null,
+                    approval_amount: null,
+                    revenue_amount: null
                 })
             });
 
@@ -118,8 +154,17 @@ export default function ProgressStepsSection({
                 if (onProgressUpdate) {
                     onProgressUpdate('서류요청');
                 }
+                // 로컬 상태 초기화
+                setApprovalAmount('');
+                setRevenueAmount('');
+                setApprovalPassword('');
+                setApprovalApproved(false);
+
                 setSuccessMessage('진행 단계가 초기화되었습니다.');
+                setSuccessModalType('success');
                 setSuccessModalOpen(true);
+                // 사이드바 업데이트
+                window.dispatchEvent(new Event('notificationUpdate'));
             }
         } catch (error) {
             console.error('초기화 실패:', error);
@@ -129,7 +174,11 @@ export default function ProgressStepsSection({
     };
 
     const handlePrevious = () => {
-        if (currentStepIndex > 0) {
+        // 승인 단계에서는 승인요청으로 이동
+        if (currentProgress === '승인') {
+            setPrevStepName('승인요청');
+            setPrevStepModalOpen(true);
+        } else if (currentStepIndex > 0) {
             const prevStep = stepOrder[currentStepIndex - 1];
             setPrevStepName(prevStep);
             setPrevStepModalOpen(true);
@@ -140,23 +189,43 @@ export default function ProgressStepsSection({
         setPrevStepModalOpen(false);
         setIsLoading(true);
         try {
-            // 이전 단계로 이동 시 배정된 실무자 제거
+            // 이전 단계로 이동
             if (!documentId) return;
+
+            const updateBody: any = {
+                progress_details: prevStepName,
+                completed_date: null,
+                progress_end_time: null
+            };
+
+            // 승인 단계에서 승인요청으로 이동할 때 승인금액과 매출액 초기화
+            if (currentProgress === '승인' && prevStepName === '승인요청') {
+                updateBody.approval_amount = null;
+                updateBody.revenue_amount = null;
+            }
+
+            // 심사 단계에서 분석 단계로 이동할 때 실무자 초기화
+            if (currentProgress === '심사' && prevStepName === '분석') {
+                updateBody.manager_id = null;
+                updateBody.manager_name = null;
+            }
 
             const response = await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    progress_details: prevStepName,
-                    manager_id: null,
-                    manager_name: null
-                })
+                body: JSON.stringify(updateBody)
             });
 
             if (response.ok) {
                 if (onProgressUpdate) {
                     onProgressUpdate(prevStepName);
                 }
+                // 사이드바 업데이트
+                window.dispatchEvent(new Event('notificationUpdate'));
+                // 성공 메시지 표시
+                setSuccessMessage(`${prevStepName}${getParticle(prevStepName)} 변경되었습니다.`);
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
             }
         } catch (error) {
             console.error('이전 단계 이동 실패:', error);
@@ -165,7 +234,32 @@ export default function ProgressStepsSection({
         }
     };
 
+    const getParticle = (stepName: string) => {
+        const lastChar = stepName.charCodeAt(stepName.length - 1);
+        const finalConsonantCode = (lastChar - 0xAC00) % 28;
+        return finalConsonantCode === 0 || finalConsonantCode === 8 ? '로' : '으로';
+    };
+
+    const getBackgroundColor = () => {
+        switch (currentProgress) {
+            case '심사':
+                return '#f3e5f5'; // 연한 보라색
+            case '승인요청':
+                return '#fff3e0'; // 연한 주황색
+            case '진행':
+                return '#ffebee'; // 연한 빨간색
+            default:
+                return '#ffffff'; // 흰색
+        }
+    };
+
     const handleNext = async () => {
+        // 승인요청 단계에서는 승인 모달 열기
+        if (currentProgress === '승인요청') {
+            setApprovalModalOpen(true);
+            return;
+        }
+
         if (currentStepIndex < stepOrder.length - 1) {
             // 1. 먼저 유효성 검사 수행 (뷰 모드에서도)
             const isValid = onValidateAndNext ? await onValidateAndNext() : true;
@@ -190,12 +284,30 @@ export default function ProgressStepsSection({
             }
 
             setNextStepName(nextStep);
+
+            // 문서 상태가 "보완"이고 현재 진행 단계가 "서류요청"일 때 특별한 메시지
+            if (documentStatus === '보완' && currentProgress === '서류요청') {
+                setNextStepMessage(`보안완료 후 ${nextStep}${getParticle(nextStep)} 변경하시겠습니까?`);
+            } else {
+                setNextStepMessage(`${nextStep}${getParticle(nextStep)} 변경하시겠습니까?`);
+            }
+
             setNextStepModalOpen(true);
         }
     };
 
     const handleNextConfirm = async () => {
         setNextStepModalOpen(false);
+
+        // 승인요청 단계에서는 승인금액 입력 모달을 열기
+        if (currentProgress === '승인요청') {
+            setApprovalAmount('');
+            setApprovalModalOpen(true);
+            return;
+        }
+
+        if (!documentId) return;
+
         setIsLoading(true);
         try {
             // 유효성 검사는 handleNext에서 이미 수행됨
@@ -209,13 +321,129 @@ export default function ProgressStepsSection({
                 await onSave(true);
                 console.log('저장 완료');
             }
-            // 2. 저장 완료 후 진행 상태 업데이트
-            console.log('진행 단계 업데이트:', nextStepName);
-            await updateProgress(nextStepName);
+
+            // 2. 상태를 "정상"으로 변경하고 진행 단계도 함께 업데이트
+            const updateData: any = {
+                status: '정상',
+                progress_details: nextStepName
+            };
+
+            // 분석 단계로 이동할 때 progress_start_date 설정
+            if (nextStepName === '분석') {
+                updateData.progress_start_date = String(Date.now());
+            } else if (nextStepName === '승인') {
+                // 승인 단계로 이동할 때 경과 시간 저장 (분석 시작~현재)
+                const startTs = progressStartDate ? parseInt(progressStartDate) : 0;
+                const elapsed = startTs > 0 ? Date.now() - startTs : 0;
+                const tot = Math.floor(Math.max(0, elapsed) / 1000);
+                const h = Math.floor(tot / 3600);
+                const m = Math.floor((tot % 3600) / 60);
+                const s = tot % 60;
+                updateData.progress_end_time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                if (progressStartDate) {
+                    updateData.progress_start_date = progressStartDate;
+                }
+            } else if (progressStartDate) {
+                // 다른 단계로 이동할 때는 기존 progress_start_date 유지
+                updateData.progress_start_date = progressStartDate;
+            }
+
+            const updateResponse = await fetch(`/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData)
+            });
+
+            if (updateResponse.ok) {
+                console.log('상태 및 진행 단계 업데이트 완료');
+                if (onProgressUpdate) {
+                    onProgressUpdate(nextStepName);
+                }
+                // 사이드바 업데이트
+                window.dispatchEvent(new Event('notificationUpdate'));
+                // 성공 메시지 표시
+                setSuccessMessage(`${nextStepName}${getParticle(nextStepName)} 변경되었습니다.`);
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
+            }
         } catch (error) {
             console.error('다음 단계 이동 실패:', error);
             // 저장 실패 시 모달을 다시 열어서 사용자에게 알림
             setNextStepModalOpen(true);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleApprovalConfirm = async () => {
+        if (!approvalAmount.trim() || !revenueAmount.trim() || !approvalPassword.trim() || !documentId) {
+            setSuccessMessage('모든 항목을 입력해주세요.');
+            setSuccessModalType('error');
+            setSuccessModalOpen(true);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            // 비밀번호 검증
+            const validateResponse = await fetch('/api/auth/verify-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: approvalPassword,
+                    user_id: currentUserId
+                })
+            });
+
+            if (!validateResponse.ok) {
+                setSuccessMessage('비밀번호가 일치하지 않습니다.');
+                setSuccessModalType('error');
+                setSuccessModalOpen(true);
+                setIsLoading(false);
+                return;
+            }
+
+            // 비밀번호 검증 성공 시 문서 업데이트 (경과 시간 계산)
+            const startTimestamp = progressStartDate ? parseInt(progressStartDate) : 0;
+            const elapsedMs = startTimestamp > 0 ? Date.now() - startTimestamp : 0;
+            const totalSecs = Math.floor(Math.max(0, elapsedMs) / 1000);
+            const endH = Math.floor(totalSecs / 3600);
+            const endM = Math.floor((totalSecs % 3600) / 60);
+            const endS = totalSecs % 60;
+            const endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS).padStart(2, '0')}`;
+
+            const updateResponse = await fetch(`/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: '정상',
+                    progress_details: '승인',
+                    approval_amount: parseInt(approvalAmount.replace(/,/g, '')),
+                    revenue_amount: parseInt(revenueAmount.replace(/,/g, '')),
+                    progress_end_time: endTime,
+                    completed_date: new Date().toISOString()
+                })
+            });
+
+            if (updateResponse.ok) {
+                if (onProgressUpdate) {
+                    onProgressUpdate('승인');
+                }
+
+                setApprovalApproved(true);
+                setApprovalModalOpen(false);
+                setApprovalAmount('');
+                setRevenueAmount('');
+                setApprovalPassword('');
+
+                // 사이드바 업데이트
+                window.dispatchEvent(new Event('notificationUpdate'));
+            }
+        } catch (error) {
+            console.error('승인 처리 실패:', error);
+            setSuccessMessage('승인 처리 중 오류가 발생했습니다.');
+            setSuccessModalType('error');
+            setSuccessModalOpen(true);
         } finally {
             setIsLoading(false);
         }
@@ -226,7 +454,7 @@ export default function ProgressStepsSection({
             // documentId가 없으면 (신규 등록 모드) 업데이트하지 않음
             if (!documentId) return;
 
-            const updateData: any = { progress_details: newProgressDetails };
+            const updateData: any = { progress_details: newProgressDetails, status: '정상' };
 
             // 서류요청 → 분석으로 변경될 때 시간 경과 시작
             if (newProgressDetails === '분석') {
@@ -253,29 +481,55 @@ export default function ProgressStepsSection({
     };
 
     const handleRevision = () => {
-        setRevisionModalOpen(true);
+        setReason('');
+        setReasonModalType('revision');
     };
 
     const handleRevisionConfirm = async () => {
-        setRevisionModalOpen(false);
+        if (!reason.trim()) {
+            setSuccessMessage('사유를 입력해주세요.');
+            setSuccessModalType('error');
+            setSuccessModalOpen(true);
+            return;
+        }
+        setReasonModalType(null);
         if (!documentId) return;
 
         try {
             setIsLoading(true);
-            const response = await fetch(`/api/documents/${documentId}`, {
+            
+            // 1. 상태 업데이트 (보완)
+            const updateData: any = { status: '보완' };
+            if (progressStartDate) {
+                updateData.progress_start_date = progressStartDate;
+            }
+            const updateResponse = await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: '보완' })
+                body: JSON.stringify(updateData)
             });
 
-            if (response.ok) {
-                // 성공 메시지 표시
+            if (updateResponse.ok) {
+                // 2. 메모 추가 (보완사유) - 현재 사용자 정보 포함
+                await fetch(`/api/documents/${documentId}/memos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: `[보완사유] ${reason}`,
+                        is_admin: true,
+                        user_name: currentUserName,
+                        user_id: currentUserId
+                    })
+                });
+
                 setSuccessMessage('보완 요청이 완료되었습니다.');
+                setSuccessModalType('success');
                 setSuccessModalOpen(true);
                 
-                // 페이지 새로고침 또는 상위 상태 업데이트 (onProgressUpdate 재사용 가능 여부 확인)
+                // 메모 섹션 리랜더링 유도
+                if (onMemoUpdate) onMemoUpdate();
                 if (onProgressUpdate && progressDetails) {
-                    onProgressUpdate(progressDetails); // 현재 단계를 다시 보내서 갱신 유도
+                    onProgressUpdate(progressDetails);
                 }
             }
         } catch (error) {
@@ -286,26 +540,90 @@ export default function ProgressStepsSection({
     };
 
     const handleEnd = () => {
-        setEndModalOpen(true);
+        setReason('');
+        setReasonModalType('end');
     };
 
     const handleEndConfirm = async () => {
-        setEndModalOpen(false);
+        if (!reason.trim()) {
+            setSuccessMessage('사유를 입력해주세요.');
+            setSuccessModalType('error');
+            setSuccessModalOpen(true);
+            return;
+        }
+        setReasonModalType(null);
         if (!documentId) return;
 
         try {
             setIsLoading(true);
+            // 진행불가 시 상태를 '보완'으로 변경, 진행 단계를 분석으로 돌림
+            const updateData: any = { status: '보완', progress_details: '분석' };
+
+            // 실무자 배정 초기화
+            updateData.manager_id = null;
+            updateData.manager_name = null;
+
+            // progress_start_date 유지
+            if (progressStartDate) {
+                updateData.progress_start_date = progressStartDate;
+            }
+
             const response = await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ progress_status: 'stopped' })
+                body: JSON.stringify(updateData)
             });
 
             if (response.ok) {
-                console.log('진행 중지 완료');
+                // 메모 추가 (진행불가사유) - 현재 사용자 정보 포함
+                await fetch(`/api/documents/${documentId}/memos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: `[진행불가사유] ${reason}`,
+                        is_admin: true,
+                        user_name: currentUserName,
+                        user_id: currentUserId
+                    })
+                });
+
+                setSuccessMessage('분석으로 변경되었습니다.');
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
+                
+                // 메모 섹션 리랜더링 유도
+                if (onMemoUpdate) onMemoUpdate();
             }
         } catch (error) {
-            console.error('진행 중지 실패:', error);
+            console.error('진행 보류 처리 실패:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleProceed = () => {
+        setProceedModalOpen(true);
+    };
+
+    const handleProceedConfirm = async () => {
+        setProceedModalOpen(false);
+        if (!documentId) return;
+
+        setIsLoading(true);
+        try {
+            const response = await fetch(`/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: '정상' })
+            });
+
+            if (response.ok) {
+                setSuccessMessage('진행이 완료되었습니다.');
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
+            }
+        } catch (error) {
+            console.error('상태 변경 실패:', error);
         } finally {
             setIsLoading(false);
         }
@@ -320,11 +638,18 @@ export default function ProgressStepsSection({
             }
         }
         setSelectedManager('');
+        setIsDirectProceed(false);
         setStaffAssignModalOpen(true);
     };
 
     const handleStaffAssignConfirm = async () => {
-        if (!selectedManager || !documentId) {
+        if (!documentId) {
+            setStaffAssignModalOpen(false);
+            return;
+        }
+
+        // 직접진행이 아닌 경우 실무자 선택 필수
+        if (!isDirectProceed && !selectedManager) {
             setStaffAssignModalOpen(false);
             return;
         }
@@ -336,30 +661,59 @@ export default function ProgressStepsSection({
                 await onSave(true);  // skipSuccessModal=true
             }
 
-            // 2. 저장 완료 후 실무자 배정
-            const selectedWorker = workers.find(w => w.user_id === selectedManager);
-            const response = await fetch(`/api/documents/${documentId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    manager_id: selectedManager,
-                    manager_name: selectedWorker?.name || ''
-                })
-            });
+            // 2. 직접진행 여부에 따라 처리
+            if (isDirectProceed) {
+                // 직접진행: 현재 사용자를 실무자로 배정
+                const response = await fetch(`/api/documents/${documentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        manager_id: currentUserId,
+                        manager_name: currentUserName
+                    })
+                });
 
-            if (response.ok) {
-                console.log('실무자 배정 완료');
-                setAssignedManagerId(selectedManager);
+                if (response.ok) {
+                    setAssignedManagerId(currentUserId || '');
 
-                // 실무자 배정 후 다음 단계로 즉시 업데이트
-                if (currentProgress === '분석') {
-                    updateProgress('심사');
-                } else if (currentProgress === '심사') {
-                    updateProgress('진행');
+                    // 실무자 배정 후 다음 단계로 즉시 업데이트
+                    if (currentProgress === '분석') {
+                        updateProgress('심사');
+                    } else if (currentProgress === '심사') {
+                        updateProgress('진행');
+                    }
+
+                    setSuccessMessage('직접진행으로 진행됩니다.');
+                    setSuccessModalType('success');
+                    setSuccessModalOpen(true);
                 }
+            } else {
+                // 실무자 배정
+                const selectedWorker = workers.find(w => w.user_id === selectedManager);
+                const response = await fetch(`/api/documents/${documentId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        manager_id: selectedManager,
+                        manager_name: selectedWorker?.name || ''
+                    })
+                });
 
-                setSuccessMessage('실무자가 배정되었습니다.');
-                setSuccessModalOpen(true);
+                if (response.ok) {
+                    console.log('실무자 배정 완료');
+                    setAssignedManagerId(selectedManager);
+
+                    // 실무자 배정 후 다음 단계로 즉시 업데이트
+                    if (currentProgress === '분석') {
+                        updateProgress('심사');
+                    } else if (currentProgress === '심사') {
+                        updateProgress('진행');
+                    }
+
+                    setSuccessMessage('실무자가 배정되었습니다.');
+                    setSuccessModalType('success');
+                    setSuccessModalOpen(true);
+                }
             }
         } catch (error) {
             console.error('실무자 배정 실패:', error);
@@ -367,16 +721,56 @@ export default function ProgressStepsSection({
             setIsLoading(false);
             setStaffAssignModalOpen(false);
             setSelectedManager('');
+            setIsDirectProceed(false);
         }
     };
 
     const handleSecurityComplete = () => {
+        setSecurityType('inspection');
         setSecurityCompleteModalOpen(true);
     };
 
-    const handleSecurityCompleteConfirm = () => {
+    const handleSecurityProcess = () => {
+        setSecurityType('security');
+        setSecurityCompleteModalOpen(true);
+    };
+
+    const handleSecurityCompleteConfirm = async () => {
         setSecurityCompleteModalOpen(false);
-        console.log('보안 완료 처리');
+        if (!documentId) {
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            const statusToSet = securityType === 'inspection' ? '정상' : '검수';
+            const response = await fetch(`/api/documents/${documentId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: statusToSet })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                const message = securityType === 'inspection' ? '검수가 완료되었습니다.' : '보안사항이 저장되었습니다.';
+                setSuccessMessage(message);
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
+                // 저장 완료 후 이벤트 발생
+                window.dispatchEvent(new Event('notificationUpdate'));
+            } else {
+                throw new Error(data.error || '상태 변경 실패');
+            }
+        } catch (error) {
+            console.error('상태 변경 실패:', error);
+            setSuccessMessage(error instanceof Error ? error.message : '상태 변경 실패');
+            setSuccessModalType('error');
+            setSuccessModalOpen(true);
+        } finally {
+            setIsLoading(false);
+            setSecurityType(null);
+        }
     };
 
     return (
@@ -387,96 +781,228 @@ export default function ProgressStepsSection({
             </div>
 
             <div className={`${styles.contentWrapper} ${documentId ? styles.withDirection : ''}`}>
-                <div className={styles.stepsContainer}>
-                <div className={styles.stepsList}>
-                    {steps.map((step, index) => (
-                        <div key={step.id} className={`${styles.stepItemWrapper} ${styles[step.status]}`}>
-                            <div className={styles.stepCircleWrapper}>
-                                <div className={styles.stepCircle}>
-                                    <img
-                                        src={
-                                            step.status === 'current' ? '/step2.png' :
-                                            step.status === 'completed' ? '/step1.png' :
-                                            '/step3.png'
-                                        }
-                                        alt={step.label}
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                    />
+                {currentProgress === '승인' ? (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px 20px',
+                        gap: '15px'
+                    }}>
+                        <Check size={48} color="#4caf50" strokeWidth={3} />
+                        <p style={{ fontSize: '18px', fontWeight: '600', color: '#4caf50', fontFamily: 'Pretendard, sans-serif' }}>승인 완료되었습니다.</p>
+                    </div>
+                ) : currentProgress === '승인요청' ? (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px 20px',
+                        gap: '20px'
+                    }}>
+                        {approvalApproved ? (
+                            <>
+                                <Check size={60} color="#4caf50" style={{ marginBottom: '10px' }} />
+                                <p style={{ fontSize: '28px', fontWeight: '400', color: '#4caf50', fontFamily: "'Great Vibes', cursive", letterSpacing: '1px' }}>승인되었습니다.</p>
+                                <button
+                                    className={`${styles.btn} ${styles.btnSuccess}`}
+                                    onClick={() => {
+                                        setApprovalApproved(false);
+                                        router.push('/main/document_submission');
+                                    }}
+                                    style={{ marginTop: '20px' }}
+                                >
+                                    확인
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p style={{ fontSize: '75px', fontWeight: '400', color: '#4a4a4a', fontFamily: "'Great Vibes', cursive", letterSpacing: '1px', marginBottom: '20px' }}>2FitReport</p>
+                                <p style={{ fontSize: '28px', fontWeight: '400', color: '#4a4a4a', fontFamily: "'Great Vibes', cursive", letterSpacing: '1px' }}>승인대기중...</p>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <div className={styles.stepsContainer}>
+                    <div className={styles.stepsList}>
+                        {steps.map((step, index) => (
+                            <div key={step.id} className={`${styles.stepItemWrapper} ${styles[step.status]}`}>
+                                <div className={styles.stepCircleWrapper}>
+                                    <div className={styles.stepCircle}>
+                                        <img
+                                            src={
+                                                step.status === 'current' && documentStatus === '보완' ? '/보완.png' :
+                                                step.status === 'current' && documentStatus === '보류' ? '/보류.png' :
+                                                step.status === 'current' ? '/step2.png' :
+                                                step.status === 'completed' ? '/step1.png' :
+                                                '/step3.png'
+                                            }
+                                            alt={step.label}
+                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        />
+                                    </div>
+                                    {index < steps.length - 1 && (
+                                        <div className={`${styles.stepLine} ${(step.status === 'current' || step.status === 'completed') ? styles.active : ''}`} />
+                                    )}
                                 </div>
-                                {index < steps.length - 1 && (
-                                    <div className={`${styles.stepLine} ${(step.status === 'current' || step.status === 'completed') ? styles.active : ''}`} />
-                                )}
+                                <div className={`${styles.stepItem} ${styles[step.status]}`}>
+                                    <p className={styles.stepLabel}>{step.label}</p>
+                                </div>
                             </div>
-                            <div className={`${styles.stepItem} ${styles[step.status]}`}>
-                                <p className={styles.stepLabel}>{step.label}</p>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+                )}
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                        <div className={styles.buttonGroup}>
-                            <h4>단계 관리</h4>
-                            <div className={styles.groupButtons}>
-                                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
-                                    이전 단계로 이동
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleNext} disabled={isLoading || currentStepIndex === stepOrder.length - 1}>
-                                    {isLoading ? '처리 중...' : '다음 단계로 이동'}
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnProceed}`} onClick={() => console.log('진행')} disabled={isLoading}>
-                                    진행
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnReset}`} onClick={handleReset} disabled={isLoading}>
-                                    초기화
-                                </button>
+                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && (
+                            <div className={styles.buttonGroup}>
+                                {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
+                                <div className={styles.groupButtons}>
+                                    {userLevel === 1 && (
+                                        <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
+                                            이전 단계로 이동
+                                        </button>
+                                    )}
+                                    {!(userLevel === 1 && currentProgress === '승인') && !(userLevel === 2 && currentProgress === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && (
+                                        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleNext} disabled={isLoading || (currentStepIndex === stepOrder.length - 1 && currentProgress !== '승인요청')}>
+                                            {isLoading ? '처리 중...' : '다음 단계로 이동'}
+                                        </button>
+                                    )}
+                                    {userLevel === 1 && (
+                                        <button className={`${styles.btn} ${styles.btnReset}`} onClick={handleReset} disabled={isLoading}>
+                                            초기화
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
+                        {!(userLevel === 1 && currentProgress === '승인') &&
+                         !(userLevel === 4 && (documentStatus !== '보완' || progressDetails === '분석')) &&
+                         !(currentProgress === '승인' && !userLevel) &&
+                         !(userLevel === 6 && progressDetails !== '서류요청' && documentStatus !== '보완') && (
                         <div className={styles.buttonGroup}>
                             <h4>진행 상태</h4>
                             <div className={styles.groupButtons}>
-                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
-                                    보완요청
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={() => console.log('검수완료')} disabled={isLoading}>
-                                    검수완료
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnApprove}`} onClick={() => console.log('승인')} disabled={isLoading}>
-                                    승인
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
-                                    실무자배정
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                    보안완료
-                                </button>
-                                <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
-                                    진행불가
-                                </button>
+                                {userLevel === 4 ? (
+                                    // 영업자: 보완 상태에서만 보안완료 가능 (분석 단계 제외)
+                                    documentStatus === '보완' && progressDetails !== '분석' && (
+                                        <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
+                                            보안완료
+                                        </button>
+                                    )
+                                ) : userLevel === 6 ? (
+                                    <>
+                                        {progressDetails === '서류요청' && documentStatus === '보완' && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {progressDetails === '서류요청' && documentStatus === '보류' && (
+                                            <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
+                                                진행
+                                            </button>
+                                        )}
+                                        {progressDetails === '서류요청' && documentStatus === '검수' && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {progressDetails === '서류요청' && documentStatus !== '보완' && documentStatus !== '보류' && documentStatus !== '검수' && (
+                                            <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                보완요청
+                                            </button>
+                                        )}
+                                        {progressDetails === '서류요청' && documentStatus !== '보류' && (
+                                            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
+                                                진행불가
+                                            </button>
+                                        )}
+                                        {progressDetails === '분석' && documentStatus === '보완' && (
+                                            <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
+                                                보안완료
+                                            </button>
+                                        )}
+                                        {progressDetails === '분석' && documentStatus === '검수' && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {progressDetails === '심사' && documentStatus === '보완' && (
+                                            <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
+                                                보안완료
+                                            </button>
+                                        )}
+                                        {progressDetails === '진행' && documentStatus === '보완' && (
+                                            <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
+                                                보안완료
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {documentStatus === '보류' && (
+                                            <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
+                                                진행
+                                            </button>
+                                        )}
+                                        {documentStatus === '보완' && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {documentStatus === '검수' && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {documentStatus !== '보류' && documentStatus !== '보완' && documentStatus !== '검수' && (
+                                            <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                보완요청
+                                            </button>
+                                        )}
+                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                검수완료
+                                            </button>
+                                        )}
+                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                            <button className={`${styles.btn} ${styles.btnApprove}`} onClick={() => console.log('승인')} disabled={isLoading}>
+                                                승인
+                                            </button>
+                                        )}
+                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                            <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
+                                                실무자배정
+                                            </button>
+                                        )}
+                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                            <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
+                                                진행
+                                            </button>
+                                        )}
+                                        {documentStatus !== '보류' && (
+                                            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
+                                                진행불가
+                                            </button>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* 보완 요청 모달 */}
-            <ConfirmModal
-                isOpen={revisionModalOpen}
-                message="해당 문서를 보완 요청하시겠습니까?"
-                onConfirm={handleRevisionConfirm}
-                onCancel={() => setRevisionModalOpen(false)}
-                confirmButtonText="확인"
-                hideCancel={false}
-                type="warning"
-            />
-
             {/* 다음 단계 진행 모달 */}
             <ConfirmModal
                 isOpen={nextStepModalOpen}
-                message={`${nextStepName}으로 진행하시겠습니까?`}
+                message={nextStepMessage}
                 onConfirm={handleNextConfirm}
                 onCancel={() => setNextStepModalOpen(false)}
                 confirmButtonText="확인"
@@ -487,23 +1013,12 @@ export default function ProgressStepsSection({
             {/* 이전 단계 모달 */}
             <ConfirmModal
                 isOpen={prevStepModalOpen}
-                message={`${prevStepName}으로 돌아가시겠습니까?`}
+                message={`${prevStepName}${getParticle(prevStepName)} 돌아가시겠습니까?`}
                 onConfirm={handlePrevConfirm}
                 onCancel={() => setPrevStepModalOpen(false)}
                 confirmButtonText="확인"
                 hideCancel={false}
                 type="warning"
-            />
-
-            {/* 진행 중지 모달 */}
-            <ConfirmModal
-                isOpen={endModalOpen}
-                message="진행을 중지하시겠습니까?"
-                onConfirm={handleEndConfirm}
-                onCancel={() => setEndModalOpen(false)}
-                confirmButtonText="확인"
-                hideCancel={false}
-                type="error"
             />
 
             {/* 초기화 모달 */}
@@ -514,19 +1029,113 @@ export default function ProgressStepsSection({
                 onCancel={() => setResetModalOpen(false)}
                 confirmButtonText="확인"
                 hideCancel={false}
-                type="error"
+                type="warning"
             />
 
-            {/* 보안 완료 모달 */}
+            {/* 진행 모달 */}
             <ConfirmModal
-                isOpen={securityCompleteModalOpen}
-                message="보안 검사를 완료하시겠습니까?"
-                onConfirm={handleSecurityCompleteConfirm}
-                onCancel={() => setSecurityCompleteModalOpen(false)}
+                isOpen={proceedModalOpen}
+                message="진행하시겠습니까?"
+                onConfirm={handleProceedConfirm}
+                onCancel={() => setProceedModalOpen(false)}
                 confirmButtonText="확인"
                 hideCancel={false}
-                type="success"
+                type="warning"
             />
+
+            {/* 검수/보안 완료 모달 */}
+            <ConfirmModal
+                isOpen={securityCompleteModalOpen}
+                message={securityType === 'security' ? '보안사항을 저장하시겠습니까?' : '검수완료하시겠습니까?'}
+                onConfirm={() => {
+                    console.log('ConfirmModal onConfirm 실행됨');
+                    handleSecurityCompleteConfirm();
+                }}
+                onCancel={() => {
+                    console.log('ConfirmModal onCancel 실행됨');
+                    setSecurityCompleteModalOpen(false);
+                }}
+                confirmButtonText="확인"
+                hideCancel={false}
+                type="warning"
+            />
+
+            {/* 사유 입력 모달 (보완요청/진행불가 공용) */}
+            {reasonModalType && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1001
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '24px',
+                        borderRadius: '12px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '18px', fontWeight: '700' }}>
+                            {reasonModalType === 'revision' ? '보완 요청 사유' : '진행 불가 사유'}
+                        </h3>
+                        <p style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
+                            {reasonModalType === 'revision' ? '문서 보완을 위한 상세 사유를 입력해주세요.' : '진행을 중지하는 사유를 입력해주세요.'}
+                        </p>
+                        <textarea
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            placeholder="사유를 입력하세요..."
+                            style={{
+                                width: '100%',
+                                height: '120px',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid #ddd',
+                                fontSize: '14px',
+                                resize: 'none',
+                                marginBottom: '20px',
+                                outline: 'none'
+                            }}
+                        />
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setReasonModalType(null)}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={reasonModalType === 'revision' ? handleRevisionConfirm : handleEndConfirm}
+                                disabled={!reason.trim() || isLoading}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: '6px',
+                                    backgroundColor: reasonModalType === 'revision' ? '#ff9800' : '#ef5350',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: reason.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                                    opacity: reason.trim() && !isLoading ? 1 : 0.6
+                                }}
+                            >
+                                {isLoading ? '처리 중...' : '확인'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 실무자 배정 필수 모달 */}
             <ConfirmModal
@@ -561,17 +1170,37 @@ export default function ProgressStepsSection({
                         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                     }}>
                         <h3 style={{ marginTop: 0, marginBottom: '15px' }}>실무자 선택</h3>
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', padding: '12px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={isDirectProceed}
+                                    onChange={(e) => {
+                                        setIsDirectProceed(e.target.checked);
+                                        if (e.target.checked) {
+                                            setSelectedManager('');
+                                        }
+                                    }}
+                                    style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                                />
+                                <span style={{ fontSize: '16px', color: '#333', fontWeight: '500' }}>직접진행</span>
+                            </label>
+                        </div>
                         <div style={{ position: 'relative', marginBottom: '20px' }}>
                             <select
                                 value={selectedManager}
                                 onChange={(e) => setSelectedManager(e.target.value)}
+                                disabled={isDirectProceed}
                                 style={{
                                     width: '100%',
                                     padding: '10px 40px 10px 14px',
                                     borderRadius: '4px',
                                     border: '1px solid #ddd',
                                     fontSize: '14px',
-                                    appearance: 'none'
+                                    appearance: 'none',
+                                    backgroundColor: isDirectProceed ? '#f5f5f5' : '#fff',
+                                    color: isDirectProceed ? '#999' : '#333',
+                                    cursor: isDirectProceed ? 'not-allowed' : 'pointer'
                                 }}
                             >
                                 <option value="">실무자를 선택해주세요.</option>
@@ -605,6 +1234,7 @@ export default function ProgressStepsSection({
                                 onClick={() => {
                                     setStaffAssignModalOpen(false);
                                     setSelectedManager('');
+                                    setIsDirectProceed(false);
                                 }}
                                 disabled={isLoading}
                                 style={{
@@ -620,17 +1250,140 @@ export default function ProgressStepsSection({
                             </button>
                             <button
                                 onClick={handleStaffAssignConfirm}
-                                disabled={!selectedManager || isLoading}
+                                disabled={(!selectedManager && !isDirectProceed) || isLoading}
                                 style={{
                                     padding: '8px 16px',
                                     borderRadius: '4px',
-                                    backgroundColor: selectedManager && !isLoading ? '#1c283c' : '#ccc',
+                                    backgroundColor: ((selectedManager || isDirectProceed) && !isLoading) ? '#1c283c' : '#ccc',
                                     color: 'white',
                                     border: 'none',
-                                    cursor: selectedManager && !isLoading ? 'pointer' : 'not-allowed'
+                                    cursor: ((selectedManager || isDirectProceed) && !isLoading) ? 'pointer' : 'not-allowed'
                                 }}
                             >
                                 {isLoading ? '배정 중...' : '확인'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 승인금액 입력 모달 */}
+            {approvalModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1001
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '24px',
+                        borderRadius: '12px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '18px', fontWeight: '700' }}>
+                            승인 정보 입력
+                        </h3>
+
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>
+                            승인금액 (만원)
+                        </label>
+                        <input
+                            type="text"
+                            value={approvalAmount}
+                            onChange={(e) => setApprovalAmount(formatNumberWithComma(e.target.value))}
+                            placeholder="승인금액을 입력하세요..."
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid #ddd',
+                                fontSize: '14px',
+                                marginBottom: '16px',
+                                boxSizing: 'border-box',
+                                outline: 'none'
+                            }}
+                        />
+
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>
+                            매출액 (만원)
+                        </label>
+                        <input
+                            type="text"
+                            value={revenueAmount}
+                            onChange={(e) => setRevenueAmount(formatNumberWithComma(e.target.value))}
+                            placeholder="매출액을 입력하세요..."
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid #ddd',
+                                fontSize: '14px',
+                                marginBottom: '16px',
+                                boxSizing: 'border-box',
+                                outline: 'none'
+                            }}
+                        />
+
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>
+                            비밀번호
+                        </label>
+                        <input
+                            type="password"
+                            value={approvalPassword}
+                            onChange={(e) => setApprovalPassword(e.target.value)}
+                            placeholder="비밀번호를 입력하세요..."
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                borderRadius: '8px',
+                                border: '1px solid #ddd',
+                                fontSize: '14px',
+                                marginBottom: '20px',
+                                boxSizing: 'border-box',
+                                outline: 'none'
+                            }}
+                        />
+
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => {
+                                    setApprovalModalOpen(false);
+                                    setApprovalAmount('');
+                                    setRevenueAmount('');
+                                    setApprovalPassword('');
+                                }}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: '6px',
+                                    backgroundColor: '#f5f5f5',
+                                    border: '1px solid #ddd',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleApprovalConfirm}
+                                disabled={!approvalAmount.trim() || !revenueAmount.trim() || !approvalPassword.trim() || isLoading}
+                                style={{
+                                    padding: '10px 20px',
+                                    borderRadius: '6px',
+                                    backgroundColor: approvalAmount.trim() && revenueAmount.trim() && approvalPassword.trim() && !isLoading ? '#1c283c' : '#ccc',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: approvalAmount.trim() && revenueAmount.trim() && approvalPassword.trim() && !isLoading ? 'pointer' : 'not-allowed'
+                                }}
+                            >
+                                {isLoading ? '처리 중...' : '확인'}
                             </button>
                         </div>
                     </div>
@@ -643,13 +1396,17 @@ export default function ProgressStepsSection({
                 message={successMessage}
                 onConfirm={() => {
                     setSuccessModalOpen(false);
-                    if (onStaffAssignSuccess) {
-                        onStaffAssignSuccess();
+                    // 성공 메시지일 때만 리다이렉트
+                    if (successModalType === 'success') {
+                        if (onStaffAssignSuccess) {
+                            onStaffAssignSuccess();
+                        }
+                        router.push('/main/document_submission');
                     }
                 }}
                 confirmButtonText="확인"
                 hideCancel={true}
-                type="success"
+                type={successModalType}
             />
         </div>
     );

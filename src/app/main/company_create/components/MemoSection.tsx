@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Send, Loader } from 'lucide-react';
 import Modal from '@/components/Modal/Modal';
+import Pagination from '@/app/components/Pagination/Pagination';
 import styles from './MemoSection.module.css';
 
 interface Reply {
@@ -25,6 +26,7 @@ interface Memo {
 interface MemoSectionProps {
     documentId?: string | null;
     isViewMode?: boolean;
+    readOnly?: boolean;
     currentUserId?: string;
     currentUserName?: string;
     currentUserPositionLevel?: number;
@@ -35,6 +37,7 @@ interface MemoSectionProps {
 export default function MemoSection({
     documentId,
     isViewMode = false,
+    readOnly = false,
     currentUserId = '0',
     currentUserName = '현재사용자',
     currentUserPositionLevel = 0,
@@ -51,6 +54,8 @@ export default function MemoSection({
     const [deleteMessage, setDeleteMessage] = useState('');
     const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 3;
 
     // documentId가 있으면 메모 로드
     useEffect(() => {
@@ -302,6 +307,28 @@ export default function MemoSection({
         }
     };
 
+    const renderMemoContent = (content: string) => {
+        if (content.startsWith('[보완사유]')) {
+            const reasonText = content.replace('[보완사유]', '').trim();
+            return (
+                <div className={styles.reasonMemo}>
+                    <span className={`${styles.badge} ${styles.revisionBadge}`}>보완</span>
+                    <span className={styles.reasonText}>{reasonText}</span>
+                </div>
+            );
+        }
+        if (content.startsWith('[진행불가사유]')) {
+            const reasonText = content.replace('[진행불가사유]', '').trim();
+            return (
+                <div className={styles.reasonMemo}>
+                    <span className={`${styles.badge} ${styles.holdBadge}`}>보류</span>
+                    <span className={styles.reasonText}>{reasonText}</span>
+                </div>
+            );
+        }
+        return content;
+    };
+
     return (
         <>
             <Modal
@@ -339,7 +366,12 @@ export default function MemoSection({
             </div>
 
             <div className={styles.memoList}>
-                {memos.map((memo) => (
+                {(() => {
+                    const reversedMemos = [...memos].reverse();
+                    const startIndex = (currentPage - 1) * itemsPerPage;
+                    const endIndex = startIndex + itemsPerPage;
+                    const paginatedMemos = reversedMemos.slice(startIndex, endIndex);
+                    return paginatedMemos.map((memo) => (
                     <div key={memo.id} className={styles.memoItem}>
                         <div className={styles.memoHeader}>
                             <div className={styles.memoAuthor}>
@@ -359,7 +391,7 @@ export default function MemoSection({
                                 )}
                             </div>
                         </div>
-                        <p className={styles.memoContent}>{memo.content}</p>
+                        <div className={styles.memoContent}>{renderMemoContent(memo.content)}</div>
 
                         {/* 답글 섹션 */}
                         {memo.replies && memo.replies.length > 0 && (
@@ -410,6 +442,7 @@ export default function MemoSection({
                         )}
 
                         {/* 답글 입력 */}
+                        {!readOnly && (
                         <div className={styles.replyInputWrap}>
                             <textarea
                                 className={styles.replyInput}
@@ -429,10 +462,22 @@ export default function MemoSection({
                                 )}
                             </button>
                         </div>
+                        )}
                     </div>
-                ))}
+                ));
+                })()}
             </div>
 
+            {memos.length > 0 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalItems={memos.length}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={setCurrentPage}
+                />
+            )}
+
+            {!readOnly && (
             <div className={styles.memoInputWrap}>
                 <textarea
                     className={styles.memoInput}
@@ -453,6 +498,7 @@ export default function MemoSection({
                     메모 추가
                 </button>
             </div>
+            )}
         </div>
         </>
     );

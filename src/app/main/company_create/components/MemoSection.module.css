@@ -1,7 +1,7 @@
 /* === 메모 섹션 === */
 .memoWrap {
     background: #fff;
-    padding: 30px 40px;
+    padding: 40px 50px;
     border-radius: 10px;
     box-shadow: 0 2px 8px rgba(99, 99, 99, 0.2);
     display: flex;
@@ -15,8 +15,8 @@
     flex-direction: column;
     gap: 10px;
     border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 20px;
-    margin-bottom: 24px;
+    padding-bottom: 28px;
+    margin-bottom: 32px;
     height: 58px;
 }
 
@@ -57,11 +57,11 @@
 .memoList {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 24px;
     flex: 1;
     overflow-y: auto;
     padding-right: 8px;
-    margin-bottom: 20px;
+    margin-bottom: 28px;
 }
 
 .memoList::-webkit-scrollbar {
@@ -83,12 +83,12 @@
 }
 
 .memoItem {
-    padding: 16px;
+    padding: 24px;
     background: #fff;
     border-radius: 8px;
     border: 1px solid #e0e0e0;
     transition: all 0.2s ease;
-    margin-bottom: 4px;
+    margin-bottom: 12px;
 }
 
 .memoItem:hover {
@@ -100,7 +100,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 16px;
 }
 
 .memoAuthor {
@@ -123,7 +123,7 @@
 }
 
 .authorId {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 400;
     color: #999;
     margin-left: 2px;
@@ -136,7 +136,7 @@
 }
 
 .timestamp {
-    font-size: 13px;
+    font-size: 16px;
     color: #999;
     white-space: nowrap;
 }
@@ -165,14 +165,43 @@
 .memoContent {
     font-size: 18px;
     color: #666;
-    margin: 20px 0;
+    margin: 28px 0;
     line-height: 1.5;
+}
+
+.reasonMemo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.badge {
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.revisionBadge {
+    background: var(--color-revision);
+    color: #ffffff;
+}
+
+.holdBadge {
+    background: var(--color-hold);
+    color: #ffffff;
+}
+
+.reasonText {
+    font-weight: 500;
+    color: #444;
 }
 
 /* === 답글 섹션 === */
 .repliesContainer {
-    margin-top: 14px;
-    padding-top: 14px;
+    margin-top: 20px;
+    padding-top: 20px;
     border-top: 1px solid #e8e8e8;
 }
 
@@ -181,7 +210,7 @@
     border: none;
     color: #1c283c;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     padding: 4px 8px;
     display: flex;
@@ -201,14 +230,14 @@
 .repliesList {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin-bottom: 12px;
-    padding-left: 20px;
-    padding-top: 10px;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-left: 28px;
+    padding-top: 16px;
 }
 
 .reply {
-    padding: 12px 14px;
+    padding: 16px 18px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     transition: all 0.2s ease;
@@ -234,13 +263,13 @@
 }
 
 .replyAuthor {
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
     color: #0f1a2e;
 }
 
 .replyAuthorId {
-    font-size: 12px;
+    font-size: 16px;
     font-weight: 400;
     color: #999;
 }
@@ -252,7 +281,7 @@
 }
 
 .replyTime {
-    font-size: 12px;
+    font-size: 16px;
     color: #999;
     flex-shrink: 0;
     white-space: nowrap;
@@ -280,7 +309,7 @@
 }
 
 .replyContent {
-    font-size: 13px;
+    font-size: 16px;
     color: #333;
     margin: 0;
     line-height: 1.5;
@@ -302,7 +331,7 @@
     padding: 8px 10px;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 16px;
     font-family: inherit;
     color: #333;
     resize: none;
@@ -332,7 +361,7 @@
     white-space: nowrap;
     flex-shrink: 0;
     height: 38px;
-    font-size: 12px;
+    font-size: 16px;
 }
 
 .replyBtn:hover:not(:disabled) {
@@ -372,7 +401,7 @@
     padding: 12px 14px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 16px;
     font-family: inherit;
     color: #333;
     resize: none;
@@ -400,7 +429,7 @@
     background: #1c283c;
     border: none;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     color: #fff;
     cursor: pointer;
@@ -447,7 +476,7 @@
     }
 
     .memoTitle h3 {
-        font-size: 13px;
+        font-size: 16px;
     }
 
     .titleIcon {
@@ -470,26 +499,26 @@
     }
 
     .authorName {
-        font-size: 13px;
+        font-size: 16px;
     }
 
     .timestamp {
-        font-size: 12px;
+        font-size: 16px;
     }
 
     .memoContent {
-        font-size: 13px;
+        font-size: 16px;
     }
 
     .memoInput {
-        font-size: 13px;
+        font-size: 16px;
         padding: 10px 12px;
         min-height: 40px;
     }
 
     .submitBtn {
         padding: 10px 16px;
-        font-size: 13px;
+        font-size: 16px;
     }
 
     .submitBtn svg {
@@ -522,7 +551,7 @@
     }
 
     .memoTitle h3 {
-        font-size: 12px;
+        font-size: 16px;
     }
 
     .memoHeader {

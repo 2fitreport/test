@@ -43,6 +43,7 @@
 
 .contentWrapper.withDirection {
     flex-direction: column;
+    justify-content: center;
 }
 
 /* === 단계 표시 === */
@@ -203,14 +204,14 @@
 }
 
 .btnWarning {
-    background: linear-gradient(135deg, #fff8f0 0%, #fef3e0 100%);
-    border-color: #fdd835;
-    color: #ff9800;
+    background: var(--color-revision);
+    border-color: var(--color-revision);
+    color: #ffffff;
 }
 
 .btnWarning:hover {
-    background: linear-gradient(135deg, #fef7e0 0%, #fef1d0 100%);
-    border-color: #ffb300;
+    background: #ff8533;
+    border-color: #ff8533;
 }
 
 .btnSecondary {
@@ -236,14 +237,14 @@
 }
 
 .btnDanger {
-    background: linear-gradient(135deg, #fff0f0 0%, #ffebeb 100%);
-    border-color: #ef5350;
-    color: #ef5350;
+    background: var(--color-hold);
+    border-color: var(--color-hold);
+    color: #ffffff;
 }
 
 .btnDanger:hover {
-    background: linear-gradient(135deg, #ffebeb 0%, #ffd9d9 100%);
-    border-color: #e53935;
+    background: #ff4444;
+    border-color: #ff4444;
 }
 
 .btnInfo {
@@ -258,14 +259,14 @@
 }
 
 .btnSuccess {
-    background: linear-gradient(135deg, #f0f9ff 0%, #d4edda 100%);
-    border-color: #52ea9b;
-    color: #28a745;
+    background: var(--color-status-inspection);
+    border-color: var(--color-status-inspection);
+    color: #ffffff;
 }
 
 .btnSuccess:hover {
-    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border-color: #1e7e34;
+    background: #1976d2;
+    border-color: #1976d2;
 }
 
 .btnPending {
@@ -280,15 +281,25 @@
 }
 
 .btnInspect {
-    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+    background: #9c27b0;
     border-color: #9c27b0;
-    color: #7b1fa2;
+    color: #ffffff;
+}
+
+.btnInspect:hover {
+    background: #7b1fa2;
+    border-color: #7b1fa2;
 }
 
 .btnProceed {
-    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-    border-color: #4caf50;
-    color: #2e7d32;
+    background: var(--color-normal);
+    border-color: var(--color-normal);
+    color: #ffffff;
+}
+
+.btnProceed:hover {
+    background: #43a047;
+    border-color: #43a047;
 }
 
 .btnApprove {

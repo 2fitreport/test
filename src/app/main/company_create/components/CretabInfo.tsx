@@ -50,9 +50,11 @@ interface CretabInfoProps {
     viewId?: string | null;
     isEditMode?: boolean;
     onEditClick?: () => void;
+    userLevel?: number;
+    progressDetails?: string;
 }
 
-const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function CretabInfo({ isViewMode = false, viewId = null, isEditMode = false, onEditClick }, ref) {
+const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function CretabInfo({ isViewMode = false, viewId = null, isEditMode = false, onEditClick, userLevel = 0, progressDetails = '' }, ref) {
     const [formData, setFormData] = useState<CretabFormData>({
         companyCreditRatingKCB: '',
         companyCreditRatingNICE: '',
@@ -843,14 +845,14 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
     };
 
     const handleCretabNoneClick = () => {
-        // 크레탑 정보가 없거나 파일이 등록되어 있지 않은 경우: 초기화하지 않음
+        // 기업상세정보가 없거나 파일이 등록되어 있지 않은 경우: 초기화하지 않음
         if (cretabStatus === 'none' || !cretabFile) {
             setCretabStatus('none');
             setCretabFile(null);
             return;
         }
 
-        // 파일이 있었는데 크레탑 정보 없음으로 변경: 데이터 초기화
+        // 파일이 있었는데 기업상세정보 없음으로 변경: 데이터 초기화
         setCretabStatus('none');
         setCretabFile(null);
         // 폼 데이터 초기화 (년도 제외)
@@ -934,7 +936,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
 
     const handleDownloadCretabZip = async () => {
         if (!cretabFile) {
-            alert('다운로드할 크레탑 파일이 없습니다.');
+            alert('다운로드할 기업상세정보 파일이 없습니다.');
             return;
         }
 
@@ -961,7 +963,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `크레탑파일_${new Date().getTime()}.zip`;
+            a.download = `기업상세정보_${new Date().getTime()}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1063,13 +1065,13 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                     <h3 className={styles.subtitle}>기업상세정보를 입력해주세요.</h3>
                 </div>
                 <div className={styles.cretabFileSection}>
-                    {cretabStatus === 'none' && (
+                    {cretabStatus === 'none' && userLevel !== 4 && (
                         <div className={styles.cretabStatusBadge}>
                             <Check size={16} />
-                            크레탑 정보 없음
+                            기업상세정보 없음
                         </div>
                     )}
-                    {cretabFile && (
+                    {cretabFile && userLevel !== 4 && (
                         <div
                             className={styles.cretabFileInfo}
                             onClick={() => handleOpenPreview(cretabFile)}
@@ -1093,32 +1095,24 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             )}
                         </div>
                     )}
-                    {cretabFile && (
+                    {cretabFile && userLevel !== 4 && (
                         <button
                             className={styles.downloadBtn}
                             onClick={handleDownloadCretabZip}
-                            title="크레탑 파일 다운로드"
+                            title="기업상세정보 파일 다운로드"
                         >
                             <Download size={18} />
                             다운로드
                         </button>
                     )}
-                    {viewId && (
+                    {viewId && !isViewMode && userLevel !== 4 && (
                         <>
-                            {isViewMode ? (
-                                <button className={styles.cretabFileBtn} onClick={onEditClick}>
-                                    크레탑 파일 등록
-                                </button>
-                            ) : (
-                                <>
-                                    <button className={styles.cretabFileBtn} onClick={handleCretabFileClick}>
-                                        크레탑 파일 등록
-                                    </button>
-                                    <button className={styles.cretabNoneBtn} onClick={handleCretabNoneClick}>
-                                        크레탑 정보 없음
-                                    </button>
-                                </>
-                            )}
+                            <button className={styles.cretabFileBtn} onClick={handleCretabFileClick}>
+                                기업상세정보 파일 등록
+                            </button>
+                            <button className={styles.cretabNoneBtn} onClick={handleCretabNoneClick}>
+                                기업상세정보 없음
+                            </button>
                         </>
                     )}
                     <input
@@ -1143,7 +1137,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.companyCreditRatingKCB}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="최대 4자리"
                             maxLength={4}
                         />
@@ -1160,7 +1154,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.companyCreditRatingNICE}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="최대 4자리"
                             maxLength={4}
                         />
@@ -1177,7 +1171,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.companyType}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="기업유형을 입력하세요"
                         />
                     </li>
@@ -1193,7 +1187,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.standardClassification}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="표준분류를 입력하세요"
                         />
                     </li>
@@ -1209,7 +1203,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.establishmentDate}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="2000-01-02"
                             maxLength={10}
                         />
@@ -1226,7 +1220,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             className={styles.input}
                             value={formData.companyAddress}
                             onChange={handleChange}
-                            disabled={isViewMode}
+                            disabled={isViewMode || userLevel === 4}
                             placeholder="회사주소를 입력하세요"
                         />
                     </li>
@@ -1248,11 +1242,11 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                                 <tbody>
                                     <tr>
                                         <td className={styles.rowLabel}>평가일자</td>
-                                        <td><input type="text" className={styles.cellInput} value={formData.assessmentDate} onChange={(e) => setFormData(prev => ({ ...prev, assessmentDate: e.target.value }))} disabled={isViewMode} /></td>
+                                        <td><input type="text" className={styles.cellInput} value={formData.assessmentDate} onChange={(e) => setFormData(prev => ({ ...prev, assessmentDate: e.target.value }))} disabled={isViewMode || userLevel === 4} /></td>
                                     </tr>
                                     <tr>
                                         <td className={styles.rowLabel}>결산일자</td>
-                                        <td><input type="text" className={styles.cellInput} value={formData.settlementDate} onChange={(e) => setFormData(prev => ({ ...prev, settlementDate: e.target.value }))} disabled={isViewMode} /></td>
+                                        <td><input type="text" className={styles.cellInput} value={formData.settlementDate} onChange={(e) => setFormData(prev => ({ ...prev, settlementDate: e.target.value }))} disabled={isViewMode || userLevel === 4} /></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1267,7 +1261,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                                 <tr className={styles.tableHeader}>
                                     <th>구분</th>
                                     {tableHeaders.map((header, idx) => (
-                                        <th key={idx}><input type="text" value={header} onChange={(e) => setTableHeaders(prev => { const newHeaders = [...prev]; newHeaders[idx] = e.target.value; return newHeaders; })} className={styles.headerInput} disabled={isViewMode} /></th>
+                                        <th key={idx}><input type="text" value={header} onChange={(e) => setTableHeaders(prev => { const newHeaders = [...prev]; newHeaders[idx] = e.target.value; return newHeaders; })} className={styles.headerInput} disabled={isViewMode || userLevel === 4} /></th>
                                     ))}
                                 </tr>
                             </thead>
@@ -1275,25 +1269,25 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                                 <tr>
                                     <td className={styles.rowLabel}>자산총계</td>
                                     {tableData.assetTotal.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, assetTotal: prev.assetTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, assetTotal: prev.assetTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                                 <tr>
                                     <td className={styles.rowLabel}>부채총계</td>
                                     {tableData.debtTotal.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, debtTotal: prev.debtTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, debtTotal: prev.debtTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                                 <tr>
                                     <td className={styles.rowLabel}>자본금</td>
                                     {tableData.capital.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, capital: prev.capital.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, capital: prev.capital.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                                 <tr>
                                     <td className={styles.rowLabel}>자본총계</td>
                                     {tableData.equityTotal.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, equityTotal: prev.equityTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, equityTotal: prev.equityTotal.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                             </tbody>
@@ -1305,7 +1299,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                                 <tr className={styles.tableHeader}>
                                     <th>구분</th>
                                     {tableHeaders.map((header, idx) => (
-                                        <th key={idx}><input type="text" value={header} onChange={(e) => setTableHeaders(prev => { const newHeaders = [...prev]; newHeaders[idx] = e.target.value; return newHeaders; })} className={styles.headerInput} disabled={isViewMode} /></th>
+                                        <th key={idx}><input type="text" value={header} onChange={(e) => setTableHeaders(prev => { const newHeaders = [...prev]; newHeaders[idx] = e.target.value; return newHeaders; })} className={styles.headerInput} disabled={isViewMode || userLevel === 4} /></th>
                                     ))}
                                 </tr>
                             </thead>
@@ -1313,19 +1307,19 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                                 <tr>
                                     <td className={styles.rowLabel}>매출액</td>
                                     {tableData.sales.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, sales: prev.sales.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, sales: prev.sales.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                                 <tr>
                                     <td className={styles.rowLabel}>당기순이익</td>
                                     {tableData.netIncome.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, netIncome: prev.netIncome.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, netIncome: prev.netIncome.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                                 <tr>
                                     <td className={styles.rowLabel}>현금흐름등급</td>
                                     {tableData.cashFlowGrade.map((value, idx) => (
-                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, cashFlowGrade: prev.cashFlowGrade.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode} /></td>
+                                        <td key={idx}><input type="text" value={value} onChange={(e) => setTableData(prev => ({ ...prev, cashFlowGrade: prev.cashFlowGrade.map((v, i) => i === idx ? e.target.value : v) }))} className={styles.cellInput}  disabled={isViewMode || userLevel === 4} /></td>
                                     ))}
                                 </tr>
                             </tbody>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAdminData } from '@/lib/auth';
-import DocumentSubmissionList from './DocumentSubmissionList';
+import DocumentSubmissionList from './documentSubmissionList';
 import styles from './page.module.css';
 
 export default function DocumentSubmissionPage() {

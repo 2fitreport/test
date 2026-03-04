@@ -18,9 +18,11 @@ export interface CompanyInfoCardHandle {
 
 interface CompanyInfoCardProps {
     isViewMode?: boolean;
+    progressDetails?: string;
+    status?: string;
 }
 
-const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(function CompanyInfoCard({ isViewMode = false }, ref) {
+const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(function CompanyInfoCard({ isViewMode = false, progressDetails = '', status = '' }, ref) {
     const [formData, setFormData] = useState<CompanyFormData>({
         company_name: '',
         business_number: '',

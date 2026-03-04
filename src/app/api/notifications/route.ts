@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { title, content, type, sender_id, receiver_id } = body;
+        const { title, content, type, sender_id, receiver_id, receiver_ids } = body;
 
         if (!title || !content || !type || !sender_id) {
             return NextResponse.json(
@@ -86,24 +86,42 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (type === 'personal' && !receiver_id) {
+        if (type === 'personal' && !receiver_id && (!receiver_ids || receiver_ids.length === 0)) {
             return NextResponse.json(
                 { error: '개인 알림은 수신자를 지정해야 합니다.' },
                 { status: 400 }
             );
         }
 
-        const { data, error } = await supabase
-            .from('notifications')
-            .insert([{
+        let data;
+        let error;
+
+        if (type === 'personal' && receiver_ids && receiver_ids.length > 0) {
+            const notifications = receiver_ids.map((rid: number) => ({
                 title,
                 content,
                 type,
                 sender_id,
-                receiver_id: type === 'personal' ? receiver_id : null,
-            }])
-            .select()
-            .single();
+                receiver_id: rid
+            }));
+            const result = await supabase.from('notifications').insert(notifications).select();
+            data = result.data;
+            error = result.error;
+        } else {
+            const { data: singleData, error: singleError } = await supabase
+                .from('notifications')
+                .insert([{
+                    title,
+                    content,
+                    type,
+                    sender_id,
+                    receiver_id: type === 'personal' ? receiver_id : null,
+                }])
+                .select()
+                .single();
+            data = singleData;
+            error = singleError;
+        }
 
         if (error) throw error;
 

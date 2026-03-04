@@ -13,7 +13,7 @@ export async function PUT(
     try {
         const { id } = await params;
         const docId = parseInt(id);
-        const { progress_details, progress_start_date } = await request.json();
+        const { progress_details, progress_start_date, status } = await request.json();
 
         if (!progress_details?.trim()) {
             return NextResponse.json(
@@ -43,6 +43,11 @@ export async function PUT(
             updateData.progress_start_date = progress_start_date;
         }
 
+        // status가 제공되면 포함
+        if (status) {
+            updateData.status = status;
+        }
+
         // DB에서 업데이트
         const { data, error: updateError } = await supabase
             .from('documents')
@@ -60,6 +65,48 @@ export async function PUT(
                 { error: '문서를 찾을 수 없습니다.' },
                 { status: 404 }
             );
+        }
+
+        // 로그 생성 (진행단계 변경)
+        const authToken = request.cookies.get('auth_token')?.value;
+        let actorId = 'system';
+        let actorName = '시스템';
+
+        if (authToken) {
+            try {
+                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+                actorId = tokenData.user_id || 'system';
+
+                const { data: userData } = await supabase
+                    .from('users')
+                    .select('name')
+                    .eq('user_id', actorId)
+                    .single();
+
+                if (userData) {
+                    actorName = userData.name || actorId;
+                }
+            } catch (e) {
+                console.error('사용자 정보 조회 실패:', e);
+            }
+        }
+
+        const { error: logError } = await supabase
+            .from('document_logs')
+            .insert({
+                document_id: docId,
+                document_title: data.title || '',
+                company_name: data.company_name || '',
+                action_type: 'progress_details_change',
+                actor_id: actorId,
+                actor_name: actorName,
+                old_value: data.progress_details || null,
+                new_value: progress_details,
+                created_at: new Date().toISOString()
+            });
+
+        if (logError) {
+            console.error('로그 생성 실패:', logError);
         }
 
         return NextResponse.json({

@@ -61,8 +61,12 @@ export async function GET(request: NextRequest) {
         let filteredDocuments = data;
 
         // 역할별 필터링
+        // 실무자 (position이 없는 경우, manager_id로 식별): 자신에게 배정받은 문서만
+        if (!userLevel) {
+            filteredDocuments = data.filter((doc: any) => doc.manager_id === userId);
+        }
         // Level 3 (실무자): 자신에게 배정받은 문서만 (manager_id = 자신의 user_id)
-        if (userLevel === 3) {
+        else if (userLevel === 3) {
             filteredDocuments = data.filter((doc: any) => doc.manager_id === userId);
         }
         // Level 4 (영업자): 자신의 문서만

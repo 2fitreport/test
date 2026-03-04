@@ -79,7 +79,11 @@
       "Bash(git checkout:*)",
       "Bash(tail:*)",
       "Bash(grep:*)",
-      "Bash(cd C:\\\\Users\\\\111\\\\Desktop\\\\2fitreport\\\\src\\\\app\\\\main:*)"
+      "Bash(cd C:\\\\Users\\\\111\\\\Desktop\\\\2fitreport\\\\src\\\\app\\\\main:*)",
+      "Bash(git pull:*)",
+      "Bash(node:*)",
+      "Bash(npx playwright:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

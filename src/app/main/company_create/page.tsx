@@ -28,8 +28,8 @@ function Company1Content() {
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const [isCreateMode, setIsCreateMode] = useState(createParam === 'true');
     const [isViewMode, setIsViewMode] = useState(!!viewId && !createParam);
-    // 초기값을 URL에서 직접 받기 (editParam === 'true')
-    const [isEditMode, setIsEditMode] = useState(editParam === 'true' && !!viewId);
+    // 초기값은 false로 설정, useEffect에서 권한 확인 후 설정
+    const [isEditMode, setIsEditMode] = useState(false);
     const [documentData, setDocumentData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(!!viewId);
     const [accessDenied, setAccessDenied] = useState(false);
@@ -64,6 +64,7 @@ function Company1Content() {
 
             const { document: data } = await response.json();
             setDocumentData(data);
+
             setIsLoading(false);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : '문서 조회 실패';
@@ -92,10 +93,30 @@ function Company1Content() {
         }
     }, [viewId]);
 
-    // edit 파라미터 감시 - 수정 모드 활성화
+    // edit 파라미터 감시 - 수정 모드 활성화 (승인 문서는 수정 불가, 영업자/검수자는 분석 단계 수정 불가)
     useEffect(() => {
-        setIsEditMode(editParam === 'true' && !!viewId);
-    }, [editParam, viewId]);
+        if (!documentData) return;
+
+        const adminData = getAdminData();
+        const userLevel = adminData?.position?.level;
+
+        const isApproved = documentData?.progress_details === '승인';
+        // 영업자는 분석 단계에서 수정 불가
+        // 검수자는 모든 단계에서 수정 가능
+        // 대표실무자(level 2)는 진행 단계에서 수정 불가 (이전단계/초기화 불가이므로)
+        // 실무자(level 3 또는 undefined)가 본인 배정 문서는 수정 불가
+        const isAnalysisPhase = (userLevel === 4 && documentData?.progress_details === '분석') ||
+                                (userLevel === 2 && documentData?.progress_details === '진행');
+        const isManagerAssignedDoc = (userLevel === 3 || userLevel === undefined) &&
+                                     documentData?.manager_id === adminData?.user_id;
+        const canEdit = editParam === 'true' && !!viewId && !isApproved && !isAnalysisPhase && !isManagerAssignedDoc;
+        setIsEditMode(canEdit);
+
+        // 영업자/검수자가 수정 불가 단계 수정 페이지 접근 시 리다이렉트
+        if (editParam === 'true' && isAnalysisPhase && viewId) {
+            router.replace(`?view=${viewId}`);
+        }
+    }, [editParam, viewId, documentData, router]);
 
     // 조회한 문서 데이터를 폼에 반영 (처음 진입할 때만)
     useEffect(() => {
@@ -298,11 +319,13 @@ function Company1Content() {
 
     const getProgressBadgeStyle = (progress: string | null | undefined) => {
         const styleMap: Record<string, React.CSSProperties> = {
-            '상담': { background: '#e3f2fd', color: '#1976d2' },
-            '서류요청': { background: '#fff3e0', color: '#f57c00' },
-            '분석': { background: '#f3e5f5', color: '#7b1fa2' },
-            '진행': { background: '#e8f5e9', color: '#388e3c' },
-            '승인': { background: '#fce4ec', color: '#c2185b' },
+            '상담': { backgroundColor: '#9e9e9e', color: '#ffffff' },
+            '서류요청': { backgroundColor: '#ffc107', color: '#ffffff' },
+            '분석': { backgroundColor: '#2196f3', color: '#ffffff' },
+            '심사': { backgroundColor: '#9c27b0', color: '#ffffff' },
+            '진행': { backgroundColor: '#e74c3c', color: '#ffffff' },
+            '승인요청': { backgroundColor: '#ff9800', color: '#ffffff' },
+            '승인': { backgroundColor: '#4caf50', color: '#ffffff' },
         };
         return styleMap[progress || '상담'] || styleMap['상담'];
     };
@@ -492,11 +515,14 @@ function Company1Content() {
             }
 
             const saveData: any = {
-                user_id: userId,
-                user_name: adminData.name || userId,
+                // 수정 모드에서는 기존 user_id 유지, 생성 모드에서만 현재 사용자로 설정
+                ...(viewId ? {} : { user_id: userId }),
+                // 수정 모드에서는 user_name도 원본 저자 유지
+                ...(viewId ? { user_name: documentData?.user_name } : { user_name: adminData.name || userId }),
                 document_type: '기업등록',
                 title: formData.company_name,
-                status: '정상',
+                // 생성 모드에서만 status 설정, 수정 모드에서는 기존 상태 유지
+                ...(viewId ? {} : { status: '정상' }),
                 progress_status: 'not_started',
                 company_name: formData.company_name,
                 business_number: formData.business_number,
@@ -508,7 +534,7 @@ function Company1Content() {
                 type: businessType,
                 // 파일 경로들 (DB 컬럼명과 맞춰야 함)
                 files: allFiles, // 첨부파일
-                cretop_file: cretabFileData, // 크레탑 파일
+                ...(currentUserPosition?.level !== 4 && { cretop_file: cretabFileData }), // 크레탑 파일 (영업자 제외)
                 supplement_files: additionalFilesCombined, // 추가서류
                 memos: memos, // 메모
                 submitted_date: now.toLocaleString('ko-KR'),
@@ -676,18 +702,13 @@ function Company1Content() {
         );
     }
 
-    if (accessDenied) {
-        return (
-            <div className={styles.container}>
-                <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>
-                    <p>접근 권한이 없습니다.</p>
-                </div>
-            </div>
-        );
-    }
+    const handleAccessDeniedClose = () => {
+        router.push('/main/home');
+    };
 
     return (
-        <div className={styles.container}>
+        <>
+        <div className={styles.container} style={{ display: accessDenied ? 'none' : 'block' }}>
             <div className={isCreateMode ? styles.companyTitle : styles.companyTitleView}>
                 {viewId ? (
                     <>
@@ -707,22 +728,37 @@ function Company1Content() {
                 )}
             </div>
             <div className={styles.companyManagementWrap}>
-                <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode} />
+                <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode} progressDetails={documentData?.progress_details} status={documentData?.status} />
                 <ProgressStepsSection
                     isViewMode={isViewMode && !isEditMode}
                     documentId={viewId}
                     progressDetails={documentData?.progress_details}
                     progressStartDate={documentData?.progress_start_date}
                     managerId={documentData?.manager_id}
+                    documentStatus={documentData?.status}
+                    currentUserName={currentUserName}
+                    currentUserId={currentUserId}
+                    currentUserPositionLevel={currentUserPosition?.level}
                     onValidateAndNext={handleValidateAndNext}
                     onProgressUpdate={handleProgressUpdate}
+                    onMemoUpdate={async () => {
+                        // 메모 목록 다시 불러오기
+                        if (viewId) {
+                            const response = await fetch(`/api/documents/${viewId}`);
+                            if (response.ok) {
+                                const data = await response.json();
+                                if (data.memos) setMemos(data.memos);
+                            }
+                        }
+                    }}
                     onSave={handleSave}
                     onStaffAssignSuccess={handleStaffAssignSuccess}
                 />
-                {viewId && currentUserPosition?.level !== 4 && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode} viewId={viewId} isEditMode={isEditMode} onEditClick={handleEditCretabFile} />}
+                {viewId && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode} viewId={viewId} isEditMode={isEditMode} onEditClick={documentData?.progress_details === '승인' ? undefined : handleEditCretabFile} userLevel={currentUserPosition?.level} progressDetails={documentData?.progress_details} />}
                 <MemoSection
                     documentId={viewId}
                     isViewMode={isViewMode && !isEditMode}
+                    readOnly={false}
                     currentUserId={currentUserId}
                     currentUserName={currentUserName}
                     currentUserPositionLevel={currentUserPosition?.level || 0}
@@ -738,7 +774,7 @@ function Company1Content() {
                     isEditMode={isEditMode}
                     userPositionLevel={currentUserPosition?.level || 0}
                 />
-                <AdditionalFiles ref={additionalFilesRef} isViewMode={isViewMode && !isEditMode} />
+                <AdditionalFiles ref={additionalFilesRef} isViewMode={isViewMode && !isEditMode} progressDetails={documentData?.progress_details} userPositionLevel={currentUserPosition?.level || 0} />
             </div>
 
             {/* 저장/취소 버튼 (고정) */}
@@ -752,12 +788,14 @@ function Company1Content() {
                             >
                                 돌아가기
                             </button>
-                            <button
-                                className={styles.saveBtn}
-                                onClick={() => router.push(`?view=${viewId}&edit=true`)}
-                            >
-                                수정
-                            </button>
+                            {documentData?.progress_details !== '승인' && !(currentUserPosition?.level === 4 && documentData?.progress_details === '분석') && (
+                                <button
+                                    className={styles.saveBtn}
+                                    onClick={() => router.push(`?view=${viewId}&edit=true`)}
+                                >
+                                    수정
+                                </button>
+                            )}
                         </>
                     ) : (
                         <>
@@ -809,16 +847,29 @@ function Company1Content() {
                 hideCancel={true}
             />
 
-            {/* 취소 확인 모달 */}
-            <Modal
-                isOpen={cancelModalOpen}
-                message="작업을 취소하시겠습니까?<br>저장하지 않은 내용은 삭제됩니다."
-                onClose={() => setCancelModalOpen(false)}
-                type="warning"
-                confirmText="확인"
-                onConfirm={handleCancelConfirm}
-            />
         </div>
+
+        {/* 취소 확인 모달 */}
+        <Modal
+            isOpen={cancelModalOpen}
+            message={"작업을 취소하시겠습니까?\n저장하지 않은 내용은 삭제됩니다."}
+            onClose={() => setCancelModalOpen(false)}
+            type="warning"
+            confirmText="확인"
+            onConfirm={handleCancelConfirm}
+        />
+
+        {/* 접근 권한 없음 모달 */}
+        <Modal
+            isOpen={accessDenied}
+            message="접근 권한이 없습니다."
+            onClose={handleAccessDeniedClose}
+            type="error"
+            confirmText="확인"
+            onConfirm={handleAccessDeniedClose}
+            showCancelButton={false}
+        />
+        </>
     )
 }
 

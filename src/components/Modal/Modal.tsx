@@ -48,7 +48,14 @@ export default function Modal({
               <img src={iconSrc} alt={type} className={styles.icon} />
             </div>
           )}
-          <p className={styles.message}>{message}</p>
+          <p className={styles.message}>
+            {message.split('\n').map((line, i, arr) => (
+              <span key={i}>
+                {line}
+                {i < arr.length - 1 && <br />}
+              </span>
+            ))}
+          </p>
         </div>
         <div className={styles.footer}>
           {showConfirmButton ? (

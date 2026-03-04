@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getTimeAgo } from './timeUtils';
 
 interface TimeAgoProps {
@@ -8,19 +8,22 @@ interface TimeAgoProps {
 }
 
 export default function TimeAgo({ dateString }: TimeAgoProps) {
-    const [timeAgo, setTimeAgo] = useState<string>('');
+    const [timeAgo, setTimeAgo] = useState<string>(() => getTimeAgo(dateString));
+    const dateStringRef = useRef(dateString);
 
     useEffect(() => {
-        // 초기값 설정
+        dateStringRef.current = dateString;
         setTimeAgo(getTimeAgo(dateString));
+    }, [dateString]);
 
+    useEffect(() => {
         // 1초마다 업데이트
         const interval = setInterval(() => {
-            setTimeAgo(getTimeAgo(dateString));
+            setTimeAgo(getTimeAgo(dateStringRef.current));
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [dateString]);
+    }, []);
 
     return <span>{timeAgo}</span>;
 }

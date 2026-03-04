@@ -53,6 +53,7 @@ export async function PUT(
         // 액터 정보 파싱 (쿠키 토큰)
         let actorId = 'unknown';
         let actorName = '알 수 없음';
+        let actorLevel = 0;
         const authToken = request.cookies.get('auth_token')?.value;
         if (authToken) {
             try {
@@ -60,10 +61,14 @@ export async function PUT(
                 actorId = tokenData.user_id || 'unknown';
                 const { data: actorUser } = await supabase
                     .from('users')
-                    .select('name')
+                    .select('name, position(level)')
                     .eq('user_id', actorId)
                     .single();
-                if (actorUser) actorName = actorUser.name || actorId;
+                if (actorUser) {
+                    actorName = actorUser.name || actorId;
+                    const positionArray = actorUser.position as any;
+                    actorLevel = (Array.isArray(positionArray) ? positionArray[0]?.level : positionArray?.level) || 0;
+                }
             } catch {}
         }
 
@@ -73,6 +78,148 @@ export async function PUT(
             .select('status, progress_details, memos, title, company_name, manager_id, manager_name')
             .eq('id', docId)
             .single();
+
+        // 문서 소유자 변경 방지 (모든 역할에 대해)
+        if (body.user_id !== undefined) {
+            return NextResponse.json(
+                { error: '문서 소유자는 변경할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
+
+        // 권한 체크
+        if (actorLevel === 4) {
+            // 영업자(level 4)는 기업상세정보(CretabInfo) 필드 수정 불가
+            const cretabInfoFields = [
+                'company_credit_rating_kcb', 'company_credit_rating_nice', 'company_type', 'standard_classification',
+                'establishment_date', 'company_address', 'assessment_date', 'settlement_date',
+                'financial_data', 'income_data', 'extracted_images', 'cretop_none', 'cretop_file'
+            ];
+
+            const isModifyingCretabInfo = cretabInfoFields.some(field => body[field] !== undefined);
+
+            if (isModifyingCretabInfo) {
+                return NextResponse.json(
+                    { error: '영업자는 기업상세정보를 수정할 수 없습니다.' },
+                    { status: 403 }
+                );
+            }
+
+            // status를 변경하려는 경우만 체크
+            if (body.status !== undefined) {
+                // status를 변경하려는 경우: 보완 상태에서만 보안완료(status='검수')만 가능
+                const isSecurityProcess = body.status === '검수' && Object.keys(body).length === 1;
+                const currentStatus = prevDoc?.status;
+
+                if (currentStatus !== '보완' || !isSecurityProcess) {
+                    return NextResponse.json(
+                        { error: '영업자는 보완 상태에서 보안완료만 가능합니다.' },
+                        { status: 403 }
+                    );
+                }
+            }
+        } else if (actorLevel === 6) {
+            // 검수자(level 6)는 승인요청/승인 단계 제외하고 수정 가능
+            const currentProgress = prevDoc?.progress_details;
+
+            if (currentProgress === '승인요청' || currentProgress === '승인') {
+                return NextResponse.json(
+                    { error: '승인 단계에서는 작업할 수 없습니다.' },
+                    { status: 403 }
+                );
+            }
+            // OK - 다른 단계에서는 수정 가능
+        } else if (actorLevel === 1 || actorLevel === 2) {
+            // 대표자 및 대표실무자: progress_details 변경(이전단계, 초기화 등)은 모든 상태에서 가능
+            const currentStatus = prevDoc?.status;
+            const currentProgress = prevDoc?.progress_details;
+            const hasProgressDetailsChange = body.progress_details !== undefined;
+            const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
+            const isEndAction = body.progress_details === '보류' && Object.keys(body).length === 1;
+
+            // progress_details가 포함되면 모든 상태에서 가능 (이전단계, 초기화 등)
+            if (hasProgressDetailsChange) {
+                // OK - 항상 가능
+            }
+            // progress_details 없이 상태만 변경하는 경우
+            else if (isEndAction) {
+                // OK - 항상 가능
+            }
+            // 서류요청, 분석, 심사, 진행, 승인요청 단계에서는 status 변경도 자유롭게 가능 (보완, 보류, 정상 등)
+            else if (currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') {
+                // OK - 이 단계들에서는 모든 status 변경 가능
+            }
+            // 보완 상태: 보안완료(status='검수')만 가능
+            else if (currentStatus === '보완' && body.status === '검수' && isStatusChange) {
+                // OK
+            }
+            // 검수 상태: 검수완료(status='정상')만 가능
+            else if (currentStatus === '검수' && body.status === '정상' && isStatusChange) {
+                // OK
+            }
+            // 기타 상태: 보완요청(status='보완')만 가능
+            else if (currentStatus !== '보류' && currentStatus !== '보완' && currentStatus !== '검수' && body.status === '보완' && isStatusChange) {
+                // OK
+            }
+            else {
+                return NextResponse.json(
+                    { error: '현재 상태에서 불가능한 작업입니다.' },
+                    { status: 403 }
+                );
+            }
+        } else if (prevDoc?.manager_id === actorId) {
+            // 실무자(level 3 또는 undefined): 다음 단계 이동, 상태 변경(보완요청, 진행불가 등)만 가능
+            // 기업 정보 등 다른 필드는 수정 불가
+            const currentProgress = prevDoc?.progress_details;
+
+            if (currentProgress === '승인') {
+                return NextResponse.json(
+                    { error: '승인 단계에서는 작업할 수 없습니다.' },
+                    { status: 403 }
+                );
+            }
+
+            // progress_details 변경 (다음 단계 이동 또는 진행불가) 또는 status 변경만 허용
+            const hasProgressDetailsChange = body.progress_details !== undefined;
+            const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
+
+            if (hasProgressDetailsChange) {
+                // 진행불가(분석으로 돌아가면서 상태=보완)는 특례로 허용
+                const isGoingBackToAnalysis = body.progress_details === '분석' && body.status === '보완';
+
+                if (!isGoingBackToAnalysis) {
+                    // 다음 단계로 이동만 가능 (이전 단계나 초기화는 불가)
+                    const stepOrder = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+                    const currentIndex = stepOrder.indexOf(currentProgress);
+                    const newIndex = stepOrder.indexOf(body.progress_details);
+                    if (newIndex !== currentIndex + 1) {
+                        return NextResponse.json(
+                            { error: '다음 단계로만 이동 가능합니다.' },
+                            { status: 403 }
+                        );
+                    }
+                }
+                // OK - 다음 단계 이동 또는 진행불가 가능
+            }
+            // status 변경 (보완요청, 진행불가)
+            else if (body.status === '보완' || body.status === '보류' || body.status === '검수' || (body.status === '정상' && prevDoc?.status === '검수')) {
+                // OK - 보완요청, 진행불가, 보안완료, 검수완료 가능
+            }
+            else {
+                return NextResponse.json(
+                    { error: '문서 정보는 수정할 수 없습니다.' },
+                    { status: 403 }
+                );
+            }
+        } else {
+            // 그 외 모든 권한: 진행 단계 변경 불가
+            if (body.progress_details !== undefined || body.status !== undefined || body.manager_id !== undefined || body.manager_name !== undefined) {
+                return NextResponse.json(
+                    { error: '진행 단계를 변경할 권한이 없습니다.' },
+                    { status: 403 }
+                );
+            }
+        }
 
         // progress_start_date가 문자열 타임스탐프면 숫자로 변환
         if (body.progress_start_date && typeof body.progress_start_date === 'string') {

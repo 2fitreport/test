@@ -57,8 +57,8 @@ export default function DocumentSubmissionList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류'>('all');
-    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담' | '서류요청' | '분석' | '진행' | '승인'>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류' | '검수'>('all');
+    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -293,21 +293,41 @@ export default function DocumentSubmissionList() {
 
             if (doc.progress_details === '서류요청') {
                 // 서류요청 → 분석으로 변경
+                const startDate = String(Date.now());
+                console.log('분석 설정, progress_start_date:', startDate);
                 updatedDoc = {
                     ...doc,
                     status: '정상' as const,
                     progress_details: '분석',
                     inspector_id: currentUserId,
-                    progress_start_date: String(Date.now())
+                    progress_start_date: startDate
                 };
                 message = '분석 상태로 변경되었습니다.';
             } else if (doc.progress_details === '분석') {
                 // 분석 → 진행으로 변경
-                updatedDoc = { ...doc, status: '정상' as const, progress_details: '진행' };
+                updatedDoc = {
+                    ...doc,
+                    status: '정상' as const,
+                    progress_details: '진행',
+                    progress_start_date: doc.progress_start_date
+                };
                 message = '진행 상태로 변경되었습니다.';
             } else if (doc.progress_details === '진행') {
-                // 진행 → 승인으로 변경
-                updatedDoc = { ...doc, status: '정상' as const, progress_details: '승인' };
+                // 진행 → 승인으로 변경 (경과 시간 계산)
+                const startTimestamp = parseInt(String(doc.progress_start_date || '0'));
+                const elapsedMs = startTimestamp > 0 ? Date.now() - startTimestamp : 0;
+                const totalSecs = Math.floor(Math.max(0, elapsedMs) / 1000);
+                const endH = Math.floor(totalSecs / 3600);
+                const endM = Math.floor((totalSecs % 3600) / 60);
+                const endS = totalSecs % 60;
+
+                updatedDoc = {
+                    ...doc,
+                    status: '정상' as const,
+                    progress_details: '승인',
+                    progress_start_date: doc.progress_start_date,
+                    progress_end_time: `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:${String(endS).padStart(2, '0')}`
+                };
                 message = '승인 상태로 변경되었습니다.';
             } else if (doc.progress_details === '승인') {
                 // 승인 완료
@@ -334,6 +354,8 @@ export default function DocumentSubmissionList() {
             // UI 상태 업데이트
             setDocuments(docs => docs.map(d => d.id === id ? updatedDoc : d));
             setSuccessMessage(message);
+            setConfirmModalOpen(false);
+            setSuccessModalOpen(true);
         } else if (action === 'reject') {
             const doc = documents.find(d => d.id === id);
             if (doc) {
@@ -357,7 +379,8 @@ export default function DocumentSubmissionList() {
                     ...doc,
                     status: '보류' as const,
                     reason: combinedReason,
-                    reason_read: false
+                    reason_read: false,
+                    progress_start_date: doc.progress_start_date
                 } as Document;
 
                 // DB에 저장
@@ -393,7 +416,8 @@ export default function DocumentSubmissionList() {
                     ...doc,
                     status: '보완' as const,
                     reason: combinedReason,
-                    reason_read: false
+                    reason_read: false,
+                    progress_start_date: doc.progress_start_date
                 } as Document;
 
                 // DB에 저장
@@ -777,6 +801,8 @@ export default function DocumentSubmissionList() {
                 return styles.revision;
             case '보류':
                 return styles.rejected;
+            case '검수':
+                return styles.inspection;
             default:
                 return '';
         }
@@ -784,12 +810,18 @@ export default function DocumentSubmissionList() {
 
     const getProgressDetailsBadgeClass = (progressDetails: string) => {
         switch (progressDetails) {
+            case '상담':
+                return styles.progressBadgeConsultation;
             case '서류요청':
                 return styles.progressBadgeWaiting;
             case '분석':
                 return styles.progressBadgeAnalysis;
+            case '심사':
+                return styles.progressBadgeInspection;
             case '진행':
                 return styles.progressBadgeProgress;
+            case '승인요청':
+                return styles.progressBadgeApprovalRequest;
             case '승인':
                 return styles.progressBadgeApproved;
             default:
@@ -883,7 +915,7 @@ export default function DocumentSubmissionList() {
                                     className={styles.itemsSelect}
                                     value={progressDetailsFilter}
                                     onChange={(e) => {
-                                        setProgressDetailsFilter(e.target.value as 'all' | '상담' | '서류요청' | '분석' | '진행' | '승인');
+                                        setProgressDetailsFilter(e.target.value as 'all' | '상담' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인');
                                         setCurrentPage(1);
                                     }}
                                 >
@@ -891,7 +923,9 @@ export default function DocumentSubmissionList() {
                                     <option value="상담">상담</option>
                                     <option value="서류요청">서류요청</option>
                                     <option value="분석">분석</option>
+                                    <option value="심사">심사</option>
                                     <option value="진행">진행</option>
+                                    <option value="승인요청">승인요청</option>
                                     <option value="승인">승인</option>
                                 </select>
                                 <Image
@@ -910,7 +944,7 @@ export default function DocumentSubmissionList() {
                                     className={styles.itemsSelect}
                                     value={statusFilter}
                                     onChange={(e) => {
-                                        setStatusFilter(e.target.value as 'all' | '정상' | '보완' | '보류');
+                                        setStatusFilter(e.target.value as 'all' | '정상' | '보완' | '보류' | '검수');
                                         setCurrentPage(1);
                                     }}
                                 >
@@ -918,6 +952,7 @@ export default function DocumentSubmissionList() {
                                     <option value="정상">정상</option>
                                     <option value="보완">보완</option>
                                     <option value="보류">보류</option>
+                                    <option value="검수">검수</option>
                                 </select>
                                 <Image
                                     src="/arrow.svg"
@@ -1118,18 +1153,23 @@ export default function DocumentSubmissionList() {
                                             )}
                                         </td>
                                         <td className={styles.timeAgo}>
-                                            {doc.progress_status === 'stopped' && doc.stopped_time ? (
-                                                <span>{doc.stopped_time}</span>
-                                            ) : (doc.progress_details === '분석' || doc.progress_details === '심사' || doc.progress_details === '진행') && doc.progress_start_date ? (
-                                                <TimeAgo dateString={doc.progress_start_date} />
-                                            ) : doc.progress_details === '승인' && doc.progress_end_time ? (
-                                                <span>{doc.progress_end_time}</span>
-                                            ) : (
-                                                <span>-</span>
-                                            )}
+                                            {(() => {
+                                                const isAnalysis = doc.progress_details === '분석' || doc.progress_details === '심사' || doc.progress_details === '진행' || doc.progress_details === '승인요청';
+                                                const hasStartDate = !!doc.progress_start_date;
+
+                                                if (doc.progress_status === 'stopped' && doc.stopped_time) {
+                                                    return <span>{doc.stopped_time}</span>;
+                                                } else if (isAnalysis && hasStartDate) {
+                                                    return <TimeAgo dateString={String(doc.progress_start_date)} />;
+                                                } else if (doc.progress_details === '승인' && doc.progress_end_time) {
+                                                    return <span>{doc.progress_end_time}</span>;
+                                                } else {
+                                                    return <span>-</span>;
+                                                }
+                                            })()}
                                         </td>
                                         <td className={styles.approvalAmount}>
-                                            {doc.approval_amount ? `${doc.approval_amount.toLocaleString()}원` : '-'}
+                                            {doc.approval_amount ? `${doc.approval_amount.toLocaleString()}만원` : '-'}
                                         </td>
                                         {!isUserSalesManager && (
                                             <td className={styles.userName}>{doc.user_name}</td>

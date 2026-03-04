@@ -31,15 +31,13 @@ export async function GET(
 
         const userId = tokenData.user_id;
 
-        // 병렬로 모든 데이터 조회
+        // 현재 사용자와 문서 조회
         const [
             { data: currentUser },
-            { data: document },
-            { data: users }
+            { data: document }
         ] = await Promise.all([
             supabase.from('users').select('*, position(level)').eq('user_id', userId).single(),
-            supabase.from('documents').select('*').eq('id', docId).single(),
-            supabase.from('users').select('id, user_id, name, position_id, position(id, name, level), company_name, supervisor_id')
+            supabase.from('documents').select('*').eq('id', docId).single()
         ]);
 
         if (!currentUser) {
@@ -52,6 +50,16 @@ export async function GET(
 
         const userLevel = currentUser.position?.level;
         const userIdNumber = currentUser.id;
+
+        // 영업자(level 4)는 users 데이터 조회 안 함 (보안)
+        // 검수자(level 6)와 대표/대표실무자(level 1,2)는 필요시 조회
+        let users = null;
+        if (userLevel !== 4) {
+            const { data: usersData } = await supabase
+                .from('users')
+                .select('id, user_id, name, position_id, position(id, name, level), company_name, supervisor_id');
+            users = usersData;
+        }
 
         // 권한 확인
         // 영업자(level=4)는 자신이 작성한 문서만
@@ -81,6 +89,21 @@ export async function GET(
             }
         }
 
+        // 실무자(manager) 권한 확인 (level 3 또는 position이 없는 경우)
+        if (userLevel === 3 || userLevel === null || userLevel === undefined) {
+            // 실무자는 자신의 manager_id가 지정된 문서만 접근 가능
+            const isManager = document.manager_id === userId || document.manager_id === String(userIdNumber);
+            if (!document.manager_id || !isManager) {
+                console.log('실무자 접근 거부:', {
+                    userId,
+                    userIdNumber,
+                    docManagerId: document.manager_id,
+                    isManager
+                });
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
+        }
+
         // 담당검수자 정보 조회
         let supervisorInfo = null;
         const documentOwner = users?.find((u: any) => u.user_id === document.user_id);
@@ -91,8 +114,14 @@ export async function GET(
             }
         }
 
+        // 영업자(level 4)에게는 cretop_file 제거
+        const responseDocument = { ...document };
+        if (userLevel === 4) {
+            responseDocument.cretop_file = null;
+        }
+
         return NextResponse.json({
-            document,
+            document: responseDocument,
             users: users || [],
             currentUser: {
                 id: currentUser.id,

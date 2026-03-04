@@ -13,6 +13,7 @@ export interface CreateUserFormData {
     email_display: string;
     address: string;
     address_detail: string;
+    resident_id: string;
     company_name: string;
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
@@ -39,6 +40,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
         email_display: '',
         address: '',
         address_detail: '',
+        resident_id: '',
         company_name: '',
         status: 'active',
         supervisor_id: null,
@@ -312,6 +314,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
             email_display: '',
             address: '',
             address_detail: '',
+            resident_id: '',
             company_name: '',
             status: 'active',
             supervisor_id: null,

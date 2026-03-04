@@ -307,7 +307,8 @@ export default function CompanyCreateForm() {
                 assignedSalesManagerIds.length > 0 ? assignedSalesManagerIds : undefined,
                 data.inspector_id,
                 data.manager_id,
-                data.progress_details
+                data.progress_details,
+                data.status
             ) : false;
 
             setCanEdit(hasEditPermission);

@@ -64,7 +64,6 @@ export async function GET(request: NextRequest) {
         email_display,
         address,
         address_detail,
-        company_name,
         password,
         supervisor_id,
         bank_name,
@@ -87,6 +86,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
+    // 소속 정보 조회 (inspector_affiliations + user_affiliations)
+    const { data: inspectorAffData } = await supabase
+      .from('inspector_affiliations')
+      .select('inspector_id, affiliation_name');
+
+    const { data: userAffData } = await supabase
+      .from('user_affiliations')
+      .select('user_id, affiliations(name)');
+
+    // inspector_id → affiliation_name 맵
+    const inspectorAffMap = new Map<number, string>();
+    inspectorAffData?.forEach((ia: any) => {
+      if (!inspectorAffMap.has(ia.inspector_id)) {
+        inspectorAffMap.set(ia.inspector_id, ia.affiliation_name);
+      }
+    });
+
+    // user_id → affiliation name 맵
+    const userAffMap = new Map<number, string>();
+    userAffData?.forEach((ua: any) => {
+      if (ua.affiliations?.name && !userAffMap.has(ua.user_id)) {
+        userAffMap.set(ua.user_id, ua.affiliations.name);
+      }
+    });
+
+    // 각 유저에 affiliation_name 추가
+    data = data.map((u: any) => ({
+      ...u,
+      affiliation_name: inspectorAffMap.get(u.id) || userAffMap.get(u.id) || null
+    }));
+
     // 역할별 필터링
     if (userLevel === 4) {
       // 영업자: 자신의 정보만
@@ -100,7 +130,7 @@ export async function GET(request: NextRequest) {
 
       if (affiliationsData) {
         const affiliationNames = affiliationsData.map((a: any) => a.affiliation_name);
-        data = data.filter((u: any) => affiliationNames.includes(u.company_name));
+        data = data.filter((u: any) => affiliationNames.includes(u.affiliation_name));
       } else {
         data = [];
       }
@@ -163,21 +193,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 검수자인 경우 이미 사용 중인 소속 확인
+    // 검수자인 경우 이미 사용 중인 소속 확인 ('소속없음'은 중복 허용)
     if (isInspector && affiliations && affiliations.length > 0) {
-      const { data: takenData, error: takenError } = await supabase
-        .from('user_affiliations')
-        .select('affiliations(name)')
-        .in('affiliations.name', affiliations);
+      const affiliationsToCheck = affiliations.filter((a: string) => a !== '소속없음');
+      if (affiliationsToCheck.length > 0) {
+        const { data: takenData, error: takenError } = await supabase
+          .from('inspector_affiliations')
+          .select('affiliation_name')
+          .in('affiliation_name', affiliationsToCheck);
 
-      if (takenError) throw takenError;
+        if (takenError) throw takenError;
 
-      const takenAffiliations = takenData?.map((item: any) => item.affiliations?.name).filter(Boolean) || [];
-      if (takenAffiliations.length > 0) {
-        return NextResponse.json(
-          { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
-          { status: 400 }
-        );
+        const takenAffiliations = takenData?.map((item: any) => item.affiliation_name).filter(Boolean) || [];
+        if (takenAffiliations.length > 0) {
+          return NextResponse.json(
+            { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
+            { status: 400 }
+          );
+        }
       }
     }
 
