@@ -83,7 +83,8 @@
       "Bash(git pull:*)",
       "Bash(node:*)",
       "Bash(npx playwright:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx vercel:*)"
     ],
     "deny": [],
     "ask": []
