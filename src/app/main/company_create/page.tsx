@@ -19,6 +19,7 @@ function Company1Content() {
     const createParam = searchParams.get('create');
     const viewId = searchParams.get('view');
     const editParam = searchParams.get('edit');
+    const fromAdditionalParam = searchParams.get('fromAdditional');
 
     const [isSaving, setIsSaving] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
@@ -26,6 +27,8 @@ function Company1Content() {
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
     const [cancelModalOpen, setCancelModalOpen] = useState(false);
+    const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+    const [supplementCompleted, setSupplementCompleted] = useState(false);
     const [isCreateMode, setIsCreateMode] = useState(createParam === 'true');
     const [isViewMode, setIsViewMode] = useState(!!viewId && !createParam);
     // 초기값은 false로 설정, useEffect에서 권한 확인 후 설정
@@ -45,6 +48,7 @@ function Company1Content() {
     const additionalFilesRef = useRef<AdditionalFilesHandle>(null);
     // 저장 완료 후 최신 document 즉시 참조용 (setState 비동기 문제 해결)
     const latestSavedDocumentRef = useRef<any>(null);
+    const isEditModeRef = useRef(false);
 
     // 문서 조회 함수
     const fetchDocumentData = async (docId: number) => {
@@ -84,6 +88,47 @@ function Company1Content() {
         }
     }, []);
 
+    // 수정 모드에서 페이지 이탈 방지 (브라우저 새로고침/닫기)
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isEditModeRef.current) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            (window as any).__isEditMode = false;
+        };
+    }, []);
+
+    // 수정 모드에서 브라우저 뒤로가기 감지
+    useEffect(() => {
+        const handlePopState = () => {
+            if (isEditModeRef.current) {
+                window.history.pushState(null, '', window.location.href);
+                setCancelModalOpen(true);
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    // 사이드바 링크 클릭 시 수정 모드 이탈 감지
+    useEffect(() => {
+        const handleSidebarNavigation = (e: Event) => {
+            const path = (e as CustomEvent<{ path: string }>).detail.path;
+            if (isEditModeRef.current) {
+                setPendingNavPath(path);
+                setCancelModalOpen(true);
+            } else {
+                router.push(path);
+            }
+        };
+        window.addEventListener('sidebarNavigation', handleSidebarNavigation);
+        return () => window.removeEventListener('sidebarNavigation', handleSidebarNavigation);
+    }, [router]);
+
     // viewId 감시 - 문서 조회
     useEffect(() => {
         if (viewId) {
@@ -100,20 +145,46 @@ function Company1Content() {
         const adminData = getAdminData();
         const userLevel = adminData?.position?.level;
 
-        const isApproved = documentData?.progress_details === '승인';
+        const currentProgressDetails = documentData?.progress_details;
+        // 승인요청/승인 단계에서는 대표자(level 1)만 수정 가능
+        const isApprovedOrRequested = currentProgressDetails === '승인' || currentProgressDetails === '승인요청';
+        const isLevel1 = userLevel === 1;
         // 영업자는 분석 단계에서 수정 불가
-        // 검수자는 모든 단계에서 수정 가능
-        // 대표실무자(level 2)는 진행 단계에서 수정 불가 (이전단계/초기화 불가이므로)
-        // 실무자(level 3 또는 undefined)가 본인 배정 문서는 수정 불가
-        const isAnalysisPhase = (userLevel === 4 && documentData?.progress_details === '분석') ||
-                                (userLevel === 2 && documentData?.progress_details === '진행');
-        const isManagerAssignedDoc = (userLevel === 3 || userLevel === undefined) &&
-                                     documentData?.manager_id === adminData?.user_id;
-        const canEdit = editParam === 'true' && !!viewId && !isApproved && !isAnalysisPhase && !isManagerAssignedDoc;
+        // 대표실무자(level 2)는 진행 단계에서 수정 불가
+        // 실무자(level 3 또는 undefined)는 수정 불가
+        const isAnalysisPhase = (userLevel === 4 && (currentProgressDetails === '분석' || currentProgressDetails === '심사' || currentProgressDetails === '진행')) ||
+                                (userLevel === 2 && currentProgressDetails === '진행');
+        const isStaff = userLevel === 3 || userLevel === undefined;
+        const isBowan = documentData?.status === '보완' && userLevel === 4;
+        // 분석 이후 단계 영업자는 추가서류/메모만 편집 가능
+        const isAnalysisPhaseEditMode = isAnalysisPhase && editParam === 'true' && !!viewId;
+        const canEdit = editParam === 'true' && !!viewId &&
+                        !(isApprovedOrRequested && !isLevel1) &&
+                        !isAnalysisPhase && !isStaff && !isBowan ||
+                        (isAnalysisPhaseEditMode);
         setIsEditMode(canEdit);
+        isEditModeRef.current = canEdit;
+        (window as any).__isEditMode = canEdit;
+        // 수정 모드 진입 시 뒤로가기 가드용 히스토리 엔트리 추가
+        if (canEdit) {
+            window.history.pushState(null, '', window.location.href);
+        }
 
-        // 영업자/검수자가 수정 불가 단계 수정 페이지 접근 시 리다이렉트
-        if (editParam === 'true' && isAnalysisPhase && viewId) {
+        // 수정 모드 진입 시 추가서류 uploadedFiles 초기화
+        if (canEdit && additionalFilesRef.current) {
+            additionalFilesRef.current.resetUploadedFiles();
+            // 추가서류 섹션에서 온 경우만 파일 선택창 자동 열기 (한 번만)
+            if (fromAdditionalParam === 'true') {
+                router.replace(`?view=${viewId}&edit=true`);
+                setTimeout(() => {
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                    additionalFilesRef.current?.triggerFileInput();
+                }, 300);
+            }
+        }
+
+        // 수정 불가 조건 시 리다이렉트 (분석 단계는 추가서류/메모 편집 가능)
+        if (editParam === 'true' && viewId && (isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
             router.replace(`?view=${viewId}`);
         }
     }, [editParam, viewId, documentData, router]);
@@ -341,6 +412,9 @@ function Company1Content() {
             }
             const userId = adminData.user_id;
 
+            // 분석 이후 단계: 메모와 추가서류만 저장
+            const isAnalysisPhaseEdit = isEditMode && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserPosition?.level === 4;
+
             // 1. 폼 데이터 수집
             const formData = companyInfoRef.current?.getFormData();
             if (!formData) {
@@ -482,24 +556,44 @@ function Company1Content() {
                 cretabFileData = documentData.cretop_file;
             }
 
-            // 추가서류 업로드
-            const additionalFilesPaths: Array<{ name: string; path: string; size: number }> = [];
-            for (const { file, fileName } of additionalFiles) {
-                const path = await uploadFileToStorage(file, 'additional_files');
-                if (path) {
-                    additionalFilesPaths.push({
-                        name: fileName,
-                        path: path,
-                        size: file.size,
-                    });
+            // 추가서류 업로드 (신규 모드에서만)
+            let additionalFilesCombined: Array<{ name: string; path: string; size: number }> = [];
+
+            if (!isEditMode || !viewId) {
+                // 신규 생성 모드: 새 파일만
+                const additionalFilesPaths: Array<{ name: string; path: string; size: number }> = [];
+                for (const { file, fileName } of additionalFiles) {
+                    const path = await uploadFileToStorage(file, 'additional_files');
+                    if (path) {
+                        additionalFilesPaths.push({
+                            name: fileName,
+                            path: path,
+                            size: file.size,
+                        });
+                    }
                 }
+                additionalFilesCombined = additionalFilesPaths;
+            } else {
+                // 수정 모드: 기존 파일 + 새 파일
+                const existingAdditionalFiles = additionalFilesRef.current?.getExistingFiles() || [];
+                const newAdditionalFilesPaths: Array<{ name: string; path: string; size: number }> = [];
+                for (const { file, fileName } of additionalFiles) {
+                    const path = await uploadFileToStorage(file, 'additional_files');
+                    if (path) {
+                        newAdditionalFilesPaths.push({
+                            name: fileName,
+                            path: path,
+                            size: file.size,
+                        });
+                    }
+                }
+                additionalFilesCombined = [...existingAdditionalFiles, ...newAdditionalFilesPaths];
             }
 
             // 7. DB에 저장 (API 호출)
             const now = new Date();
             // 기존 파일과 새 파일 합치기
             const allFiles = [...existingFiles, ...uploadedFiles];
-            const additionalFilesCombined = [...existingFiles?.filter((f: any) => !f.path?.includes('documents')) || [], ...additionalFilesPaths];
 
             // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 신규면 '서류요청')
             let progressDetails = '서류요청';
@@ -574,10 +668,16 @@ function Company1Content() {
                 };
             }
 
+            // 분석 단계: 메모와 추가서류만 저장
+            const finalSaveData = isAnalysisPhaseEdit ? {
+                memos: saveData.memos,
+                supplement_files: saveData.supplement_files,
+            } : saveData;
+
             const response = await fetch(isEditMode && viewId ? `/api/documents/${viewId}` : '/api/documents', {
                 method: isEditMode && viewId ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(saveData),
+                body: JSON.stringify(finalSaveData),
             });
 
             if (!response.ok) {
@@ -612,6 +712,63 @@ function Company1Content() {
             setErrorMessage(message);
             setErrorModalOpen(true);
             throw error; // 호출한 쪽에서 중단할 수 있도록 re-throw
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSupplementComplete = async () => {
+        setIsSaving(true);
+        try {
+            // 새로 선택한 추가서류 업로드
+            const filesToUpload = additionalFilesRef.current?.getFilesForUpload() || [];
+            const uploadedPaths: Array<{ name: string; path: string; size: number }> = [];
+
+            for (const { file, fileName } of filesToUpload) {
+                const signedUrlRes = await fetch('/api/upload/signed-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: 'additional_files',
+                        fileName: file.name,
+                        fileSize: file.size,
+                        contentType: file.type,
+                    }),
+                });
+                if (!signedUrlRes.ok) throw new Error('파일 업로드 URL 생성 실패');
+                const { signedUrl, path } = await signedUrlRes.json();
+                const uploadRes = await fetch(signedUrl, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+                    body: file,
+                });
+                if (!uploadRes.ok) throw new Error('파일 업로드 실패');
+                uploadedPaths.push({ name: fileName, path, size: file.size });
+            }
+
+            const existingFiles = additionalFilesRef.current?.getExistingFiles() || [];
+            const allSupplementFiles = [...existingFiles, ...uploadedPaths];
+
+            const updateRes = await fetch(`/api/documents/${viewId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: '검수',
+                    ...(allSupplementFiles.length > 0 ? { supplement_files: allSupplementFiles } : {}),
+                }),
+            });
+
+            if (!updateRes.ok) {
+                const err = await updateRes.json();
+                throw new Error(err.error || '보완완료 처리 실패');
+            }
+
+            setSuccessMessage('보완이 완료되었습니다.');
+            setSupplementCompleted(true);
+            setSuccessModalOpen(true);
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : '오류 발생');
+            setErrorModalOpen(true);
         } finally {
             setIsSaving(false);
         }
@@ -682,10 +839,17 @@ function Company1Content() {
             }
         }
         // 추가서류 초기화
-        if (additionalFilesRef.current && documentData?.supplement_files) {
-            additionalFilesRef.current.setExistingFiles(documentData.supplement_files);
+        if (additionalFilesRef.current) {
+            additionalFilesRef.current.resetUploadedFiles();
+            if (documentData?.supplement_files) {
+                additionalFilesRef.current.setExistingFiles(documentData.supplement_files);
+            }
         }
-        if (viewId) {
+        if (pendingNavPath) {
+            const path = pendingNavPath;
+            setPendingNavPath(null);
+            router.push(path);
+        } else if (viewId) {
             router.push(`?view=${viewId}`);
         } else {
             router.push('/main/document_submission');
@@ -727,93 +891,135 @@ function Company1Content() {
                     </>
                 )}
             </div>
-            <div className={styles.companyManagementWrap}>
-                <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode} progressDetails={documentData?.progress_details} status={documentData?.status} />
-                <ProgressStepsSection
-                    isViewMode={isViewMode && !isEditMode}
-                    documentId={viewId}
-                    progressDetails={documentData?.progress_details}
-                    progressStartDate={documentData?.progress_start_date}
-                    managerId={documentData?.manager_id}
-                    documentStatus={documentData?.status}
-                    currentUserName={currentUserName}
-                    currentUserId={currentUserId}
-                    currentUserPositionLevel={currentUserPosition?.level}
-                    onValidateAndNext={handleValidateAndNext}
-                    onProgressUpdate={handleProgressUpdate}
-                    onMemoUpdate={async () => {
-                        // 메모 목록 다시 불러오기
-                        if (viewId) {
-                            const response = await fetch(`/api/documents/${viewId}`);
-                            if (response.ok) {
-                                const data = await response.json();
-                                if (data.memos) setMemos(data.memos);
-                            }
-                        }
-                    }}
-                    onSave={handleSave}
-                    onStaffAssignSuccess={handleStaffAssignSuccess}
-                />
-                {viewId && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode} viewId={viewId} isEditMode={isEditMode} onEditClick={documentData?.progress_details === '승인' ? undefined : handleEditCretabFile} userLevel={currentUserPosition?.level} progressDetails={documentData?.progress_details} />}
-                <MemoSection
-                    documentId={viewId}
-                    isViewMode={isViewMode && !isEditMode}
-                    readOnly={false}
-                    currentUserId={currentUserId}
-                    currentUserName={currentUserName}
-                    currentUserPositionLevel={currentUserPosition?.level || 0}
-                    memos={memos}
-                    onMemosChange={handleMemosChange}
-                />
-                <CompanyFile
-                    ref={companyFileRef}
-                    isViewMode={isViewMode && !isEditMode}
-                    viewId={viewId}
-                    progressDetails={documentData?.progress_details}
-                    isAuthor={currentUserId === documentData?.user_id}
-                    isEditMode={isEditMode}
-                    userPositionLevel={currentUserPosition?.level || 0}
-                />
-                <AdditionalFiles ref={additionalFilesRef} isViewMode={isViewMode && !isEditMode} progressDetails={documentData?.progress_details} userPositionLevel={currentUserPosition?.level || 0} />
-            </div>
+            {(() => {
+                const isSupplementMode = isViewMode && !isEditMode && documentData?.status === '보완' && currentUserPosition?.level === 4;
+                const isAnalysisAdditionalFilesMode = isEditMode && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserPosition?.level === 4;
+                const isSimplifiedMode = isSupplementMode || isAnalysisAdditionalFilesMode;
+                return (
+                <div className={styles.companyManagementWrap}>
+                    {/* 분석 단계 추가서류 모드에서도 기업정보 표시 (읽기 전용) */}
+                    {!isSupplementMode && <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} progressDetails={documentData?.progress_details} status={documentData?.status} />}
+                    {!isSupplementMode && (
+                        <ProgressStepsSection
+                            isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode}
+                            documentId={viewId}
+                            progressDetails={documentData?.progress_details}
+                            progressStartDate={documentData?.progress_start_date}
+                            managerId={documentData?.manager_id}
+                            documentStatus={documentData?.status}
+                            currentUserName={currentUserName}
+                            currentUserId={currentUserId}
+                            currentUserPositionLevel={currentUserPosition?.level}
+                            memos={memos}
+                            onValidateAndNext={handleValidateAndNext}
+                            onProgressUpdate={handleProgressUpdate}
+                            onMemoUpdate={async () => {
+                                if (viewId) {
+                                    const response = await fetch(`/api/documents/${viewId}`);
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        if (data.memos) setMemos(data.memos);
+                                    }
+                                }
+                            }}
+                            onSave={handleSave}
+                            onStaffAssignSuccess={handleStaffAssignSuccess}
+                        />
+                    )}
+                    {!isSupplementMode && viewId && (currentUserPosition?.level !== 4 || documentData?.cretop_file || documentData?.company_credit_rating_kcb || documentData?.company_credit_rating_nice || documentData?.company_type) && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} viewId={viewId} isEditMode={isEditMode && !isAnalysisAdditionalFilesMode} onEditClick={documentData?.progress_details === '승인' ? undefined : handleEditCretabFile} userLevel={currentUserPosition?.level} progressDetails={documentData?.progress_details} />}
+                    <MemoSection
+                        documentId={viewId}
+                        isViewMode={isViewMode && !isEditMode}
+                        readOnly={(documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
+                        currentUserId={currentUserId}
+                        currentUserName={currentUserName}
+                        currentUserPositionLevel={currentUserPosition?.level || 0}
+                        memos={memos}
+                        onMemosChange={handleMemosChange}
+                        showOnlyLatest={documentData?.status === '보완' && currentUserPosition?.level === 4}
+                    />
+                    {!isSupplementMode && (
+                        <CompanyFile
+                            ref={companyFileRef}
+                            isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode}
+                            viewId={viewId}
+                            progressDetails={documentData?.progress_details}
+                            isAuthor={currentUserId === documentData?.user_id}
+                            isEditMode={isEditMode && !isAnalysisAdditionalFilesMode}
+                            userPositionLevel={currentUserPosition?.level || 0}
+                        />
+                    )}
+                    <AdditionalFiles
+                        ref={additionalFilesRef}
+                        isViewMode={isSimplifiedMode ? false : isViewMode && !isEditMode || (documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
+                        progressDetails={documentData?.progress_details}
+                        userPositionLevel={currentUserPosition?.level || 0}
+                        viewId={viewId}
+                        onEditClick={!isSimplifiedMode && viewId && !((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1) ? () => router.push(`?view=${viewId}&edit=true&fromAdditional=true`) : undefined}
+                        readOnly={(documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
+                    />
+                </div>
+                );
+            })()}
 
             {/* 저장/취소 버튼 (고정) */}
             <div className={styles.buttonFooter}>
                 <div className={styles.buttonContainer}>
                     {isViewMode && !isEditMode ? (
-                        <>
-                            <button
-                                className={styles.cancelBtn}
-                                onClick={() => router.push('/main/document_submission')}
-                            >
-                                돌아가기
-                            </button>
-                            {documentData?.progress_details !== '승인' && !(currentUserPosition?.level === 4 && documentData?.progress_details === '분석') && (
+                        (() => {
+                            const isSupplementMode = documentData?.status === '보완' && currentUserPosition?.level === 4;
+                            return (
+                            <>
+                                <button
+                                    className={styles.cancelBtn}
+                                    onClick={() => router.push('/main/document_submission')}
+                                    disabled={isSaving}
+                                >
+                                    돌아가기
+                                </button>
+                                {isSupplementMode ? (
+                                    <button
+                                        className={styles.saveBtn}
+                                        onClick={handleSupplementComplete}
+                                        disabled={isSaving}
+                                    >
+                                        {isSaving ? '처리 중...' : '보완완료'}
+                                    </button>
+                                ) : (
+                                    documentData?.progress_details !== '승인' && (documentData?.progress_details !== '승인요청' || currentUserPosition?.level === 1) && (
+                                        <button
+                                            className={styles.saveBtn}
+                                            onClick={() => router.push(`?view=${viewId}&edit=true`)}
+                                        >
+                                            수정
+                                        </button>
+                                    )
+                                )}
+                            </>
+                            );
+                        })()
+                    ) : (
+                        (() => {
+                            const isAnalysisAdditionalFiles = documentData?.progress_details === '분석' && currentUserPosition?.level === 4;
+                            return (
+                            <>
+                                <button
+                                    className={styles.cancelBtn}
+                                    onClick={handleCancel}
+                                    disabled={isSaving}
+                                >
+                                    취소
+                                </button>
                                 <button
                                     className={styles.saveBtn}
-                                    onClick={() => router.push(`?view=${viewId}&edit=true`)}
+                                    onClick={() => handleSave()}
+                                    disabled={isSaving}
                                 >
-                                    수정
+                                    {isSaving ? '저장 중...' : (viewId ? '저장' : '등록하기')}
                                 </button>
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className={styles.cancelBtn}
-                                onClick={handleCancel}
-                                disabled={isSaving}
-                            >
-                                취소
-                            </button>
-                            <button
-                                className={styles.saveBtn}
-                                onClick={() => handleSave()}
-                                disabled={isSaving}
-                            >
-                                {isSaving ? (viewId ? '저장 중...' : '등록 중...') : (viewId ? '저장' : '등록하기')}
-                            </button>
-                        </>
+                            </>
+                            );
+                        })()
                     )}
                 </div>
             </div>
@@ -825,11 +1031,12 @@ function Company1Content() {
                 type="success"
                 onConfirm={() => {
                     setSuccessModalOpen(false);
-                    if (viewId) {
-                        // 수정 모드: view 페이지로 리다이렉트
+                    if (supplementCompleted) {
+                        setSupplementCompleted(false);
+                        router.push('/main/document_submission');
+                    } else if (viewId) {
                         router.push(`?view=${viewId}`);
                     } else {
-                        // 신규 등록: document_submission으로 리다이렉트
                         router.push('/main/document_submission');
                     }
                 }}

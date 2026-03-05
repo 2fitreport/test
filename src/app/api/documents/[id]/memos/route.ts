@@ -59,15 +59,43 @@ export async function POST(
             );
         }
 
+        // 액터 정보 파싱 (권한 체크용)
+        let actorLevel = 0;
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (authToken) {
+            try {
+                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+                const actorId = tokenData.user_id || 'unknown';
+                const { data: actorUser } = await supabase
+                    .from('users')
+                    .select('position(level)')
+                    .eq('user_id', actorId)
+                    .single();
+                if (actorUser) {
+                    const positionArray = actorUser.position as any;
+                    actorLevel = (Array.isArray(positionArray) ? positionArray[0]?.level : positionArray?.level) || 0;
+                }
+            } catch {}
+        }
+
         // 기존 메모 조회
         const { data: docData, error: fetchError } = await supabase
             .from('documents')
-            .select('memos')
+            .select('memos, progress_details')
             .eq('id', docId)
             .single();
 
         if (fetchError) {
             throw fetchError;
+        }
+
+        // 승인요청/승인 단계에서는 대표자(level 1)만 메모 추가 가능
+        const progressDetails = docData?.progress_details;
+        if ((progressDetails === '승인요청' || progressDetails === '승인') && actorLevel !== 1) {
+            return NextResponse.json(
+                { error: '승인 단계에서는 대표자만 메모를 추가할 수 있습니다.' },
+                { status: 403 }
+            );
         }
 
         // 새 메모 생성

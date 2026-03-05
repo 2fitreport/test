@@ -32,6 +32,7 @@ interface MemoSectionProps {
     currentUserPositionLevel?: number;
     memos?: Memo[];
     onMemosChange?: (memos: Memo[]) => void;
+    showOnlyLatest?: boolean; // 최신 메모만 표시
 }
 
 export default function MemoSection({
@@ -42,7 +43,8 @@ export default function MemoSection({
     currentUserName = '현재사용자',
     currentUserPositionLevel = 0,
     memos: initialMemos = [],
-    onMemosChange
+    onMemosChange,
+    showOnlyLatest = false
 }: MemoSectionProps) {
     const [memos, setMemos] = useState<Memo[]>(initialMemos);
     const [memoInput, setMemoInput] = useState('');
@@ -368,9 +370,15 @@ export default function MemoSection({
             <div className={styles.memoList}>
                 {(() => {
                     const reversedMemos = [...memos].reverse();
-                    const startIndex = (currentPage - 1) * itemsPerPage;
-                    const endIndex = startIndex + itemsPerPage;
-                    const paginatedMemos = reversedMemos.slice(startIndex, endIndex);
+                    // 최신 메모만 표시 모드
+                    let paginatedMemos: Memo[] = [];
+                    if (showOnlyLatest && reversedMemos.length > 0) {
+                        paginatedMemos = [reversedMemos[0]];
+                    } else {
+                        const startIndex = (currentPage - 1) * itemsPerPage;
+                        const endIndex = startIndex + itemsPerPage;
+                        paginatedMemos = reversedMemos.slice(startIndex, endIndex);
+                    }
                     return paginatedMemos.map((memo) => (
                     <div key={memo.id} className={styles.memoItem}>
                         <div className={styles.memoHeader}>

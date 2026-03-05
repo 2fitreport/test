@@ -100,7 +100,11 @@ export async function GET(request: NextRequest) {
                 }
             }
         }
-        // Level 1 (대표자), Level 2 (대표실무자): 필터링 없음 (모든 문서)
+        // Level 1 (대표자): 필터링 없음 (모든 문서)
+        // Level 2 (대표실무자): 서류요청 단계 이전의 문서는 제외
+        else if (userLevel === 2) {
+            filteredDocuments = data.filter((doc: any) => doc.progress_details !== '서류요청');
+        }
 
         // progress_start_date를 string으로 변환하여 반환 (TimeAgo 컴포넌트용)
         const documents = filteredDocuments.map((doc: any) => ({

@@ -84,7 +84,9 @@
       "Bash(node:*)",
       "Bash(npx playwright:*)",
       "Bash(ls:*)",
-      "Bash(npx vercel:*)"
+      "Bash(npx vercel:*)",
+      "Bash(python3:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

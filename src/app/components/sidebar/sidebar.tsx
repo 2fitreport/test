@@ -144,6 +144,11 @@ export default function Sidebar() {
     }, []);
 
     const handleMenuClick = (path: string) => {
+        if ((window as any).__isEditMode && path) {
+            window.dispatchEvent(new CustomEvent('sidebarNavigation', { detail: { path } }));
+            setIsMenuOpen(false);
+            return;
+        }
         router.push(path);
         setIsMenuOpen(false);
     };

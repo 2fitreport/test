@@ -21,6 +21,23 @@ interface Step {
     status: 'completed' | 'current' | 'pending';
 }
 
+interface Reply {
+    id: string;
+    author: string;
+    author_id: string;
+    content: string;
+    created_at: string;
+}
+
+interface Memo {
+    id: string;
+    author: string;
+    author_id: string;
+    content: string;
+    created_at: string;
+    replies: Reply[];
+}
+
 interface ProgressStepsSectionProps {
     isViewMode?: boolean;
     documentId?: string | null;
@@ -31,6 +48,7 @@ interface ProgressStepsSectionProps {
     currentUserName?: string;
     currentUserId?: string;
     currentUserPositionLevel?: number | null;
+    memos?: Memo[];
     onProgressUpdate?: (progressDetails: string) => void;
     onMemoUpdate?: () => void;
     onValidateAndNext?: () => Promise<boolean>;
@@ -42,6 +60,7 @@ export default function ProgressStepsSection({
     isViewMode = false,
     documentId,
     progressDetails,
+    memos = [],
     progressStartDate,
     managerId,
     documentStatus,
@@ -497,20 +516,22 @@ export default function ProgressStepsSection({
 
         try {
             setIsLoading(true);
-            
-            // 1. 상태 업데이트 (보완)
+
+            // 상태를 보완으로 업데이트
             const updateData: any = { status: '보완' };
             if (progressStartDate) {
                 updateData.progress_start_date = progressStartDate;
             }
-            const updateResponse = await fetch(`/api/documents/${documentId}`, {
+            await fetch(`/api/documents/${documentId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updateData)
             });
 
-            if (updateResponse.ok) {
-                // 2. 메모 추가 (보완사유) - 현재 사용자 정보 포함
+            // 정상 상태에서 보완으로: 새로운 메모 생성
+            // 보완/검수 상태에서 보완으로: 직전 보완 메모의 답글에 추가
+            if (documentStatus === '정상' || documentStatus === '보류') {
+                // 정상 상태: 새 메모 생성
                 await fetch(`/api/documents/${documentId}/memos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -521,16 +542,47 @@ export default function ProgressStepsSection({
                         user_id: currentUserId
                     })
                 });
+            } else {
+                // 보완/검수 상태: 직전 보완 메모에 답글 추가
+                const revisionMemos = memos
+                    .filter(m => m.content.startsWith('[보완사유]'))
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-                setSuccessMessage('보완 요청이 완료되었습니다.');
-                setSuccessModalType('success');
-                setSuccessModalOpen(true);
-                
-                // 메모 섹션 리랜더링 유도
-                if (onMemoUpdate) onMemoUpdate();
-                if (onProgressUpdate && progressDetails) {
-                    onProgressUpdate(progressDetails);
+                if (revisionMemos.length > 0) {
+                    // 기존 보완 메모에 답글 추가
+                    const lastRevisionMemoId = revisionMemos[0].id;
+                    await fetch(`/api/documents/${documentId}/memos/${lastRevisionMemoId}/replies`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            content: reason,
+                            author: currentUserName,
+                            author_id: currentUserId
+                        })
+                    });
+                } else {
+                    // 보완 메모가 없으면 새 메모 생성
+                    await fetch(`/api/documents/${documentId}/memos`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            content: `[보완사유] ${reason}`,
+                            is_admin: true,
+                            user_name: currentUserName,
+                            user_id: currentUserId
+                        })
+                    });
                 }
+            }
+
+            setSuccessMessage('보완 요청이 완료되었습니다.');
+            setSuccessModalType('success');
+            setSuccessModalOpen(true);
+
+            // 메모 섹션 리랜더링 유도
+            if (onMemoUpdate) onMemoUpdate();
+            if (onProgressUpdate && progressDetails) {
+                onProgressUpdate(progressDetails);
             }
         } catch (error) {
             console.error('보완 요청 실패:', error);
@@ -556,12 +608,18 @@ export default function ProgressStepsSection({
 
         try {
             setIsLoading(true);
-            // 진행불가 시 상태를 '보완'으로 변경, 진행 단계를 분석으로 돌림
-            const updateData: any = { status: '보완', progress_details: '분석' };
+            const updateData: any = {};
 
-            // 실무자 배정 초기화
-            updateData.manager_id = null;
-            updateData.manager_name = null;
+            // 심사 또는 진행 단계에서만 분석으로 돌림
+            if (progressDetails === '심사' || progressDetails === '진행') {
+                updateData.status = '보완';
+                updateData.progress_details = '분석';
+                updateData.manager_id = null;
+                updateData.manager_name = null;
+            } else {
+                // 서류요청 또는 분석 단계에서는 단계 유지, 보류 상태만 설정
+                updateData.status = '보류';
+            }
 
             // progress_start_date 유지
             if (progressStartDate) {
@@ -587,10 +645,13 @@ export default function ProgressStepsSection({
                     })
                 });
 
-                setSuccessMessage('분석으로 변경되었습니다.');
+                const successMsg = (progressDetails === '심사' || progressDetails === '진행')
+                    ? '분석으로 변경되었습니다.'
+                    : '보류되었습니다.';
+                setSuccessMessage(successMsg);
                 setSuccessModalType('success');
                 setSuccessModalOpen(true);
-                
+
                 // 메모 섹션 리랜더링 유도
                 if (onMemoUpdate) onMemoUpdate();
             }
@@ -833,7 +894,7 @@ export default function ProgressStepsSection({
                                     <div className={styles.stepCircle}>
                                         <img
                                             src={
-                                                step.status === 'current' && documentStatus === '보완' ? '/보완.png' :
+                                                step.status === 'current' && (documentStatus === '보완' || documentStatus === '검수') ? '/보완.png' :
                                                 step.status === 'current' && documentStatus === '보류' ? '/보류.png' :
                                                 step.status === 'current' ? '/step2.png' :
                                                 step.status === 'completed' ? '/step1.png' :
@@ -884,13 +945,14 @@ export default function ProgressStepsSection({
                         {!(userLevel === 1 && currentProgress === '승인') &&
                          !(userLevel === 4 && (documentStatus !== '보완' || progressDetails === '분석')) &&
                          !(currentProgress === '승인' && !userLevel) &&
-                         !(userLevel === 6 && progressDetails !== '서류요청' && documentStatus !== '보완') && (
+                         !(userLevel === 6 && progressDetails !== '서류요청' && documentStatus !== '보완') &&
+                         !(currentProgress === '승인요청') && (
                         <div className={styles.buttonGroup}>
                             <h4>진행 상태</h4>
                             <div className={styles.groupButtons}>
                                 {userLevel === 4 ? (
-                                    // 영업자: 보완 상태에서만 보안완료 가능 (분석 단계 제외)
-                                    documentStatus === '보완' && progressDetails !== '분석' && (
+                                    // 영업자: 보완 상태에서 보안완료 가능 (모든 단계)
+                                    documentStatus === '보완' && (
                                         <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
                                             보안완료
                                         </button>
@@ -898,9 +960,14 @@ export default function ProgressStepsSection({
                                 ) : userLevel === 6 ? (
                                     <>
                                         {progressDetails === '서류요청' && documentStatus === '보완' && (
-                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                검수완료
-                                            </button>
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                    검수완료
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                            </>
                                         )}
                                         {progressDetails === '서류요청' && documentStatus === '보류' && (
                                             <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
@@ -908,9 +975,14 @@ export default function ProgressStepsSection({
                                             </button>
                                         )}
                                         {progressDetails === '서류요청' && documentStatus === '검수' && (
-                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                검수완료
-                                            </button>
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                    검수완료
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                            </>
                                         )}
                                         {progressDetails === '서류요청' && documentStatus !== '보완' && documentStatus !== '보류' && documentStatus !== '검수' && (
                                             <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
@@ -928,9 +1000,14 @@ export default function ProgressStepsSection({
                                             </button>
                                         )}
                                         {progressDetails === '분석' && documentStatus === '검수' && (
-                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                검수완료
-                                            </button>
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                    검수완료
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                            </>
                                         )}
                                         {progressDetails === '심사' && documentStatus === '보완' && (
                                             <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
@@ -951,14 +1028,24 @@ export default function ProgressStepsSection({
                                             </button>
                                         )}
                                         {documentStatus === '보완' && (
-                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                검수완료
-                                            </button>
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                    검수완료
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                            </>
                                         )}
                                         {documentStatus === '검수' && (
-                                            <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                검수완료
-                                            </button>
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                    검수완료
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                            </>
                                         )}
                                         {documentStatus !== '보류' && documentStatus !== '보완' && documentStatus !== '검수' && (
                                             <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>

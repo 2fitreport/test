@@ -16,22 +16,30 @@ interface UploadedFile {
 
 export interface AdditionalFilesHandle {
     getFilesForUpload: () => Array<{ file: File; fileName: string }>;
+    getExistingFiles: () => Array<{ name: string; path: string; size: number }>;
     setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => void;
+    resetUploadedFiles: () => void;
+    triggerFileInput: () => void;
+    scrollToSection: () => void;
 }
 
 interface AdditionalFilesProps {
     isViewMode?: boolean;
     progressDetails?: string;
     userPositionLevel?: number;
+    viewId?: string | null;
+    onEditClick?: () => void;
+    readOnly?: boolean;
 }
 
-const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false, progressDetails = '', userPositionLevel = 0 }, ref) {
+const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false, progressDetails = '', userPositionLevel = 0, viewId, onEditClick, readOnly = false }, ref) {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
     const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
 
     const formatFileSize = (bytes: number): string => {
         if (bytes === 0) return '0 Bytes';
@@ -95,8 +103,20 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                     fileName: file.fileName,
                 }));
         },
+        getExistingFiles: () => {
+            return existingFiles;
+        },
         setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => {
             setExistingFiles(files);
+        },
+        resetUploadedFiles: () => {
+            setUploadedFiles([]);
+        },
+        triggerFileInput: () => {
+            fileInputRef.current?.click();
+        },
+        scrollToSection: () => {
+            containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         },
     }));
 
@@ -202,7 +222,7 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
     };
 
     return (
-        <div className={styles.additionalWrap}>
+        <div className={styles.additionalWrap} ref={containerRef}>
             <div className={styles.additionalTitle}>
                 <div className={styles.titleContent}>
                     <h2>추가서류</h2>
@@ -250,33 +270,37 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                 </div>
             )}
 
+            {/* input은 항상 DOM에 존재해야 fileInputRef가 유효함 */}
+            <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+            />
+
             <div className={styles.fileList}>
                 {uploadedFiles.length === 0 && existingFiles.length === 0 ? (
-                    <div className={styles.docItem}>
-                        <div className={styles.docContent}>
-                            <File className={styles.docIcon} />
-                            <div className={styles.docInfo}>
-                                <p className={styles.docName}>추가서류</p>
-                                <p className={styles.docDescription}>필요한 서류를 선택하여 업로드해주세요</p>
+                    !readOnly && (
+                        <div className={styles.docItem} onClick={isViewMode && onEditClick ? onEditClick : undefined} style={isViewMode && onEditClick ? { cursor: 'pointer' } : {}}>
+                            <div className={styles.docContent}>
+                                <File className={styles.docIcon} />
+                                <div className={styles.docInfo}>
+                                    <p className={styles.docName}>추가서류</p>
+                                    <p className={styles.docDescription}>필요한 서류를 선택하여 업로드해주세요</p>
+                                </div>
                             </div>
+                            <button
+                                className={styles.uploadBtn}
+                                onClick={handleUploadClick}
+                                disabled={isViewMode}
+                                style={{
+                                    display: isViewMode ? 'none' : 'block'
+                                }}
+                            >
+                                업로드
+                            </button>
                         </div>
-                        <button
-                            className={styles.uploadBtn}
-                            onClick={handleUploadClick}
-                            disabled={isViewMode || (userPositionLevel === 4 && progressDetails !== '서류요청') || progressDetails === '분석'}
-                            style={{
-                                display: isViewMode || (userPositionLevel === 4 && progressDetails !== '서류요청') || progressDetails === '분석' ? 'none' : 'block'
-                            }}
-                        >
-                            업로드
-                        </button>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            style={{ display: 'none' }}
-                        />
-                    </div>
+                    )
                 ) : (
                     <div className={styles.uploadedFilesList}>
                         {uploadedFiles.map((uploadedFile) => (
@@ -355,31 +379,31 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                                 )}
                             </div>
                         ))}
-                        {!isViewMode && (
+                        {!readOnly && (
                             <div className={styles.addMoreWrapper}>
-                                <div className={styles.docItem} onClick={handleUploadClick}>
-                                <div className={styles.docContent}>
-                                    <File className={styles.docIcon} />
-                                    <div className={styles.docInfo}>
-                                        <p className={styles.docName}>추가서류</p>
-                                        <p className={styles.docDescription}>필요한 서류를 선택하여 업로드해주세요</p>
-                                    </div>
-                                </div>
-                                <button
-                                    className={styles.uploadBtn}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleUploadClick();
-                                    }}
+                                <div
+                                    className={styles.docItem}
+                                    onClick={isViewMode && onEditClick ? onEditClick : (!isViewMode ? handleUploadClick : undefined)}
+                                    style={isViewMode && onEditClick ? { cursor: 'pointer' } : {}}
                                 >
-                                    업로드
-                                </button>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    style={{ display: 'none' }}
-                                />
+                                    <div className={styles.docContent}>
+                                        <File className={styles.docIcon} />
+                                        <div className={styles.docInfo}>
+                                            <p className={styles.docName}>추가서류</p>
+                                            <p className={styles.docDescription}>필요한 서류를 선택하여 업로드해주세요</p>
+                                        </div>
+                                    </div>
+                                    {!isViewMode && (
+                                        <button
+                                            className={styles.uploadBtn}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleUploadClick();
+                                            }}
+                                        >
+                                            업로드
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}

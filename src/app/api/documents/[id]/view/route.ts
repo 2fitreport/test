@@ -89,6 +89,11 @@ export async function GET(
             }
         }
 
+        // 대표실무자(level 2) 권한 확인: 서류요청 단계 문서 접근 불가
+        if (userLevel === 2 && document.progress_details === '서류요청') {
+            return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+        }
+
         // 실무자(manager) 권한 확인 (level 3 또는 position이 없는 경우)
         if (userLevel === 3 || userLevel === null || userLevel === undefined) {
             // 실무자는 자신의 manager_id가 지정된 문서만 접근 가능
