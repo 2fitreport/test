@@ -8,6 +8,11 @@
     flex-direction: column;
 }
 
+.dragging {
+    outline: 2px dashed #1c283c;
+    background: #f0f4ff;
+}
+
 .additionalTitle {
     display: flex;
     justify-content: space-between;
@@ -222,6 +227,34 @@
 }
 
 .downloadBtn:active {
+    transform: translateY(0);
+}
+
+/* === 전체삭제 버튼 === */
+.deleteAllBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #ef5350;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.deleteAllBtn:hover {
+    background: #c62828;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.deleteAllBtn:active {
     transform: translateY(0);
 }
 

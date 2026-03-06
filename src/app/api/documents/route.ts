@@ -122,6 +122,19 @@ export async function GET(request: NextRequest) {
     }
 }
 
+function validateBusinessNumberType(businessNumber: string, type: string): string | null {
+    const digits = businessNumber.replace(/\D/g, '');
+    if (digits.length !== 10) return null; // 형식 오류는 별도 검증
+    const mid = parseInt(digits.substring(3, 5), 10);
+    if (type === 'individual' && mid >= 80 && mid <= 99) {
+        return '사업자등록번호가 법인사업자 번호입니다. 사업자 유형을 확인해주세요.';
+    }
+    if (type === 'business' && mid >= 1 && mid <= 79) {
+        return '사업자등록번호가 개인사업자 번호입니다. 사업자 유형을 확인해주세요.';
+    }
+    return null;
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -130,6 +143,14 @@ export async function POST(request: NextRequest) {
             submitted_date: body.submitted_date,
             completed_date: body.completed_date
         });
+
+        // 사업자등록번호 & 사업자 유형 검증
+        if (body.business_number && body.type) {
+            const typeError = validateBusinessNumberType(body.business_number, body.type);
+            if (typeError) {
+                return NextResponse.json({ error: typeError }, { status: 400 });
+            }
+        }
 
         // memos가 없으면 빈 배열로 초기화
         const documentData = {

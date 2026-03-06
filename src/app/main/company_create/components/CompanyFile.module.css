@@ -370,6 +370,12 @@
     border-color: #d0d0d0;
 }
 
+.docItem.dragging {
+    outline: 2px dashed #1c283c;
+    background: #f0f4ff;
+    border-color: #1c283c;
+}
+
 .docContent {
     display: flex;
     align-items: flex-start;

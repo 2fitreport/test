@@ -81,7 +81,7 @@ export async function POST(
         // 기존 메모 조회
         const { data: docData, error: fetchError } = await supabase
             .from('documents')
-            .select('memos, progress_details')
+            .select('memos, progress_details, status')
             .eq('id', docId)
             .single();
 
@@ -89,11 +89,28 @@ export async function POST(
             throw fetchError;
         }
 
-        // 승인요청/승인 단계에서는 대표자(level 1)만 메모 추가 가능
         const progressDetails = docData?.progress_details;
+        const docStatus = docData?.status;
+
+        // 승인요청/승인 단계에서는 대표자(level 1)만 메모 추가 가능
         if ((progressDetails === '승인요청' || progressDetails === '승인') && actorLevel !== 1) {
             return NextResponse.json(
                 { error: '승인 단계에서는 대표자만 메모를 추가할 수 있습니다.' },
+                { status: 403 }
+            );
+        }
+
+        // 보완 상태에서 영업자/검수자는 새 메모 추가 불가 (답글만 가능)
+        const isAnalysisPhase = progressDetails === '분석' || progressDetails === '심사' || progressDetails === '진행';
+        if (docStatus === '보완' && actorLevel === 4) {
+            return NextResponse.json(
+                { error: '보완 상태에서는 새 메모를 추가할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
+        if (docStatus === '보완' && actorLevel === 6 && isAnalysisPhase) {
+            return NextResponse.json(
+                { error: '보완 상태에서는 새 메모를 추가할 수 없습니다.' },
                 { status: 403 }
             );
         }

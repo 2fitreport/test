@@ -421,7 +421,7 @@ export default function MemoSection({
 
                                 {!collapsedMemoId.has(memo.id) && (
                                     <div className={styles.repliesList}>
-                                        {memo.replies.map((reply) => (
+                                        {[...memo.replies].reverse().map((reply) => (
                                             <div key={reply.id} className={styles.reply}>
                                                 <div className={styles.replyHeader}>
                                                     <div className={styles.replyAuthorWrapper}>
@@ -485,7 +485,7 @@ export default function MemoSection({
                 />
             )}
 
-            {!readOnly && (
+            {!readOnly && !showOnlyLatest && (
             <div className={styles.memoInputWrap}>
                 <textarea
                     className={styles.memoInput}

@@ -87,8 +87,12 @@
 }
 
 .input:disabled {
-    color: #999;
+    color: #333;
     cursor: not-allowed;
+}
+
+.input:disabled::placeholder {
+    color: #ccc;
 }
 
 /* === 기업상세정보 파일 섹션 === */

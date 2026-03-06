@@ -30,14 +30,18 @@ interface AdditionalFilesProps {
     viewId?: string | null;
     onEditClick?: () => void;
     readOnly?: boolean;
+    companyName?: string;
 }
 
-const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false, progressDetails = '', userPositionLevel = 0, viewId, onEditClick, readOnly = false }, ref) {
+const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(function AdditionalFiles({ isViewMode = false, progressDetails = '', userPositionLevel = 0, viewId, onEditClick, readOnly = false, companyName = '' }, ref) {
     const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
     const [existingFiles, setExistingFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
+    // 서버에서 로드된 원본 파일 목록 (저장 전 X/추가 조작에 영향받지 않음, 다운로드용)
+    const [savedFiles, setSavedFiles] = useState<Array<{ name: string; path: string; size: number }>>([]);
     const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -108,6 +112,7 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
         },
         setExistingFiles: (files: Array<{ name: string; path: string; size: number }>) => {
             setExistingFiles(files);
+            setSavedFiles(files);
         },
         resetUploadedFiles: () => {
             setUploadedFiles([]);
@@ -127,31 +132,50 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            // 파일 크기 검증 (5GB 제한)
-            if (file.size > 5 * 1024 * 1024 * 1024) {
-                setUploadError('파일 크기는 5GB 이하여야 합니다.');
-                return;
-            }
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-            // 메모리에만 저장 (저장 시 업로드)
-            const fileId = Date.now().toString();
-            const newFile: UploadedFile = {
-                id: fileId,
+        const newFiles: UploadedFile[] = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.size > 5 * 1024 * 1024 * 1024) {
+                setUploadError(`${file.name}: 파일 크기는 5GB 이하여야 합니다.`);
+                continue;
+            }
+            newFiles.push({
+                id: `${Date.now()}_${i}`,
                 file,
                 fileName: file.name,
                 fileSize: formatFileSize(file.size),
-            };
-            setUploadedFiles((prev) => [...prev, newFile]);
-
-            // input 초기화 (setTimeout으로 지연)
-            setTimeout(() => {
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                }
-            }, 0);
+            });
         }
+
+        if (newFiles.length > 0) {
+            setUploadedFiles((prev) => [...prev, ...newFiles]);
+        }
+
+        setTimeout(() => {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }, 0);
+    };
+
+    const handleDropFiles = (files: FileList) => {
+        if (isViewMode) return;
+        const newFiles: UploadedFile[] = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.size > 5 * 1024 * 1024 * 1024) {
+                setUploadError(`${file.name}: 파일 크기는 5GB 이하여야 합니다.`);
+                continue;
+            }
+            newFiles.push({
+                id: `${Date.now()}_${i}`,
+                file,
+                fileName: file.name,
+                fileSize: formatFileSize(file.size),
+            });
+        }
+        if (newFiles.length > 0) setUploadedFiles((prev) => [...prev, ...newFiles]);
     };
 
     const handleRemoveFile = (id: string) => {
@@ -192,7 +216,7 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
     };
 
     const handleDownloadZip = async () => {
-        if (uploadedFiles.length === 0) {
+        if (savedFiles.length === 0) {
             alert('다운로드할 파일이 없습니다.');
             return;
         }
@@ -200,9 +224,22 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
         try {
             const zip = new JSZip();
 
-            for (const file of uploadedFiles) {
-                if (file.file) {
-                    zip.file(file.fileName, file.file);
+            // 실제 저장된 파일 기준으로 다운로드 (로컬 X/추가 조작 무시)
+            for (const file of savedFiles) {
+                try {
+                    const response = await fetch('/api/file/view', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filePath: file.path }),
+                    });
+                    const data = await response.json();
+                    if (data.url) {
+                        const fileResponse = await fetch(data.url);
+                        const blob = await fileResponse.blob();
+                        zip.file(file.name, blob);
+                    }
+                } catch (e) {
+                    console.error(`파일 fetch 실패: ${file.name}`, e);
                 }
             }
 
@@ -210,7 +247,9 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `추가서류_${new Date().getTime()}.zip`;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const prefix = companyName ? `${companyName}_` : '';
+            a.download = `${prefix}추가서류_${dateStr}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -222,22 +261,40 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
     };
 
     return (
-        <div className={styles.additionalWrap} ref={containerRef}>
+        <div
+            className={`${styles.additionalWrap} ${isDragging ? styles.dragging : ''}`}
+            ref={containerRef}
+            onDragOver={(e) => { e.preventDefault(); if (!isViewMode) setIsDragging(true); }}
+            onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+            onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files.length > 0) handleDropFiles(e.dataTransfer.files); }}
+        >
             <div className={styles.additionalTitle}>
                 <div className={styles.titleContent}>
                     <h2>추가서류</h2>
                     <h3>필요시 추가 서류를 업로드해주세요</h3>
                 </div>
-                {(uploadedFiles.length > 0 || existingFiles.length > 0) && (
-                    <button
-                        className={styles.downloadBtn}
-                        onClick={handleDownloadZip}
-                        title="파일 일괄 다운로드"
-                    >
-                        <Download size={18} />
-                        다운로드
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    {savedFiles.length > 0 && (
+                        <button
+                            className={styles.downloadBtn}
+                            onClick={handleDownloadZip}
+                            title="파일 일괄 다운로드"
+                        >
+                            <Download size={18} />
+                            다운로드
+                        </button>
+                    )}
+                    {!isViewMode && (uploadedFiles.length > 0 || existingFiles.length > 0) && (
+                        <button
+                            className={styles.deleteAllBtn}
+                            onClick={() => { setUploadedFiles([]); setExistingFiles([]); }}
+                            title="파일 전체 삭제"
+                        >
+                            <X size={18} />
+                            전체삭제
+                        </button>
+                    )}
+                </div>
             </div>
 
             {uploadError && (
@@ -275,6 +332,7 @@ const AdditionalFiles = forwardRef<AdditionalFilesHandle, AdditionalFilesProps>(
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
+                multiple
                 style={{ display: 'none' }}
             />
 

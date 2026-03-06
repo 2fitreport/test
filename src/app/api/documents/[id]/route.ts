@@ -102,7 +102,7 @@ export async function PUT(
         // 변경 전 문서 조회
         const { data: prevDoc } = await supabase
             .from('documents')
-            .select('status, progress_details, memos, title, company_name, manager_id, manager_name')
+            .select('status, progress_details, memos, title, company_name, manager_id, manager_name, business_number, type')
             .eq('id', docId)
             .single();
 
@@ -114,6 +114,50 @@ export async function PUT(
             );
         }
 
+        // 신용점수 검증 (1000 이하)
+        if (body.company_credit_rating_kcb !== undefined) {
+            const kcbValue = parseInt(body.company_credit_rating_kcb, 10);
+            if (!isNaN(kcbValue) && kcbValue > 1000) {
+                return NextResponse.json(
+                    { error: 'KCB 신용점수는 1000 이하여야 합니다.' },
+                    { status: 400 }
+                );
+            }
+        }
+        if (body.company_credit_rating_nice !== undefined) {
+            const niceValue = parseInt(body.company_credit_rating_nice, 10);
+            if (!isNaN(niceValue) && niceValue > 1000) {
+                return NextResponse.json(
+                    { error: 'NICE 신용점수는 1000 이하여야 합니다.' },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // 사업자등록번호 & 사업자 유형 검증
+        if (body.business_number !== undefined || body.type !== undefined) {
+            const bizNum = body.business_number ?? prevDoc?.business_number;
+            const bizType = body.type ?? prevDoc?.type;
+            if (bizNum && bizType) {
+                const digits = String(bizNum).replace(/\D/g, '');
+                if (digits.length === 10) {
+                    const mid = parseInt(digits.substring(3, 5), 10);
+                    if (bizType === 'individual' && mid >= 80 && mid <= 99) {
+                        return NextResponse.json(
+                            { error: '사업자등록번호가 법인사업자 번호입니다. 사업자 유형을 확인해주세요.' },
+                            { status: 400 }
+                        );
+                    }
+                    if (bizType === 'business' && mid >= 1 && mid <= 79) {
+                        return NextResponse.json(
+                            { error: '사업자등록번호가 개인사업자 번호입니다. 사업자 유형을 확인해주세요.' },
+                            { status: 400 }
+                        );
+                    }
+                }
+            }
+        }
+
         // 승인요청/승인 단계에서는 대표자(level 1)만 수정 가능
         const currentProgressForCheck = prevDoc?.progress_details;
         if ((currentProgressForCheck === '승인요청' || currentProgressForCheck === '승인') && actorLevel !== 1) {
@@ -121,6 +165,19 @@ export async function PUT(
                 { error: '승인요청/승인 단계에서는 대표자만 수정할 수 있습니다.' },
                 { status: 403 }
             );
+        }
+
+        // 심사 단계에서 대표자(level 1) 또는 배정된 실무자만 다음단계/보완요청/진행불가 가능
+        const isAssignedManager = prevDoc?.manager_id && actorId === prevDoc.manager_id;
+        if (currentProgressForCheck === '심사' && actorLevel !== 1 && !isAssignedManager) {
+            const isProgressChange = body.progress_details !== undefined && body.progress_details !== prevDoc?.progress_details;
+            const isStatusChange = body.status === '보완';
+            if (isProgressChange || isStatusChange) {
+                return NextResponse.json(
+                    { error: '심사 단계에서는 대표자 또는 배정된 실무자만 단계 변경 및 보완/진행불가 처리를 할 수 있습니다.' },
+                    { status: 403 }
+                );
+            }
         }
 
         // 권한 체크
@@ -176,6 +233,7 @@ export async function PUT(
         } else if (actorLevel === 6) {
             // 검수자(level 6)는 승인요청/승인 단계 제외하고 수정 가능
             const currentProgress = prevDoc?.progress_details;
+            const currentStatus = prevDoc?.status;
 
             if (currentProgress === '승인요청' || currentProgress === '승인') {
                 return NextResponse.json(
@@ -183,11 +241,27 @@ export async function PUT(
                     { status: 403 }
                 );
             }
+
+            // 분석/심사/진행 단계 보완 상태: 메모, 추가서류, status(검수로 변경)만 수정 가능
+            if ((currentProgress === '분석' || currentProgress === '진행') && currentStatus === '보완') {
+                const allowedKeys = ['memos', 'supplement_files', 'status'];
+                const bodyKeys = Object.keys(body);
+                const isOnlyAllowedFields = bodyKeys.every((k: string) => allowedKeys.includes(k));
+                const isSecurityProcess = body.status === '검수';
+
+                if (!isOnlyAllowedFields || (body.status !== undefined && !isSecurityProcess)) {
+                    return NextResponse.json(
+                        { error: '분석 단계 보완 상태에서는 메모와 추가서류만 수정할 수 있습니다.' },
+                        { status: 403 }
+                    );
+                }
+            }
             // OK - 다른 단계에서는 수정 가능
         } else if (actorLevel === 1 || actorLevel === 2) {
             // 대표자 및 대표실무자: progress_details 변경(이전단계, 초기화 등)은 모든 상태에서 가능
             const currentStatus = prevDoc?.status;
             const currentProgress = prevDoc?.progress_details;
+
             const hasProgressDetailsChange = body.progress_details !== undefined;
             const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
             const isEndAction = body.progress_details === '보류' && Object.keys(body).length === 1;
@@ -281,6 +355,14 @@ export async function PUT(
                     { status: 403 }
                 );
             }
+        }
+
+        // manager_name이 빈 문자열('')로 전송된 경우 덮어씌움 방지 (null은 의도적 초기화이므로 허용)
+        if (body.manager_name === '') {
+            delete body.manager_name;
+        }
+        if (body.manager_id === '') {
+            delete body.manager_id;
         }
 
         // progress_start_date가 문자열 타임스탐프면 숫자로 변환

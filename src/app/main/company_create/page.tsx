@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -153,7 +153,7 @@ function Company1Content() {
         // 대표실무자(level 2)는 진행 단계에서 수정 불가
         // 실무자(level 3 또는 undefined)는 수정 불가
         const isAnalysisPhase = (userLevel === 4 && (currentProgressDetails === '분석' || currentProgressDetails === '심사' || currentProgressDetails === '진행')) ||
-                                (userLevel === 2 && currentProgressDetails === '진행');
+                                (userLevel === 2 && currentProgressDetails === '진행' && (adminData?.user_id || currentUserId) !== documentData?.manager_id);
         const isStaff = userLevel === 3 || userLevel === undefined;
         const isBowan = documentData?.status === '보완' && userLevel === 4;
         // 분석 이후 단계 영업자는 추가서류/메모만 편집 가능
@@ -364,7 +364,9 @@ function Company1Content() {
         }
     };
 
-    const handleProgressUpdate = (progressDetails: string) => {
+    const handleProgressUpdate = (progressDetails: string, skipRedirect?: boolean) => {
+        // 실무자 배정 후 리다이렉트하는 경우 로컬 상태 업데이트 불필요
+        if (skipRedirect) return;
         // latestSavedDocumentRef 우선 사용 (setState 비동기 문제 - 저장 직후 최신 데이터)
         const baseData = latestSavedDocumentRef.current || documentData;
         if (baseData) {
@@ -378,10 +380,7 @@ function Company1Content() {
     };
 
     const handleStaffAssignSuccess = () => {
-        // 수정 모드에서 실무자 배정 완료 시 조회 페이지로 이동
-        if (isEditMode && viewId) {
-            router.push(`?view=${viewId}`);
-        }
+        router.push('/main/document_submission');
     };
 
     const handleEditCretabFile = () => {
@@ -452,8 +451,8 @@ function Company1Content() {
                 // 크레탑 파일 또는 정보없음 선택 검증
                 const cretabFile = cretabInfoRef.current?.getCretabFileForUpload();
                 const cretabStatus = cretabInfoRef.current?.getCretabStatus();
-                // 수정 모드: 새 파일이 없으면 기존 파일 확인
-                const hasExistingFile = isEditMode && documentData?.cretop_file;
+                // 수정 모드: 파일 상태가 'file'이고 기존 파일이 있을 때만 기존 파일로 간주
+                const hasExistingFile = isEditMode && documentData?.cretop_file && cretabStatus === 'file';
                 if (!cretabFile && !hasExistingFile && cretabStatus !== 'none') {
                     throw new Error('크레탑 파일을 업로드하거나\n정보없음을 선택해주세요.');
                 }
@@ -551,8 +550,8 @@ function Company1Content() {
                         size: cretabFileObj.file.size,
                     };
                 }
-            } else if (isEditMode && documentData?.cretop_file) {
-                // 수정 모드: 새 파일을 업로드하지 않으면 기존 파일 유지
+            } else if (isEditMode && documentData?.cretop_file && cretabStatus === 'file') {
+                // 수정 모드: 파일 상태가 'file'일 때만 기존 파일 유지 (X버튼이나 정보없음 선택 시 제외)
                 cretabFileData = documentData.cretop_file;
             }
 
@@ -622,7 +621,7 @@ function Company1Content() {
                 business_number: formData.business_number,
                 representative_name: formData.representative_name,
                 phone: formData.phone,
-                manager_name: '',
+                ...(viewId ? {} : { manager_name: '' }),
                 progress_details: progressDetails,
                 ...(progressStartDate && { progress_start_date: progressStartDate }),
                 type: businessType,
@@ -892,13 +891,16 @@ function Company1Content() {
                 )}
             </div>
             {(() => {
-                const isSupplementMode = isViewMode && !isEditMode && documentData?.status === '보완' && currentUserPosition?.level === 4;
+                const isSupplementMode = isViewMode && !isEditMode && documentData?.status === '보완' &&
+                    (currentUserPosition?.level === 4 ||
+                     (currentUserPosition?.level === 6 && (documentData?.progress_details === '분석' || documentData?.progress_details === '진행' || documentData?.progress_details === '심사')) ||
+                     (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id));
                 const isAnalysisAdditionalFilesMode = isEditMode && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserPosition?.level === 4;
                 const isSimplifiedMode = isSupplementMode || isAnalysisAdditionalFilesMode;
                 return (
                 <div className={styles.companyManagementWrap}>
                     {/* 분석 단계 추가서류 모드에서도 기업정보 표시 (읽기 전용) */}
-                    {!isSupplementMode && <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} progressDetails={documentData?.progress_details} status={documentData?.status} />}
+                    {!isSupplementMode && <CompanyInfoCard ref={companyInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} progressDetails={documentData?.progress_details} status={documentData?.status} onBusinessNumberChange={() => companyFileRef.current?.resetFiles()} />}
                     {!isSupplementMode && (
                         <ProgressStepsSection
                             isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode}
@@ -926,7 +928,7 @@ function Company1Content() {
                             onStaffAssignSuccess={handleStaffAssignSuccess}
                         />
                     )}
-                    {!isSupplementMode && viewId && (currentUserPosition?.level !== 4 || documentData?.cretop_file || documentData?.company_credit_rating_kcb || documentData?.company_credit_rating_nice || documentData?.company_type) && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} viewId={viewId} isEditMode={isEditMode && !isAnalysisAdditionalFilesMode} onEditClick={documentData?.progress_details === '승인' ? undefined : handleEditCretabFile} userLevel={currentUserPosition?.level} progressDetails={documentData?.progress_details} />}
+                    {!isSupplementMode && viewId && (currentUserPosition?.level !== 4 || documentData?.cretop_file || documentData?.company_credit_rating_kcb || documentData?.company_credit_rating_nice || documentData?.company_type) && <CretabInfo ref={cretabInfoRef} isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode} viewId={viewId} isEditMode={isEditMode && !isAnalysisAdditionalFilesMode} onEditClick={documentData?.progress_details === '승인' ? undefined : handleEditCretabFile} userLevel={currentUserPosition?.level} progressDetails={documentData?.progress_details} companyName={documentData?.company_name || ''} />}
                     <MemoSection
                         documentId={viewId}
                         isViewMode={isViewMode && !isEditMode}
@@ -936,7 +938,7 @@ function Company1Content() {
                         currentUserPositionLevel={currentUserPosition?.level || 0}
                         memos={memos}
                         onMemosChange={handleMemosChange}
-                        showOnlyLatest={documentData?.status === '보완' && currentUserPosition?.level === 4}
+                        showOnlyLatest={documentData?.status === '보완' && (currentUserPosition?.level === 4 || (currentUserPosition?.level === 6 && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행')) || (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id))}
                     />
                     {!isSupplementMode && (
                         <CompanyFile
@@ -947,6 +949,8 @@ function Company1Content() {
                             isAuthor={currentUserId === documentData?.user_id}
                             isEditMode={isEditMode && !isAnalysisAdditionalFilesMode}
                             userPositionLevel={currentUserPosition?.level || 0}
+                            getBusinessNumber={() => companyInfoRef.current?.getFormData()?.business_number || ''}
+                            companyName={documentData?.company_name || companyInfoRef.current?.getFormData()?.company_name || ''}
                         />
                     )}
                     <AdditionalFiles
@@ -957,6 +961,7 @@ function Company1Content() {
                         viewId={viewId}
                         onEditClick={!isSimplifiedMode && viewId && !((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1) ? () => router.push(`?view=${viewId}&edit=true&fromAdditional=true`) : undefined}
                         readOnly={(documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
+                        companyName={documentData?.company_name || companyInfoRef.current?.getFormData()?.company_name || ''}
                     />
                 </div>
                 );
@@ -967,7 +972,7 @@ function Company1Content() {
                 <div className={styles.buttonContainer}>
                     {isViewMode && !isEditMode ? (
                         (() => {
-                            const isSupplementMode = documentData?.status === '보완' && currentUserPosition?.level === 4;
+                            const isSupplementMode = documentData?.status === '보완' && (currentUserPosition?.level === 4 || (currentUserPosition?.level === 6 && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행')) || (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id));
                             return (
                             <>
                                 <button

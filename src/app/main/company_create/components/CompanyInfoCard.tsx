@@ -20,9 +20,10 @@ interface CompanyInfoCardProps {
     isViewMode?: boolean;
     progressDetails?: string;
     status?: string;
+    onBusinessNumberChange?: () => void;
 }
 
-const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(function CompanyInfoCard({ isViewMode = false, progressDetails = '', status = '' }, ref) {
+const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(function CompanyInfoCard({ isViewMode = false, progressDetails = '', status = '', onBusinessNumberChange }, ref) {
     const [formData, setFormData] = useState<CompanyFormData>({
         company_name: '',
         business_number: '',
@@ -67,6 +68,7 @@ const CompanyInfoCard = forwardRef<CompanyInfoCardHandle, CompanyInfoCardProps>(
         // 사업자 등록번호 포맷팅
         if (name === 'business_number') {
             formattedValue = formatBusinessNumber(value);
+            if (onBusinessNumberChange) onBusinessNumberChange();
         }
         // 연락처 포맷팅
         else if (name === 'phone') {

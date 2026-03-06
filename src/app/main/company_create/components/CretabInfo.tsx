@@ -52,9 +52,10 @@ interface CretabInfoProps {
     onEditClick?: () => void;
     userLevel?: number;
     progressDetails?: string;
+    companyName?: string;
 }
 
-const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function CretabInfo({ isViewMode = false, viewId = null, isEditMode = false, onEditClick, userLevel = 0, progressDetails = '' }, ref) {
+const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function CretabInfo({ isViewMode = false, viewId = null, isEditMode = false, onEditClick, userLevel = 0, progressDetails = '', companyName = '' }, ref) {
     const [formData, setFormData] = useState<CretabFormData>({
         companyCreditRatingKCB: '',
         companyCreditRatingNICE: '',
@@ -110,8 +111,12 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
     };
 
     const formatCreditRating = (value: string): string => {
-        // 숫자만 추출 (최대 4자리)
-        return value.replace(/\D/g, '').slice(0, 4);
+        // 숫자만 추출
+        const numbers = value.replace(/\D/g, '').slice(0, 4);
+        if (!numbers) return ''; // 빈 값이면 공백 반환
+        // 1000 이상이면 1000으로 제한
+        const numValue = parseInt(numbers, 10);
+        return Math.min(numValue, 1000).toString();
     };
 
     const formatDate = (value: string): string => {
@@ -248,25 +253,18 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
             const textContent = await page.getTextContent();
             const text = textContent.items.map((item: any) => item.str).join(' ');
 
+            // 공백 제거 버전으로 패턴 매칭
+            const cleanText = text.replace(/\s/g, '');
 
-            // "표준산업분류" 또는 "표 준 산 업 분 류" 패턴 (마지막 것)
-            const lastMatch = text.lastIndexOf('표');
-            if (lastMatch === -1) return null;
+            // 표준산업분류(10차)(H49231)택시운송업 형식에서 마지막 것 추출
+            const regex = /표준산업분류\([^)]*\)(\([A-Za-z]\d+\)[가-힣,·.]+)/g;
+            const matches = [...cleanText.matchAll(regex)];
 
-            // lastMatch 이후로 텍스트 추출
-            let searchText = text.substring(lastMatch, lastMatch + 100);
+            console.log('=== 표준분류 추출 결과 ===', matches.map(m => m[1]));
 
-            // "표준산업분류" 패턴 확인
-            const isValidPattern = /표[\s]*준[\s]*산[\s]*업[\s]*분[\s]*류/.test(searchText);
-            if (!isValidPattern) return null;
-
-            // 패턴 뒤의 한글만 추출 (괄호와 코드 무시하고 순수 한글만)
-            const koreanMatch = searchText.match(/[가-힣]+[가-힣\s]*/);
-            if (koreanMatch) {
-                const extracted = koreanMatch[0].replace(/\s+/g, '').match(/^[가-힣]+/)?.[0];
-                if (extracted) {
-                    return extracted;
-                }
+            if (matches.length > 0) {
+                // 마지막 매칭에서 끝에 붙은 "표준산업분류" 제거
+                return matches[matches.length - 1][1].replace(/표준산업분류$/, '');
             }
 
             return null;
@@ -763,6 +761,8 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                 fileSize: formatFileSize(file.size),
             });
             setCretabStatus('file');
+            // 파일 교체 시 KCB/NICE 제외 초기화
+            resetCretabFormData();
 
             // PDF 파일이면 정보 자동 추출
             if (file.type === 'application/pdf') {
@@ -796,8 +796,14 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                     setExtractedImages(images);
 
                     // 배열 길이를 맞추는 헬퍼 함수 (부족한 부분은 앞에 공백 추가)
+                    const formatValue = (v: number | string): string => {
+                        if (v === '' || v === '-') return '-';
+                        const num = typeof v === 'number' ? v : Number(v);
+                        if (!isNaN(num)) return num.toLocaleString('ko-KR');
+                        return String(v);
+                    };
                     const padArrayToLength = (arr: (number | string)[], targetLength: number): string[] => {
-                        const result = arr.map(v => String(v === '' ? '-' : v));
+                        const result = arr.map(v => formatValue(v));
                         while (result.length < targetLength) {
                             result.unshift('-'); // 앞에 하이픈 추가
                         }
@@ -844,31 +850,18 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
         }
     };
 
-    const handleCretabNoneClick = () => {
-        // 기업상세정보가 없거나 파일이 등록되어 있지 않은 경우: 초기화하지 않음
-        if (cretabStatus === 'none' || !cretabFile) {
-            setCretabStatus('none');
-            setCretabFile(null);
-            return;
-        }
-
-        // 파일이 있었는데 기업상세정보 없음으로 변경: 데이터 초기화
-        setCretabStatus('none');
-        setCretabFile(null);
-        // 폼 데이터 초기화 (년도 제외)
-        setFormData({
-            companyCreditRatingKCB: '',
-            companyCreditRatingNICE: '',
+    const resetCretabFormData = () => {
+        setFormData(prev => ({
+            companyCreditRatingKCB: prev.companyCreditRatingKCB,
+            companyCreditRatingNICE: prev.companyCreditRatingNICE,
             companyType: '',
             standardClassification: '',
             establishmentDate: '',
             companyAddress: '',
             assessmentDate: '',
             settlementDate: '',
-        });
-        // 이미지 초기화
+        }));
         setExtractedImages({ first: null, second: null });
-        // 테이블 데이터 초기화
         setTableHeaders(['년도', '년도', '년도']);
         setTableData({
             assetTotal: ['', '', ''],
@@ -881,12 +874,22 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
         });
     };
 
+    const handleCretabNoneClick = () => {
+        setCretabStatus('none');
+        setCretabFile(null);
+        if (cretabFileInputRef.current) {
+            cretabFileInputRef.current.value = '';
+        }
+        resetCretabFormData();
+    };
+
     const handleRemoveCretabFile = () => {
         setCretabFile(null);
         setCretabStatus(null);
         if (cretabFileInputRef.current) {
             cretabFileInputRef.current.value = '';
         }
+        resetCretabFormData();
     };
 
     const handleOpenPreview = async (file: CretabFile) => {
@@ -963,7 +966,9 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `기업상세정보_${new Date().getTime()}.zip`;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const prefix = companyName ? `${companyName}_` : '';
+            a.download = `${prefix}기업상세정보_${dateStr}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1027,17 +1032,20 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
             if (!formData.companyCreditRatingNICE?.trim()) {
                 return { valid: false, message: '신용점수 NICE를 입력해주세요.' };
             }
-            if (!formData.companyType?.trim()) {
-                return { valid: false, message: '기업유형을 입력해주세요.' };
-            }
-            if (!formData.standardClassification?.trim()) {
-                return { valid: false, message: '표준분류를 입력해주세요.' };
-            }
-            if (!formData.establishmentDate?.trim()) {
-                return { valid: false, message: '설립일자를 입력해주세요.' };
-            }
-            if (!formData.companyAddress?.trim()) {
-                return { valid: false, message: '회사주소를 입력해주세요.' };
+            // 기업상세정보없음 선택 시 나머지 필드는 필수 아님
+            if (cretabStatus !== 'none') {
+                if (!formData.companyType?.trim()) {
+                    return { valid: false, message: '기업유형을 입력해주세요.' };
+                }
+                if (!formData.standardClassification?.trim()) {
+                    return { valid: false, message: '표준분류를 입력해주세요.' };
+                }
+                if (!formData.establishmentDate?.trim()) {
+                    return { valid: false, message: '설립일자를 입력해주세요.' };
+                }
+                if (!formData.companyAddress?.trim()) {
+                    return { valid: false, message: '회사주소를 입력해주세요.' };
+                }
             }
             return { valid: true };
         },
@@ -1138,7 +1146,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             value={formData.companyCreditRatingKCB}
                             onChange={handleChange}
                             disabled={isViewMode || userLevel === 4}
-                            placeholder="최대 4자리"
+                            placeholder="최대 1000"
                             maxLength={4}
                         />
                     </li>
@@ -1155,7 +1163,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             value={formData.companyCreditRatingNICE}
                             onChange={handleChange}
                             disabled={isViewMode || userLevel === 4}
-                            placeholder="최대 4자리"
+                            placeholder="최대 1000"
                             maxLength={4}
                         />
                     </li>
@@ -1204,7 +1212,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             value={formData.establishmentDate}
                             onChange={handleChange}
                             disabled={isViewMode || userLevel === 4}
-                            placeholder="2000-01-02"
+                            placeholder="예) 2000-01-02"
                             maxLength={10}
                         />
                     </li>
@@ -1252,6 +1260,7 @@ const CretabInfo = forwardRef<CretabInfoHandle, CretabInfoProps>(function Cretab
                             </table>
                         </div>
                     </div>
+                    <p style={{ fontSize: '18px', color: '#555', textAlign: 'right', margin: '6px 0 0 0', fontWeight: '600' }}>단위: 만원</p>
 
                     {/* 테이블 영역 */}
                     <div className={styles.tableArea}>

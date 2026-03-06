@@ -31,6 +31,51 @@ export async function PUT(
             );
         }
 
+        // 액터 정보 파싱
+        let actorId = 'unknown';
+        let actorLevel = 0;
+        let actorName = '시스템';
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (authToken) {
+            try {
+                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+                actorId = tokenData.user_id || 'unknown';
+                const { data: actorUser } = await supabase
+                    .from('users')
+                    .select('position(level), name')
+                    .eq('user_id', actorId)
+                    .single();
+                if (actorUser) {
+                    const positionArray = actorUser.position as any;
+                    actorLevel = (Array.isArray(positionArray) ? positionArray[0]?.level : positionArray?.level) || 0;
+                    actorName = (actorUser as any).name || actorId;
+                }
+            } catch {}
+        }
+
+        // 현재 문서 상태 조회
+        const { data: currentDoc } = await supabase
+            .from('documents')
+            .select('progress_details, manager_id')
+            .eq('id', docId)
+            .single();
+
+        // 심사 단계에서 대표자(level 1) 또는 배정된 실무자만 단계 변경 가능
+        if (currentDoc?.progress_details === '심사' && actorLevel !== 1 && actorId !== currentDoc?.manager_id) {
+            return NextResponse.json(
+                { error: '심사 단계에서는 대표자 또는 배정된 실무자만 단계를 변경할 수 있습니다.' },
+                { status: 403 }
+            );
+        }
+
+        // 진행 단계에서 대표실무자(level 2)는 단계 변경 불가
+        if (currentDoc?.progress_details === '진행' && actorLevel === 2 && actorId !== currentDoc?.manager_id) {
+            return NextResponse.json(
+                { error: '진행 단계에서 대표실무자는 단계를 변경할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
+
         // 업데이트할 데이터 구성
         const updateData: any = {
             progress_details: progress_details,
@@ -68,29 +113,6 @@ export async function PUT(
         }
 
         // 로그 생성 (진행단계 변경)
-        const authToken = request.cookies.get('auth_token')?.value;
-        let actorId = 'system';
-        let actorName = '시스템';
-
-        if (authToken) {
-            try {
-                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
-                actorId = tokenData.user_id || 'system';
-
-                const { data: userData } = await supabase
-                    .from('users')
-                    .select('name')
-                    .eq('user_id', actorId)
-                    .single();
-
-                if (userData) {
-                    actorName = userData.name || actorId;
-                }
-            } catch (e) {
-                console.error('사용자 정보 조회 실패:', e);
-            }
-        }
-
         const { error: logError } = await supabase
             .from('document_logs')
             .insert({

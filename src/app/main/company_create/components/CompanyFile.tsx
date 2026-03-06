@@ -3,6 +3,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { File, CheckCircle2, X, Paperclip, Download, AlertCircle } from 'lucide-react';
 import JSZip from 'jszip';
+import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import styles from './CompanyFile.module.css';
 
 type BusinessType = 'business' | 'individual' | null;
@@ -28,6 +29,7 @@ export interface CompanyFileHandle {
     setBusinessType: (type: 'business' | 'individual') => void;
     setExistingFiles: (files: Array<{ name: string; path: string; size: number }>, type?: 'business' | 'individual') => void;
     validateFormData: () => { valid: boolean; message?: string };
+    resetFiles: () => void;
 }
 
 interface CompanyFileProps {
@@ -37,15 +39,23 @@ interface CompanyFileProps {
     isAuthor?: boolean;
     isEditMode?: boolean;
     userPositionLevel?: number;
+    getBusinessNumber?: () => string;
+    companyName?: string;
 }
 
-const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false, viewId = null, progressDetails = null, isAuthor = false, isEditMode = false, userPositionLevel = 0 }, ref) {
+const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false, viewId = null, progressDetails = null, isAuthor = false, isEditMode = false, userPositionLevel = 0, getBusinessNumber, companyName = '' }, ref) {
     const [businessType, setBusinessType] = useState<BusinessType>(null);
+    const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
     const [uploadedFilesByType, setUploadedFilesByType] = useState<Record<'business' | 'individual', Record<string, UploadedFile>>>({
         business: {},
         individual: {}
     });
     const [existingFilesByType, setExistingFilesByType] = useState<Record<'business' | 'individual', Array<{ name: string; path: string; size: number }>>>({
+        business: [],
+        individual: []
+    });
+    // 서버에서 로드된 원본 파일 목록 (저장 전 X/교체 조작에 영향받지 않음, 다운로드용)
+    const [savedFilesByType, setSavedFilesByType] = useState<Record<'business' | 'individual', Array<{ name: string; path: string; size: number }>>>({
         business: [],
         individual: []
     });
@@ -55,6 +65,7 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+    const [draggingDocId, setDraggingDocId] = useState<string | null>(null);
     const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
     const businessDocuments: Document[] = [
@@ -167,6 +178,11 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     ...prev,
                     [targetType]: files
                 }));
+                // 서버에서 로드된 원본 저장
+                setSavedFilesByType((prev) => ({
+                    ...prev,
+                    [targetType]: files
+                }));
             }
         },
         validateFormData: () => {
@@ -189,10 +205,35 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
             return { valid: true };
         },
+        resetFiles: () => {
+            setBusinessType(null);
+            setUploadedFilesByType({ business: {}, individual: {} });
+            setExistingFilesByType({ business: [], individual: [] });
+            setSavedFilesByType({ business: [], individual: [] });
+        },
     }));
 
     const handleUploadClick = (docId: string) => {
         fileInputRefs.current[docId]?.click();
+    };
+
+    const handleDropFile = (e: React.DragEvent, docId: string) => {
+        e.preventDefault();
+        setDraggingDocId(null);
+        if (isViewMode || !businessType) return;
+        const file = e.dataTransfer.files?.[0];
+        if (!file) return;
+        setUploadedFilesByType((prev) => ({
+            ...prev,
+            [businessType]: {
+                ...prev[businessType],
+                [docId]: {
+                    file,
+                    fileName: file.name,
+                    fileSize: `${(file.size / 1024).toFixed(2)} KB`,
+                },
+            },
+        }));
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, docId: string) => {
@@ -291,7 +332,8 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
 
 
     const handleDownloadFilesZip = async () => {
-        if (Object.keys(uploadedFiles).length === 0) {
+        const savedFiles = businessType ? savedFilesByType[businessType] : [];
+        if (savedFiles.length === 0) {
             alert('다운로드할 파일이 없습니다.');
             return;
         }
@@ -299,13 +341,22 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
         try {
             const zip = new JSZip();
 
-            for (const [docId, file] of Object.entries(uploadedFiles)) {
-                const doc = businessType === 'business'
-                    ? (documents.find(d => d.id === docId))
-                    : (documents.find(d => d.id === docId));
-
-                if (doc && file.file) {
-                    zip.file(`${doc.name}_${file.fileName}`, file.file);
+            // 실제 저장된 파일 기준으로 다운로드 (로컬 X/교체 조작 무시)
+            for (const file of savedFiles) {
+                try {
+                    const response = await fetch('/api/file/view', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filePath: file.path }),
+                    });
+                    const data = await response.json();
+                    if (data.url) {
+                        const fileResponse = await fetch(data.url);
+                        const blob = await fileResponse.blob();
+                        zip.file(file.name, blob);
+                    }
+                } catch (e) {
+                    console.error(`파일 fetch 실패: ${file.name}`, e);
                 }
             }
 
@@ -313,7 +364,9 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `첨부파일_${new Date().getTime()}.zip`;
+            const dateStr = new Date().toISOString().slice(0, 10);
+            const prefix = companyName ? `${companyName}_` : '';
+            a.download = `${prefix}첨부파일_${dateStr}.zip`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -371,24 +424,48 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     <button
                         className={`${styles.typeBtn} ${businessType === 'business' ? styles.active : ''}`}
                         onClick={() => {
+                            if (getBusinessNumber) {
+                                const num = getBusinessNumber().replace(/\D/g, '');
+                                if (!num || num.length !== 10) {
+                                    setAlertModal({ open: true, message: '사업자등록번호를 먼저 입력해주세요.' });
+                                    return;
+                                }
+                                const mid = parseInt(num.substring(3, 5), 10);
+                                if (mid >= 1 && mid <= 79) {
+                                    setAlertModal({ open: true, message: '사업자등록번호가 개인사업자 번호입니다.\n다시 확인해주세요.' });
+                                    return;
+                                }
+                            }
                             setBusinessType('business');
                         }}
-                        disabled={!!(isViewMode || (viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (viewId && progressDetails === '분석'))}
+                        disabled={!!(isViewMode || (!isEditMode && viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (!isEditMode && viewId && progressDetails === '분석'))}
                     >
                         법인사업자
                     </button>
                     <button
                         className={`${styles.typeBtn} ${businessType === 'individual' ? styles.active : ''}`}
                         onClick={() => {
+                            if (getBusinessNumber) {
+                                const num = getBusinessNumber().replace(/\D/g, '');
+                                if (!num || num.length !== 10) {
+                                    setAlertModal({ open: true, message: '사업자등록번호를 먼저 입력해주세요.' });
+                                    return;
+                                }
+                                const mid = parseInt(num.substring(3, 5), 10);
+                                if (mid >= 80 && mid <= 99) {
+                                    setAlertModal({ open: true, message: '사업자등록번호가 법인사업자 번호입니다.\n다시 확인해주세요.' });
+                                    return;
+                                }
+                            }
                             setBusinessType('individual');
                         }}
-                        disabled={!!(isViewMode || (viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (viewId && progressDetails === '분석'))}
+                        disabled={!!(isViewMode || (!isEditMode && viewId && userPositionLevel === 4 && progressDetails !== '서류요청') || (!isEditMode && viewId && progressDetails === '분석'))}
                     >
                         개인사업자
                     </button>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {(Object.keys(uploadedFiles).length > 0 || existingFiles.length > 0) && (
+                    {(businessType ? savedFilesByType[businessType] : []).length > 0 && (
                         <button
                             className={styles.downloadBtn}
                             onClick={handleDownloadFilesZip}
@@ -471,7 +548,12 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                         )}
                                     </div>
                                 ) : (
-                                    <div className={styles.docItem}>
+                                    <div
+                                        className={`${styles.docItem} ${draggingDocId === doc.id ? styles.dragging : ''}`}
+                                        onDragOver={(e) => { e.preventDefault(); if (!isViewMode && businessType) setDraggingDocId(doc.id); }}
+                                        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDraggingDocId(null); }}
+                                        onDrop={(e) => handleDropFile(e, doc.id)}
+                                    >
                                         <div className={styles.docContent}>
                                             <File className={styles.docIcon} />
                                             <div className={styles.docInfo}>
@@ -527,6 +609,14 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                     </div>
                 </div>
             )}
+            <ConfirmModal
+                isOpen={alertModal.open}
+                message={alertModal.message}
+                type="error"
+                onConfirm={() => setAlertModal({ open: false, message: '' })}
+                confirmButtonText="확인"
+                hideCancel
+            />
         </div>
     );
 });

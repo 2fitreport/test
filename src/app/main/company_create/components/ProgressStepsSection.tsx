@@ -49,7 +49,7 @@ interface ProgressStepsSectionProps {
     currentUserId?: string;
     currentUserPositionLevel?: number | null;
     memos?: Memo[];
-    onProgressUpdate?: (progressDetails: string) => void;
+    onProgressUpdate?: (progressDetails: string, skipRedirect?: boolean) => void;
     onMemoUpdate?: () => void;
     onValidateAndNext?: () => Promise<boolean>;
     onSave?: (skipSuccessModal?: boolean) => Promise<void>;
@@ -457,6 +457,9 @@ export default function ProgressStepsSection({
 
                 // 사이드바 업데이트
                 window.dispatchEvent(new Event('notificationUpdate'));
+
+                // 승인 처리 후 목록으로 리다이렉트
+                router.push('/main/document_submission');
             }
         } catch (error) {
             console.error('승인 처리 실패:', error);
@@ -468,7 +471,7 @@ export default function ProgressStepsSection({
         }
     };
 
-    const updateProgress = async (newProgressDetails: string) => {
+    const updateProgress = async (newProgressDetails: string, skipRedirect?: boolean) => {
         try {
             // documentId가 없으면 (신규 등록 모드) 업데이트하지 않음
             if (!documentId) return;
@@ -491,7 +494,7 @@ export default function ProgressStepsSection({
 
             if (response.ok) {
                 if (onProgressUpdate) {
-                    onProgressUpdate(newProgressDetails);
+                    onProgressUpdate(newProgressDetails, skipRedirect);
                 }
             }
         } catch (error) {
@@ -739,9 +742,9 @@ export default function ProgressStepsSection({
 
                     // 실무자 배정 후 다음 단계로 즉시 업데이트
                     if (currentProgress === '분석') {
-                        updateProgress('심사');
+                        updateProgress('심사', true);
                     } else if (currentProgress === '심사') {
-                        updateProgress('진행');
+                        updateProgress('진행', true);
                     }
 
                     setSuccessMessage('직접진행으로 진행됩니다.');
@@ -766,9 +769,9 @@ export default function ProgressStepsSection({
 
                     // 실무자 배정 후 다음 단계로 즉시 업데이트
                     if (currentProgress === '분석') {
-                        updateProgress('심사');
+                        updateProgress('심사', true);
                     } else if (currentProgress === '심사') {
-                        updateProgress('진행');
+                        updateProgress('진행', true);
                     }
 
                     setSuccessMessage('실무자가 배정되었습니다.');
@@ -919,7 +922,7 @@ export default function ProgressStepsSection({
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && (
+                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
                             <div className={styles.buttonGroup}>
                                 {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
                                 <div className={styles.groupButtons}>
@@ -928,7 +931,7 @@ export default function ProgressStepsSection({
                                             이전 단계로 이동
                                         </button>
                                     )}
-                                    {!(userLevel === 1 && currentProgress === '승인') && !(userLevel === 2 && currentProgress === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && (
+                                    {!(userLevel === 1 && currentProgress === '승인') && !(userLevel === 2 && currentProgress === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && (
                                         <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleNext} disabled={isLoading || (currentStepIndex === stepOrder.length - 1 && currentProgress !== '승인요청')}>
                                             {isLoading ? '처리 중...' : '다음 단계로 이동'}
                                         </button>
@@ -946,7 +949,9 @@ export default function ProgressStepsSection({
                          !(userLevel === 4 && (documentStatus !== '보완' || progressDetails === '분석')) &&
                          !(currentProgress === '승인' && !userLevel) &&
                          !(userLevel === 6 && progressDetails !== '서류요청' && documentStatus !== '보완') &&
-                         !(currentProgress === '승인요청') && (
+                         !(currentProgress === '승인요청') &&
+                         !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) &&
+                         !(currentProgress === '진행' && userLevel === 2 && documentStatus !== '보완' && currentUserId !== managerId) && (
                         <div className={styles.buttonGroup}>
                             <h4>진행 상태</h4>
                             <div className={styles.groupButtons}>
@@ -1029,25 +1034,33 @@ export default function ProgressStepsSection({
                                         )}
                                         {documentStatus === '보완' && (
                                             <>
-                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                    검수완료
-                                                </button>
-                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
-                                                    보완요청
-                                                </button>
+                                                {(currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
+                                                    <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                        검수완료
+                                                    </button>
+                                                )}
+                                                {(currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
+                                                    <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                        보완요청
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                         {documentStatus === '검수' && (
                                             <>
-                                                <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
-                                                    검수완료
-                                                </button>
-                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
-                                                    보완요청
-                                                </button>
+                                                {(currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
+                                                    <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
+                                                        검수완료
+                                                    </button>
+                                                )}
+                                                {(currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
+                                                    <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                        보완요청
+                                                    </button>
+                                                )}
                                             </>
                                         )}
-                                        {documentStatus !== '보류' && documentStatus !== '보완' && documentStatus !== '검수' && (
+                                        {documentStatus !== '보류' && documentStatus !== '보완' && documentStatus !== '검수' && (currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
                                             <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
                                                 보완요청
                                             </button>
@@ -1072,7 +1085,12 @@ export default function ProgressStepsSection({
                                                 진행
                                             </button>
                                         )}
-                                        {documentStatus !== '보류' && (
+                                        {currentProgress === '진행' && userLevel === 2 && documentStatus === '보완' && currentUserId !== managerId && (
+                                            <button className={`${styles.btn} ${styles.btnSuccess}`} onClick={handleSecurityProcess} disabled={isLoading}>
+                                                보안완료
+                                            </button>
+                                        )}
+                                        {documentStatus !== '보류' && (currentProgress !== '심사' || userLevel === 1 || currentUserId === managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
                                             <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
                                                 진행불가
                                             </button>
@@ -1292,7 +1310,7 @@ export default function ProgressStepsSection({
                             >
                                 <option value="">실무자를 선택해주세요.</option>
                                 {workers
-                                    .filter(worker => worker.position?.level === 3)
+                                    .filter(worker => worker.position?.level === 3 || worker.position?.level === 2)
                                     .map((worker) => (
                                     <option key={worker.id} value={worker.user_id}>
                                         {worker.name}({worker.user_id})
