@@ -33,12 +33,15 @@ export async function GET(request: NextRequest) {
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
+        const firstDayStr = firstDay.toISOString().split('T')[0];
+        const lastDayStr = lastDay.toISOString().split('T')[0];
+
         let query = supabase
             .from('documents')
             .select('approval_amount')
             .eq('progress_details', '승인')
-            .gte('updated_at', firstDay.toISOString())
-            .lte('updated_at', lastDay.toISOString());
+            .gte('updated_at', firstDayStr)
+            .lte('updated_at', lastDayStr + 'T23:59:59');
 
         // 영업자(4): 자신의 문서만
         if (user?.position_id === 4) {
