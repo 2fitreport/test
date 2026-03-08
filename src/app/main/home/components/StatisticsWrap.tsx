@@ -10,6 +10,7 @@ export default function StatisticsWrap({ data }: Props) {
     const stats = data?.stats;
     const userLevel = data?.userLevel || 0;
     const isInspector = userLevel === 6;
+    const loading = !data;
 
     const inProgressCount = stats?.inProgressCount || 0;
     const inProgressDifference = stats?.inProgressDifference || 0;
@@ -17,6 +18,22 @@ export default function StatisticsWrap({ data }: Props) {
     const monthlyRevenue = stats?.monthlyRevenue || 0;
     const newRegistrations = stats?.newRegistrations || 0;
     const approvedCount = stats?.approvedCount || 0;
+
+    if (loading) {
+        return (
+            <div className={styles.statisticsWrap}>
+                <ul className={styles.statistics}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <li key={i}>
+                            <h2><span className={styles.skeleton} style={{ width: 80, height: 16 }}>&nbsp;</span></h2>
+                            <span className={styles.skeleton} style={{ width: 60, height: 35 }}>&nbsp;</span>
+                            <p><span className={styles.skeleton} style={{ width: 50, height: 14 }}>&nbsp;</span></p>
+                        </li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
 
     return (
         <div className={styles.statisticsWrap}>

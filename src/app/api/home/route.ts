@@ -9,6 +9,9 @@ const supabase = createClient(
 const PROGRESS_STAGES = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
 const STATUS_LIST = ['정상', '보완', '보류', '검수'];
 
+// 로그에서 필요한 컬럼만
+const LOG_COLUMNS = 'id,document_id,document_title,company_name,action_type,actor_id,actor_name,old_value,new_value,created_at,staff_read,submitter_id,submitter_name';
+
 export async function GET(request: NextRequest) {
     try {
         const authToken = request.cookies.get('auth_token')?.value;
@@ -27,34 +30,51 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const month = searchParams.get('month');
 
-        // 1. 유저 정보 조회 (1회만)
-        const { data: user } = await supabase
+        // 유저 정보 + 문서 + 로그 + 영업자 최대한 병렬로
+        const userPromise = supabase
             .from('users')
             .select('id, user_id, position_id, company_name, is_affiliation_representative')
             .eq('user_id', userId)
             .single();
 
+        const docsPromise = supabase.from('documents')
+            .select('id, user_id, status, progress_details, approval_amount, created_at, updated_at, inspector_id');
+
+        const logsPromise = supabase.from('document_logs')
+            .select(LOG_COLUMNS)
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        // 1단계: 유저 + 문서 + 로그 동시 조회
+        const [userResult, docsResult, logsResult] = await Promise.all([
+            userPromise,
+            docsPromise,
+            logsPromise
+        ]);
+
+        const user = userResult.data;
         const userLevel = user?.position_id || 0;
         const userDbId = user?.id || 0;
         const userCompanyName = user?.company_name || '';
         const isRep = user?.is_affiliation_representative || false;
 
-        // 2. 병렬 조회: 문서, 로그, 영업자 목록
-        const docsPromise = supabase.from('documents')
-            .select('id, user_id, status, progress_details, approval_amount, created_at, updated_at, inspector_id');
+        const allDocs = docsResult.data || [];
+        let allLogs = logsResult.data || [];
 
-        // 로그: 권한 필터용 document_ids 구하기
-        let allowedDocumentIds: number[] | null = null;
+        // 권한 필터링 (JS에서 처리 - 추가 DB 호출 최소화)
+        let myDocs = allDocs;
+        let allowedDocIds: Set<number> | null = null;
 
         if (userLevel === 4) {
-            const { data: myDocs } = await supabase
-                .from('documents').select('id').eq('user_id', userId);
-            allowedDocumentIds = (myDocs || []).map((d: any) => d.id);
+            myDocs = allDocs.filter(d => d.user_id === userId);
+            allowedDocIds = new Set(myDocs.map(d => d.id));
         } else if (userLevel === 6) {
+            // 검수자: 소속 조회 필요
             const { data: myAffiliations } = await supabase
                 .from('inspector_affiliations')
                 .select('affiliation_name')
                 .eq('inspector_id', userDbId);
+
             const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
 
             let allowedUserIds: string[] = [];
@@ -64,54 +84,55 @@ export async function GET(request: NextRequest) {
                 allowedUserIds = (usersData || []).map((u: any) => u.user_id);
             }
 
-            const { data: myDocs } = await supabase
-                .from('documents').select('id').in('user_id', allowedUserIds.length > 0 ? allowedUserIds : ['__none__']);
-            const { data: assignedDocs } = await supabase
-                .from('documents').select('id').eq('inspector_id', userId);
-
-            allowedDocumentIds = [
-                ...(myDocs || []).map((d: any) => d.id),
-                ...(assignedDocs || []).map((d: any) => d.id)
-            ];
-            allowedDocumentIds = [...new Set(allowedDocumentIds)];
+            const allowedUserSet = new Set(allowedUserIds);
+            myDocs = allDocs.filter(d =>
+                allowedUserSet.has(d.user_id) || d.inspector_id === userId
+            );
+            allowedDocIds = new Set(myDocs.map(d => d.id));
         }
 
-        let logsQuery = supabase.from('document_logs')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (allowedDocumentIds !== null) {
-            if (allowedDocumentIds.length === 0) {
-                logsQuery = logsQuery.in('document_id', [-1]); // 없는 ID로 빈 결과
-            } else {
-                logsQuery = logsQuery.in('document_id', allowedDocumentIds);
-            }
+        // 로그 권한 필터링
+        if (allowedDocIds !== null) {
+            allLogs = allLogs.filter(log => allowedDocIds!.has(log.document_id));
         }
 
-        // 영업자 목록 (level 1,2,4만)
-        let salesQuery = null;
+        // 영업자 목록 (별도 쿼리 - 필요한 경우만)
+        let salesData: any[] = [];
         if (userLevel === 1 || userLevel === 2 || userLevel === 4) {
-            let q = supabase.from('users').select('user_id, name').eq('position_id', 4);
+            let salesQuery = supabase.from('users').select('user_id, name').eq('position_id', 4);
             if (userLevel === 4) {
                 if (isRep && userCompanyName) {
-                    q = q.eq('company_name', userCompanyName);
+                    salesQuery = salesQuery.eq('company_name', userCompanyName);
                 } else {
-                    q = q.eq('user_id', userId);
+                    salesQuery = salesQuery.eq('user_id', userId);
                 }
             }
-            salesQuery = q;
+            const { data: salespeople } = await salesQuery;
+
+            if (salespeople && salespeople.length > 0) {
+                const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
+                const salesDocs = allDocs.filter(d => salesUserIds.has(d.user_id));
+                const docsByUser: Record<string, any[]> = {};
+                for (const doc of salesDocs) {
+                    if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
+                    docsByUser[doc.user_id].push(doc);
+                }
+                salesData = salespeople.map((person: any) => {
+                    const userDocs = docsByUser[person.user_id] || [];
+                    const approved = userDocs.filter(d => d.progress_details === '승인').length;
+                    return {
+                        userId: person.user_id,
+                        name: person.name,
+                        registrations: userDocs.length,
+                        inProgress: userDocs.filter(d => d.progress_details === '진행').length,
+                        approved,
+                        rejected: userDocs.filter(d => d.status === '보류').length,
+                        approvalAmount: '-',
+                        conversionRate: userDocs.length > 0 ? `${Math.round((approved / userDocs.length) * 100)}%` : '-'
+                    };
+                });
+            }
         }
-
-        // 병렬 실행
-        const [docsResult, logsResult, salesResult] = await Promise.all([
-            docsPromise,
-            logsQuery,
-            salesQuery || Promise.resolve({ data: null })
-        ]);
-
-        const allDocs = docsResult.data || [];
-        const allLogs = logsResult.data || [];
-        const salespeople = salesResult.data || [];
 
         // === 통계 계산 ===
         const now = new Date();
@@ -122,16 +143,6 @@ export async function GET(request: NextRequest) {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-        // 역할별 필터링된 문서
-        let myDocs = allDocs;
-        if (userLevel === 4) {
-            myDocs = allDocs.filter(d => d.user_id === userId);
-        } else if (userLevel === 6) {
-            const allowedIds = new Set(allowedDocumentIds || []);
-            myDocs = allDocs.filter(d => allowedIds.has(d.id));
-        }
-
-        // 진행중 케이스
         const inProgressToday = myDocs.filter(d =>
             d.progress_details === '진행' && d.updated_at >= todayStr
         ).length;
@@ -141,7 +152,6 @@ export async function GET(request: NextRequest) {
             d.updated_at < todayStr + 'T00:00:00'
         ).length;
 
-        // 이번달 승인
         const monthlyApproved = myDocs.filter(d =>
             d.progress_details === '승인' &&
             d.updated_at >= firstDayStr &&
@@ -151,20 +161,10 @@ export async function GET(request: NextRequest) {
             sum + (Number(doc.approval_amount) || 0), 0
         );
 
-        // 이번달 신규
         const newRegistrations = myDocs.filter(d =>
             d.created_at >= firstDayStr &&
             d.created_at <= lastDayStr + 'T23:59:59'
         ).length;
-
-        const stats = {
-            inProgressCount: inProgressToday,
-            inProgressDifference: inProgressToday - inProgressYesterday,
-            approvalAmount: Math.round(totalApprovalAmount / 100000000 * 10) / 10,
-            monthlyRevenue: Math.round(totalApprovalAmount * 0.03 / 100000000 * 10) / 10,
-            newRegistrations,
-            approvedCount: monthlyApproved.length
-        };
 
         // === 로그 분류 ===
         const revisionLogs = allLogs.filter((log: any) =>
@@ -176,56 +176,24 @@ export async function GET(request: NextRequest) {
             return false;
         });
 
-        // === 영업자 현황 ===
-        let salesData: any[] = [];
-        if (salespeople.length > 0) {
-            const salesUserIds = salespeople.map((p: any) => p.user_id);
-            const salesDocs = allDocs.filter(d => salesUserIds.includes(d.user_id));
-            const docsByUser: Record<string, any[]> = {};
-            for (const doc of salesDocs) {
-                if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-                docsByUser[doc.user_id].push(doc);
-            }
-            salesData = salespeople.map((person: any) => {
-                const userDocs = docsByUser[person.user_id] || [];
-                const approved = userDocs.filter(d => d.progress_details === '승인').length;
-                return {
-                    userId: person.user_id,
-                    name: person.name,
-                    registrations: userDocs.length,
-                    inProgress: userDocs.filter(d => d.progress_details === '진행').length,
-                    approved,
-                    rejected: userDocs.filter(d => d.status === '보류').length,
-                    approvalAmount: '-',
-                    conversionRate: userDocs.length > 0 ? `${Math.round((approved / userDocs.length) * 100)}%` : '-'
-                };
-            });
-        }
-
         // === 진행상황 차트 ===
-        let filteredDocs = myDocs;
         const chartMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const [cYear, cMonth] = chartMonth.split('-');
-        filteredDocs = myDocs.filter((doc: any) => {
+        const filteredDocs = myDocs.filter((doc: any) => {
             if (!doc.created_at) return false;
             const docDate = new Date(doc.created_at);
             return docDate.getFullYear() === parseInt(cYear) &&
                    docDate.getMonth() + 1 === parseInt(cMonth);
         });
 
-        const stageCounts = PROGRESS_STAGES.map(stage =>
-            filteredDocs.filter(d => d.progress_details === stage).length
-        );
-        const statusCounts = STATUS_LIST.map(status =>
-            filteredDocs.filter(d => d.status === status).length
-        );
-
         const progressData = {
             stage: {
                 labels: PROGRESS_STAGES,
                 datasets: [{
                     label: '진행단계',
-                    data: stageCounts,
+                    data: PROGRESS_STAGES.map(stage =>
+                        filteredDocs.filter(d => d.progress_details === stage).length
+                    ),
                     backgroundColor: ['#b0b9c6', '#f2e7a2', '#d8c9f1', '#e0b0ff', '#82cbc4', '#ffd6a5', '#a0c4ff'],
                     borderColor: ['#8a9aaa', '#e8d670', '#c9a5e8', '#c990e8', '#5ca9a0', '#ffb873', '#7aacff'],
                     borderWidth: 1,
@@ -236,7 +204,9 @@ export async function GET(request: NextRequest) {
                 labels: STATUS_LIST,
                 datasets: [{
                     label: '상태',
-                    data: statusCounts,
+                    data: STATUS_LIST.map(status =>
+                        filteredDocs.filter(d => d.status === status).length
+                    ),
                     backgroundColor: ['#a5d6a7', '#ffd6a5', '#ffadad', '#90caf9'],
                     borderColor: ['#66bb6a', '#ffb873', '#ff8b8b', '#42a5f5'],
                     borderWidth: 1,
@@ -246,7 +216,14 @@ export async function GET(request: NextRequest) {
         };
 
         return NextResponse.json({
-            stats,
+            stats: {
+                inProgressCount: inProgressToday,
+                inProgressDifference: inProgressToday - inProgressYesterday,
+                approvalAmount: Math.round(totalApprovalAmount / 100000000 * 10) / 10,
+                monthlyRevenue: Math.round(totalApprovalAmount * 0.03 / 100000000 * 10) / 10,
+                newRegistrations,
+                approvedCount: monthlyApproved.length
+            },
             revisionLogs,
             memoLogs,
             salesData,
