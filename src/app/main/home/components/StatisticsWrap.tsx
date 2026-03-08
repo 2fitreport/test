@@ -10,6 +10,7 @@ export default function StatisticsWrap() {
     const [approvalAmount, setApprovalAmount] = useState<number>(0);
     const [monthlyRevenue, setMonthlyRevenue] = useState<number>(0);
     const [newRegistrations, setNewRegistrations] = useState<number>(0);
+    const [approvedCount, setApprovedCount] = useState<number>(0);
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -23,15 +24,16 @@ export default function StatisticsWrap() {
         }
     }, []);
 
-    // 진행중 케이스 개수, 승인금액, 매출, 신규 등록 건수 조회
+    // 진행중 케이스 개수, 승인금액, 매출, 신규 등록 건수, 승인 건수 조회
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [inProgressRes, approvalRes, revenueRes, newRegRes] = await Promise.all([
+                const [inProgressRes, approvalRes, revenueRes, newRegRes, approvedCountRes] = await Promise.all([
                     fetch('/api/progress/in-progress-count', { credentials: 'include' }),
                     fetch('/api/progress/approval-amount', { credentials: 'include' }),
                     fetch('/api/progress/monthly-revenue', { credentials: 'include' }),
-                    fetch('/api/progress/monthly-new-registrations', { credentials: 'include' })
+                    fetch('/api/progress/monthly-new-registrations', { credentials: 'include' }),
+                    fetch('/api/progress/monthly-approved-count', { credentials: 'include' })
                 ]);
 
                 if (inProgressRes.ok) {
@@ -53,6 +55,11 @@ export default function StatisticsWrap() {
                 if (newRegRes.ok) {
                     const data = await newRegRes.json();
                     setNewRegistrations(data.newRegistrations);
+                }
+
+                if (approvedCountRes.ok) {
+                    const data = await approvedCountRes.json();
+                    setApprovedCount(data.approvedCount);
                 }
             } catch (error) {
                 console.error('데이터 조회 실패:', error);
@@ -94,7 +101,7 @@ export default function StatisticsWrap() {
                 </li>
                 <li>
                     <h2>이번달 승인 건수</h2>
-                    <span>8</span>
+                    <span>{approvedCount}</span>
                     <p>건</p>
                 </li>
             </ul>
