@@ -27,27 +27,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: '로그 ID가 필요합니다.' }, { status: 400 });
         }
 
-        // 해당 로그들의 staff_read 조회
-        const { data: logs, error: fetchError } = await supabase
-            .from('document_logs')
-            .select('id, staff_read')
-            .in('id', logIds);
+        // staff_read JSONB에 현재 사용자를 true로 일괄 설정
+        const { error } = await supabase.rpc('bulk_mark_logs_read', {
+            log_ids: logIds,
+            reader_id: userId
+        });
 
-        if (fetchError) throw fetchError;
-
-        // 각 로그의 staff_read에 현재 사용자 추가
-        for (const log of (logs || [])) {
-            const staffRead = log.staff_read || {};
-            if (staffRead[userId] === true) continue;
-
-            staffRead[userId] = true;
-            const { error } = await supabase
-                .from('document_logs')
-                .update({ staff_read: staffRead })
-                .eq('id', log.id);
-
-            if (error) throw error;
-        }
+        if (error) throw error;
 
         return NextResponse.json({ success: true });
     } catch (error) {
