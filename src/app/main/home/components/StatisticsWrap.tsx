@@ -24,41 +24,18 @@ export default function StatisticsWrap() {
         }
     }, []);
 
-    // 진행중 케이스 개수, 승인금액, 매출, 신규 등록 건수, 승인 건수 조회
+    // 홈 통계 한번에 조회
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [inProgressRes, approvalRes, revenueRes, newRegRes, approvedCountRes] = await Promise.all([
-                    fetch('/api/progress/in-progress-count', { credentials: 'include' }),
-                    fetch('/api/progress/approval-amount', { credentials: 'include' }),
-                    fetch('/api/progress/monthly-revenue', { credentials: 'include' }),
-                    fetch('/api/progress/monthly-new-registrations', { credentials: 'include' }),
-                    fetch('/api/progress/monthly-approved-count', { credentials: 'include' })
-                ]);
-
-                if (inProgressRes.ok) {
-                    const data = await inProgressRes.json();
+                const res = await fetch('/api/progress/home-stats', { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
                     setInProgressCount(data.inProgressCount);
-                    setInProgressDifference(data.difference);
-                }
-
-                if (approvalRes.ok) {
-                    const data = await approvalRes.json();
+                    setInProgressDifference(data.inProgressDifference);
                     setApprovalAmount(data.approvalAmount);
-                }
-
-                if (revenueRes.ok) {
-                    const data = await revenueRes.json();
                     setMonthlyRevenue(data.monthlyRevenue);
-                }
-
-                if (newRegRes.ok) {
-                    const data = await newRegRes.json();
                     setNewRegistrations(data.newRegistrations);
-                }
-
-                if (approvedCountRes.ok) {
-                    const data = await approvedCountRes.json();
                     setApprovedCount(data.approvedCount);
                 }
             } catch (error) {
