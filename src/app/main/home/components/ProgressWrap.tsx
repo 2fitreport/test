@@ -29,76 +29,52 @@ const dataLabelsPlugin: Plugin = {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-export default function ProgressWrap() {
+interface Props {
+    data: any;
+}
+
+export default function ProgressWrap({ data }: Props) {
     const monthInputRef = useRef<HTMLInputElement>(null);
     const [stageData, setStageData] = useState<any>(null);
     const [statusData, setStatusData] = useState<any>(null);
-    const [userLevel, setUserLevel] = useState<number>(0);
-    const [currentUserId, setCurrentUserId] = useState<string>('');
-    const [isRepresentative, setIsRepresentative] = useState(false);
-    const [companyName, setCompanyName] = useState<string>('');
-    const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState<string>(() => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
-    const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
+    const [isCustomMonth, setIsCustomMonth] = useState(false);
 
+    const userLevel = data?.userLevel || 0;
+    const isRepresentative = data?.isRepresentative || false;
+
+    // 초기 데이터 설정
     useEffect(() => {
-        const adminData = sessionStorage.getItem('admin_data');
-        if (adminData) {
-            try {
-                const data = JSON.parse(adminData);
-                setUserLevel(data.position?.level || 0);
-                setCurrentUserId(data.user_id || '');
-                setIsRepresentative(data.is_affiliation_representative || false);
-                setCompanyName(data.company_name || '');
-            } catch (error) {
-                console.error('admin_data 파싱 실패:', error);
-            }
+        if (data?.progressData && !isCustomMonth) {
+            setStageData(data.progressData.stage);
+            setStatusData(data.progressData.status);
         }
-        setLoading(false);
-    }, []);
+    }, [data, isCustomMonth]);
 
+    // 월 변경 시 별도 API 호출
     useEffect(() => {
-        if (userLevel === 0) return;
+        if (!isCustomMonth) return;
 
         const fetchProgressData = async () => {
             try {
-                setLoading(true);
-                const params = new URLSearchParams();
-
-                if (userLevel === 4) {
-                    if (isRepresentative && companyName && viewMode === 'all') {
-                        params.append('companyName', companyName);
-                    } else {
-                        params.append('userId', currentUserId);
-                    }
+                const res = await fetch(`/api/home?month=${selectedMonth}`, { credentials: 'include' });
+                if (res.ok) {
+                    const result = await res.json();
+                    setStageData(result.progressData.stage);
+                    setStatusData(result.progressData.status);
                 }
-
-                params.append('month', selectedMonth);
-
-                const response = await fetch(`/api/progress/stats?${params}`, {
-                    credentials: 'include'
-                });
-
-                if (!response.ok) throw new Error('진행단계 데이터 조회 실패');
-
-                const data = await response.json();
-                setStageData(data.stage);
-                setStatusData(data.status);
             } catch (error) {
                 console.error('진행단계 데이터 조회 실패:', error);
-            } finally {
-                setLoading(false);
             }
         };
 
         fetchProgressData();
-    }, [userLevel, currentUserId, isRepresentative, companyName, selectedMonth, viewMode]);
+    }, [selectedMonth, isCustomMonth]);
 
     const shouldDisplay = userLevel === 1 || userLevel === 2 || userLevel === 4;
-
     if (!shouldDisplay) return null;
 
     const makeOptions = (maxVal: number) => ({
@@ -141,6 +117,7 @@ export default function ProgressWrap() {
         const date = new Date(parseInt(year), parseInt(month) - 1);
         date.setMonth(date.getMonth() - 1);
         setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+        setIsCustomMonth(true);
     };
 
     const handleNextMonth = () => {
@@ -148,6 +125,7 @@ export default function ProgressWrap() {
         const date = new Date(parseInt(year), parseInt(month) - 1);
         date.setMonth(date.getMonth() + 1);
         setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+        setIsCustomMonth(true);
     };
 
     const isAffiliationRepresentative = isRepresentative && userLevel === 4;
@@ -160,32 +138,17 @@ export default function ProgressWrap() {
                     {isAffiliationRepresentative && (
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <button
-                                onClick={() => setViewMode('all')}
                                 style={{
                                     padding: '8px 16px',
-                                    border: viewMode === 'all' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
+                                    border: '2px solid #fff',
                                     borderRadius: '4px',
-                                    backgroundColor: viewMode === 'all' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
                                     color: '#fff',
                                     cursor: 'pointer',
-                                    fontWeight: viewMode === 'all' ? '600' : '500'
+                                    fontWeight: '600'
                                 }}
                             >
                                 소속 영업자
-                            </button>
-                            <button
-                                onClick={() => setViewMode('my')}
-                                style={{
-                                    padding: '8px 16px',
-                                    border: viewMode === 'my' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
-                                    borderRadius: '4px',
-                                    backgroundColor: viewMode === 'my' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontWeight: viewMode === 'my' ? '600' : '500'
-                                }}
-                            >
-                                내 현황
                             </button>
                         </div>
                     )}
@@ -198,7 +161,10 @@ export default function ProgressWrap() {
                         ref={monthInputRef}
                         type="month"
                         value={selectedMonth}
-                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        onChange={(e) => {
+                            setSelectedMonth(e.target.value);
+                            setIsCustomMonth(true);
+                        }}
                         onClick={(e) => { (e.target as HTMLInputElement).showPicker?.(); }}
                         className={styles.monthInput}
                     />

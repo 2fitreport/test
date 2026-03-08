@@ -1,55 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import styles from './statisticsWrap.module.css';
 
-export default function StatisticsWrap() {
-    const [userLevel, setUserLevel] = useState<number>(0);
-    const [inProgressCount, setInProgressCount] = useState<number>(0);
-    const [inProgressDifference, setInProgressDifference] = useState<number>(0);
-    const [approvalAmount, setApprovalAmount] = useState<number>(0);
-    const [monthlyRevenue, setMonthlyRevenue] = useState<number>(0);
-    const [newRegistrations, setNewRegistrations] = useState<number>(0);
-    const [approvedCount, setApprovedCount] = useState<number>(0);
+interface Props {
+    data: any;
+}
 
-    useEffect(() => {
-        const adminData = sessionStorage.getItem('admin_data');
-        if (adminData) {
-            try {
-                const data = JSON.parse(adminData);
-                setUserLevel(data.position?.level || 0);
-            } catch (error) {
-                console.error('admin_data 파싱 실패:', error);
-            }
-        }
-    }, []);
-
-    // 홈 통계 한번에 조회
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const res = await fetch('/api/progress/home-stats', { credentials: 'include' });
-                if (res.ok) {
-                    const data = await res.json();
-                    setInProgressCount(data.inProgressCount);
-                    setInProgressDifference(data.inProgressDifference);
-                    setApprovalAmount(data.approvalAmount);
-                    setMonthlyRevenue(data.monthlyRevenue);
-                    setNewRegistrations(data.newRegistrations);
-                    setApprovedCount(data.approvedCount);
-                }
-            } catch (error) {
-                console.error('데이터 조회 실패:', error);
-            }
-        };
-
-        if (userLevel > 0) {
-            fetchData();
-        }
-    }, [userLevel]);
-
-    // 실무자(검수자, level 6)는 이번달 매출 섹션 제외
+export default function StatisticsWrap({ data }: Props) {
+    const stats = data?.stats;
+    const userLevel = data?.userLevel || 0;
     const isInspector = userLevel === 6;
+
+    const inProgressCount = stats?.inProgressCount || 0;
+    const inProgressDifference = stats?.inProgressDifference || 0;
+    const approvalAmount = stats?.approvalAmount || 0;
+    const monthlyRevenue = stats?.monthlyRevenue || 0;
+    const newRegistrations = stats?.newRegistrations || 0;
+    const approvedCount = stats?.approvedCount || 0;
 
     return (
         <div className={styles.statisticsWrap}>

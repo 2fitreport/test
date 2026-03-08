@@ -8,36 +8,14 @@ import RevisionRejectedWrap from './components/RevisionRejectedWrap';
 import SalesWrap from './components/SalesWrap';
 import ProgressWrap from './components/ProgressWrap';
 
-interface DocumentLog {
-    id: number;
-    document_id: number;
-    document_title: string;
-    company_name: string;
-    action_type: string;
-    actor_id: string;
-    actor_name: string;
-    old_value: string | null;
-    new_value: string | null;
-    created_at: string;
-    staff_read?: Record<string, boolean>;
-}
-
 export default function Home() {
-    const [revisionLogs, setRevisionLogs] = useState<DocumentLog[]>([]);
-    const [memoLogs, setMemoLogs] = useState<DocumentLog[]>([]);
-    const [currentUserId, setCurrentUserId] = useState('');
-    const [logsLoaded, setLogsLoaded] = useState(false);
+    const [homeData, setHomeData] = useState<any>(null);
 
     useEffect(() => {
-        fetch('/api/documents/logs?home_all=true', { credentials: 'include' })
-            .then(res => res.ok ? res.json() : { revisionLogs: [], memoLogs: [], currentUserId: '' })
-            .then(data => {
-                setRevisionLogs(data.revisionLogs || []);
-                setMemoLogs(data.memoLogs || []);
-                setCurrentUserId(data.currentUserId || '');
-                setLogsLoaded(true);
-            })
-            .catch(() => setLogsLoaded(true));
+        fetch('/api/home', { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => setHomeData(data))
+            .catch(() => {});
     }, []);
 
     return (
@@ -53,15 +31,23 @@ export default function Home() {
                 </div>
             </div>
             <div className={styles.homeWrap}>
-                <StatisticsWrap />
+                <StatisticsWrap data={homeData} />
                 <div className={styles.logRow}>
-                    <RevisionRejectedWrap initialLogs={revisionLogs} initialCurrentUserId={currentUserId} logsLoaded={logsLoaded} />
-                    <LogWrap initialLogs={memoLogs} initialCurrentUserId={currentUserId} logsLoaded={logsLoaded} />
+                    <RevisionRejectedWrap
+                        initialLogs={homeData?.revisionLogs || []}
+                        initialCurrentUserId={homeData?.currentUserId || ''}
+                        logsLoaded={!!homeData}
+                    />
+                    <LogWrap
+                        initialLogs={homeData?.memoLogs || []}
+                        initialCurrentUserId={homeData?.currentUserId || ''}
+                        logsLoaded={!!homeData}
+                    />
                 </div>
-            <div className={styles.statusWrap}>
-                <SalesWrap />
-                <ProgressWrap />
-            </div>
+                <div className={styles.statusWrap}>
+                    <SalesWrap data={homeData} />
+                    <ProgressWrap data={homeData} />
+                </div>
             </div>
         </div>
     );
