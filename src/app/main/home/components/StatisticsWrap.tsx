@@ -9,6 +9,7 @@ export default function StatisticsWrap() {
     const [inProgressDifference, setInProgressDifference] = useState<number>(0);
     const [approvalAmount, setApprovalAmount] = useState<number>(0);
     const [monthlyRevenue, setMonthlyRevenue] = useState<number>(0);
+    const [newRegistrations, setNewRegistrations] = useState<number>(0);
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -22,14 +23,15 @@ export default function StatisticsWrap() {
         }
     }, []);
 
-    // 진행중 케이스 개수, 승인금액, 매출 조회
+    // 진행중 케이스 개수, 승인금액, 매출, 신규 등록 건수 조회
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [inProgressRes, approvalRes, revenueRes] = await Promise.all([
+                const [inProgressRes, approvalRes, revenueRes, newRegRes] = await Promise.all([
                     fetch('/api/progress/in-progress-count', { credentials: 'include' }),
                     fetch('/api/progress/approval-amount', { credentials: 'include' }),
-                    fetch('/api/progress/monthly-revenue', { credentials: 'include' })
+                    fetch('/api/progress/monthly-revenue', { credentials: 'include' }),
+                    fetch('/api/progress/monthly-new-registrations', { credentials: 'include' })
                 ]);
 
                 if (inProgressRes.ok) {
@@ -46,6 +48,11 @@ export default function StatisticsWrap() {
                 if (revenueRes.ok) {
                     const data = await revenueRes.json();
                     setMonthlyRevenue(data.monthlyRevenue);
+                }
+
+                if (newRegRes.ok) {
+                    const data = await newRegRes.json();
+                    setNewRegistrations(data.newRegistrations);
                 }
             } catch (error) {
                 console.error('데이터 조회 실패:', error);
@@ -82,8 +89,8 @@ export default function StatisticsWrap() {
                 )}
                 <li>
                     <h2>이번달 신규</h2>
-                    <span>12</span>
-                    <p>4 from avg</p>
+                    <span>{newRegistrations}</span>
+                    <p>건</p>
                 </li>
                 <li>
                     <h2>이번달 승인 건수</h2>
