@@ -8,6 +8,7 @@ export default function StatisticsWrap() {
     const [inProgressCount, setInProgressCount] = useState<number>(0);
     const [inProgressDifference, setInProgressDifference] = useState<number>(0);
     const [approvalAmount, setApprovalAmount] = useState<number>(0);
+    const [monthlyRevenue, setMonthlyRevenue] = useState<number>(0);
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -21,13 +22,14 @@ export default function StatisticsWrap() {
         }
     }, []);
 
-    // 진행중 케이스 개수, 승인금액 조회
+    // 진행중 케이스 개수, 승인금액, 매출 조회
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [inProgressRes, approvalRes] = await Promise.all([
+                const [inProgressRes, approvalRes, revenueRes] = await Promise.all([
                     fetch('/api/progress/in-progress-count', { credentials: 'include' }),
-                    fetch('/api/progress/approval-amount', { credentials: 'include' })
+                    fetch('/api/progress/approval-amount', { credentials: 'include' }),
+                    fetch('/api/progress/monthly-revenue', { credentials: 'include' })
                 ]);
 
                 if (inProgressRes.ok) {
@@ -39,6 +41,11 @@ export default function StatisticsWrap() {
                 if (approvalRes.ok) {
                     const data = await approvalRes.json();
                     setApprovalAmount(data.approvalAmount);
+                }
+
+                if (revenueRes.ok) {
+                    const data = await revenueRes.json();
+                    setMonthlyRevenue(data.monthlyRevenue);
                 }
             } catch (error) {
                 console.error('데이터 조회 실패:', error);
@@ -69,7 +76,7 @@ export default function StatisticsWrap() {
                 {!isInspector && (
                     <li>
                         <h2>이번달 매출</h2>
-                        <span>3.2억</span>
+                        <span>{monthlyRevenue}</span>
                         <p>예상 수수료</p>
                     </li>
                 )}
