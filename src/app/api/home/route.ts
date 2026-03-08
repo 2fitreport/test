@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
             .single();
 
         const docsPromise = supabase.from('documents')
-            .select('id, user_id, status, progress_details, approval_amount, created_at, updated_at, inspector_id');
+            .select('id, user_id, status, progress_details, approval_amount, created_at, updated_at, inspector_id, manager_id');
 
         const logsPromise = supabase.from('document_logs')
             .select(LOG_COLUMNS)
@@ -65,7 +65,11 @@ export async function GET(request: NextRequest) {
         let myDocs = allDocs;
         let allowedDocIds: Set<number> | null = null;
 
-        if (userLevel === 4) {
+        // 대표실무자(2): 실무자가 admin인 문서 제외
+        if (userLevel === 2) {
+            myDocs = allDocs.filter(d => d.manager_id !== 'admin');
+            allowedDocIds = new Set(myDocs.map(d => d.id));
+        } else if (userLevel === 4) {
             myDocs = allDocs.filter(d => d.user_id === userId);
             allowedDocIds = new Set(myDocs.map(d => d.id));
         } else if (userLevel === 6) {
@@ -111,7 +115,9 @@ export async function GET(request: NextRequest) {
 
             if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
-                const salesDocs = allDocs.filter(d => salesUserIds.has(d.user_id));
+                // 대표실무자(2)는 admin 배정 문서 제외된 myDocs 사용
+                const baseDocs = (userLevel === 2) ? myDocs : allDocs;
+                const salesDocs = baseDocs.filter(d => salesUserIds.has(d.user_id));
                 const docsByUser: Record<string, any[]> = {};
                 for (const doc of salesDocs) {
                     if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
