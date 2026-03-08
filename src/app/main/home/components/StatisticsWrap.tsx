@@ -7,6 +7,7 @@ export default function StatisticsWrap() {
     const [userLevel, setUserLevel] = useState<number>(0);
     const [inProgressCount, setInProgressCount] = useState<number>(0);
     const [inProgressDifference, setInProgressDifference] = useState<number>(0);
+    const [approvalAmount, setApprovalAmount] = useState<number>(0);
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -20,25 +21,32 @@ export default function StatisticsWrap() {
         }
     }, []);
 
-    // 진행중 케이스 개수 조회
+    // 진행중 케이스 개수, 승인금액 조회
     useEffect(() => {
-        const fetchInProgressCount = async () => {
+        const fetchData = async () => {
             try {
-                const response = await fetch('/api/progress/in-progress-count', {
-                    credentials: 'include'
-                });
-                if (response.ok) {
-                    const data = await response.json();
+                const [inProgressRes, approvalRes] = await Promise.all([
+                    fetch('/api/progress/in-progress-count', { credentials: 'include' }),
+                    fetch('/api/progress/approval-amount', { credentials: 'include' })
+                ]);
+
+                if (inProgressRes.ok) {
+                    const data = await inProgressRes.json();
                     setInProgressCount(data.inProgressCount);
                     setInProgressDifference(data.difference);
                 }
+
+                if (approvalRes.ok) {
+                    const data = await approvalRes.json();
+                    setApprovalAmount(data.approvalAmount);
+                }
             } catch (error) {
-                console.error('진행중 케이스 개수 조회 실패:', error);
+                console.error('데이터 조회 실패:', error);
             }
         };
 
         if (userLevel > 0) {
-            fetchInProgressCount();
+            fetchData();
         }
     }, [userLevel]);
 
@@ -55,8 +63,8 @@ export default function StatisticsWrap() {
                 </li>
                 <li>
                     <h2>이번달 승인금액</h2>
-                    <span>82억</span>
-                    <p>원</p>
+                    <span>{approvalAmount}</span>
+                    <p>억</p>
                 </li>
                 {!isInspector && (
                     <li>
