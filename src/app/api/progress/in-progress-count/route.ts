@@ -28,21 +28,52 @@ export async function GET(request: NextRequest) {
             .eq('user_id', userId)
             .single();
 
-        let query = supabase.from('documents').select('id', { count: 'exact' }).eq('progress_details', '진행');
+        // 오늘의 진행중 케이스
+        let query = supabase
+            .from('documents')
+            .select('id', { count: 'exact' })
+            .eq('progress_details', '진행')
+            .gte('updated_at', new Date().toISOString().split('T')[0]);
+
+        // 어제의 진행중 케이스
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        let yesterdayQuery = supabase
+            .from('documents')
+            .select('id', { count: 'exact' })
+            .eq('progress_details', '진행')
+            .gte('updated_at', yesterdayStr + 'T00:00:00')
+            .lt('updated_at', todayStr + 'T00:00:00');
 
         // 영업자(4): 자신의 문서만
         if (user?.position_id === 4) {
             query = query.eq('user_id', userId);
+            yesterdayQuery = yesterdayQuery.eq('user_id', userId);
         }
         // 대표(1), 대표실무자(2): 모든 문서
         // 검수자(6): 담당 영업자의 문서만
         else if (user?.position_id === 6) {
             query = query.eq('inspector_id', userId);
+            yesterdayQuery = yesterdayQuery.eq('inspector_id', userId);
         }
 
-        const { count } = await query;
+        const [{ count: todayCount }, { count: yesterdayCount }] = await Promise.all([
+            query,
+            yesterdayQuery
+        ]);
 
-        return NextResponse.json({ inProgressCount: count || 0 });
+        const inProgressCount = todayCount || 0;
+        const yesterdayInProgressCount = yesterdayCount || 0;
+        const difference = inProgressCount - yesterdayInProgressCount;
+
+        return NextResponse.json({
+            inProgressCount,
+            yesterdayInProgressCount,
+            difference
+        });
     } catch (error) {
         console.error('진행중 케이스 개수 조회 실패:', error);
         return NextResponse.json({ error: '진행중 케이스 개수 조회 실패' }, { status: 500 });

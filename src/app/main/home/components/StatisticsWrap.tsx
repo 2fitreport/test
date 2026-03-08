@@ -6,6 +6,7 @@ import styles from './statisticsWrap.module.css';
 export default function StatisticsWrap() {
     const [userLevel, setUserLevel] = useState<number>(0);
     const [inProgressCount, setInProgressCount] = useState<number>(0);
+    const [inProgressDifference, setInProgressDifference] = useState<number>(0);
 
     useEffect(() => {
         const adminData = sessionStorage.getItem('admin_data');
@@ -29,6 +30,7 @@ export default function StatisticsWrap() {
                 if (response.ok) {
                     const data = await response.json();
                     setInProgressCount(data.inProgressCount);
+                    setInProgressDifference(data.difference);
                 }
             } catch (error) {
                 console.error('진행중 케이스 개수 조회 실패:', error);
@@ -49,7 +51,7 @@ export default function StatisticsWrap() {
                 <li>
                     <h2>진행중 케이스</h2>
                     <span>{inProgressCount}</span>
-                    <p>-</p>
+                    <p>{inProgressDifference > 0 ? `+${inProgressDifference}` : inProgressDifference} from yesterday</p>
                 </li>
                 <li>
                     <h2>이번달 승인금액</h2>
