@@ -30,18 +30,33 @@ export async function GET(request: NextRequest) {
 
         if (salesError) throw salesError;
 
-        // 각 영업자별 문서 통계 계산
-        const statsPromises = (salespeople || []).map(async (person: any) => {
-            const { data: documents } = await supabase
-                .from('documents')
-                .select('status, progress_details')
-                .eq('user_id', person.user_id);
+        const salespeopleList = salespeople || [];
+        if (salespeopleList.length === 0) {
+            return NextResponse.json([]);
+        }
 
-            const docs = documents || [];
-            const registrations = docs.length;
-            const inProgress = docs.filter(d => d.progress_details === '진행').length;
-            const approved = docs.filter(d => d.progress_details === '승인').length;
-            const rejected = docs.filter(d => d.status === '보류').length;
+        // 모든 영업자의 문서를 한번에 조회
+        const userIds = salespeopleList.map((p: any) => p.user_id);
+        const { data: allDocuments } = await supabase
+            .from('documents')
+            .select('user_id, status, progress_details')
+            .in('user_id', userIds);
+
+        const docs = allDocuments || [];
+
+        // user_id별로 그룹핑
+        const docsByUser: Record<string, any[]> = {};
+        for (const doc of docs) {
+            if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
+            docsByUser[doc.user_id].push(doc);
+        }
+
+        const stats = salespeopleList.map((person: any) => {
+            const userDocs = docsByUser[person.user_id] || [];
+            const registrations = userDocs.length;
+            const inProgress = userDocs.filter(d => d.progress_details === '진행').length;
+            const approved = userDocs.filter(d => d.progress_details === '승인').length;
+            const rejected = userDocs.filter(d => d.status === '보류').length;
 
             return {
                 userId: person.user_id,
@@ -51,11 +66,9 @@ export async function GET(request: NextRequest) {
                 approved,
                 rejected,
                 approvalAmount: '-',
-                conversionRate: docs.length > 0 ? `${Math.round((approved / docs.length) * 100)}%` : '-'
+                conversionRate: userDocs.length > 0 ? `${Math.round((approved / userDocs.length) * 100)}%` : '-'
             };
         });
-
-        const stats = await Promise.all(statsPromises);
 
         return NextResponse.json(stats);
     } catch (error) {

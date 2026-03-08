@@ -114,6 +114,42 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        // home_all: 보완요청 + 알림사항 한번에 조회
+        const homeAll = searchParams.get('home_all') === 'true';
+
+        if (homeAll) {
+            // 한번에 모든 로그 조회 후 프론트에서 분류
+            let query = supabase
+                .from('document_logs')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (allowedDocumentIds !== null) {
+                if (allowedDocumentIds.length === 0) {
+                    return NextResponse.json({ revisionLogs: [], memoLogs: [], currentUserId: userId });
+                }
+                query = query.in('document_id', allowedDocumentIds);
+            }
+
+            const { data: allLogs, error } = await query;
+            if (error) throw error;
+
+            const logs = allLogs || [];
+
+            // 서버에서 분류
+            const revisionLogs = logs.filter((log: any) =>
+                log.action_type === 'status_change' && ['보완', '보류'].includes(log.new_value)
+            );
+
+            const memoLogs = logs.filter((log: any) => {
+                if (['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned'].includes(log.action_type)) return true;
+                if (log.action_type === 'status_change' && ['정상', '검수'].includes(log.new_value)) return true;
+                return false;
+            });
+
+            return NextResponse.json({ revisionLogs, memoLogs, currentUserId: userId });
+        }
+
         // 기본 쿼리
         let query = supabase
             .from('document_logs')
@@ -122,20 +158,16 @@ export async function GET(request: NextRequest) {
 
         // 상태 필터
         if (statusChangeOnly) {
-            // 보완/보류 상태 변경 로그만 (보완요청 알림 영역용)
             query = query
                 .eq('action_type', 'status_change')
                 .in('new_value', ['보완', '보류']);
         } else if (memoOnly) {
-            // 메모, 진행단계 변경, 실무자 배정, 정상/검수 상태 변경 (알림사항 영역용)
             query = query.or('action_type.in.(memo_add,memo_delete,progress_details_change,manager_assigned),and(action_type.eq.status_change,new_value.in.(정상,검수))');
         } else if (revisionRejected) {
-            // 이전 호환성: 보완/보류만
             query = query
                 .eq('action_type', 'status_change')
                 .in('new_value', ['보완', '보류']);
         } else {
-            // 기본: 상태 변경 중 보완/보류 제외
             query = query
                 .eq('action_type', 'status_change')
                 .not('new_value', 'in', '("보완","보류")');

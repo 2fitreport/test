@@ -18,20 +18,22 @@ interface DocumentLog {
     staff_read?: Record<string, boolean>;
 }
 
-export default function LogWrap() {
+interface Props {
+    initialLogs: DocumentLog[];
+    initialCurrentUserId: string;
+    logsLoaded: boolean;
+}
+
+export default function LogWrap({ initialLogs, initialCurrentUserId, logsLoaded }: Props) {
     const [logs, setLogs] = useState<DocumentLog[]>([]);
     const [currentUserId, setCurrentUserId] = useState('');
-    const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
-        fetch('/api/documents/logs?memo_only=true&include_read=true', { credentials: 'include' })
-            .then(res => res.ok ? res.json() : { logs: [], currentUserId: '' })
-            .then(data => {
-                setLogs(data.logs || []);
-                setCurrentUserId(data.currentUserId || '');
-            })
-            .catch(() => setLogs([]));
-    }, [refreshKey]);
+        if (logsLoaded) {
+            setLogs(initialLogs);
+            setCurrentUserId(initialCurrentUserId);
+        }
+    }, [initialLogs, initialCurrentUserId, logsLoaded]);
 
     const unreadLogs = logs.filter(log => {
         const staffRead = log.staff_read || {};
@@ -84,6 +86,15 @@ export default function LogWrap() {
         }
     };
 
+    const handleLogDeleted = () => {
+        fetch('/api/documents/logs?memo_only=true&include_read=true', { credentials: 'include' })
+            .then(res => res.ok ? res.json() : { logs: [], currentUserId: '' })
+            .then(data => {
+                setLogs(data.logs || []);
+            })
+            .catch(() => {});
+    };
+
     return (
         <div className={styles.logWrap}>
             <h2>
@@ -96,7 +107,7 @@ export default function LogWrap() {
                 hasScroll={hasScroll}
                 currentUserId={currentUserId}
                 onLogRead={handleLogRead}
-                onLogDeleted={() => setRefreshKey(k => k + 1)}
+                onLogDeleted={handleLogDeleted}
             />
         </div>
     );
