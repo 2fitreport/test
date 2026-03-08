@@ -166,15 +166,20 @@ export async function GET(request: NextRequest) {
             d.created_at <= lastDayStr + 'T23:59:59'
         ).length;
 
-        // === 로그 분류 ===
-        const revisionLogs = allLogs.filter((log: any) =>
-            log.action_type === 'status_change' && ['보완', '보류'].includes(log.new_value)
-        );
-        const memoLogs = allLogs.filter((log: any) => {
-            if (['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned'].includes(log.action_type)) return true;
-            if (log.action_type === 'status_change' && ['정상', '검수'].includes(log.new_value)) return true;
-            return false;
-        });
+        // === 로그 분류 (각 50개씩) ===
+        const revisionLogs: any[] = [];
+        const memoLogs: any[] = [];
+        for (const log of allLogs) {
+            if (log.action_type === 'status_change' && ['보완', '보류'].includes(log.new_value)) {
+                if (revisionLogs.length < 50) revisionLogs.push(log);
+            } else if (
+                ['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned'].includes(log.action_type) ||
+                (log.action_type === 'status_change' && ['정상', '검수'].includes(log.new_value))
+            ) {
+                if (memoLogs.length < 50) memoLogs.push(log);
+            }
+            if (revisionLogs.length >= 50 && memoLogs.length >= 50) break;
+        }
 
         // === 진행상황 차트 ===
         const chartMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
