@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       company_name: user.company_name,
       supervisor_id: user.supervisor_id,
       is_affiliation_representative: user.is_affiliation_representative || false,
+      default_progress_filter: user.default_progress_filter || null,
     });
   } catch (error) {
     console.error('사용자 정보 조회 실패:', error);

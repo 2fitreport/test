@@ -6,8 +6,8 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const PROGRESS_STAGES = ['상담', '서류요청', '분석', '진행', '승인'];
-const STATUS_LIST = ['보완', '보류'];
+const PROGRESS_STAGES = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+const STATUS_LIST = ['정상', '보완', '보류', '검수'];
 
 export async function GET(request: NextRequest) {
     try {
@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
 
         // 소속대표: 같은 소속의 모든 영업자 문서
         if (companyName) {
-            // 해당 소속의 영업자 user_id 목록 조회
             const { data: usersData } = await supabase
                 .from('users')
                 .select('user_id')
@@ -34,7 +33,6 @@ export async function GET(request: NextRequest) {
                 query = query.eq('user_id', '__none__');
             }
         } else if (userId) {
-            // 일반 영업자: 자신의 문서만
             query = query.eq('user_id', userId);
         }
 
@@ -54,43 +52,39 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // 진행단계별 건수 계산
-        const stageCounts = PROGRESS_STAGES.map(stage => {
-            return filteredDocuments.filter((doc: any) => doc.progress_details === stage).length;
-        });
+        // 진행단계별 건수
+        const stageCounts = PROGRESS_STAGES.map(stage =>
+            filteredDocuments.filter((doc: any) => doc.progress_details === stage).length
+        );
 
-        // 상태별 건수 계산 (보완, 보류만)
-        const statusCounts = STATUS_LIST.map(status => {
-            return filteredDocuments.filter((doc: any) => doc.status === status).length;
-        });
+        // 상태별 건수
+        const statusCounts = STATUS_LIST.map(status =>
+            filteredDocuments.filter((doc: any) => doc.status === status).length
+        );
 
-        // 모든 레이블과 데이터 합치기
-        const allLabels = [
-            '상담',
-            '서류요청',
-            '분석',
-            '진행',
-            '승인',
-            '보완',
-            '보류'
-        ];
-        const allData = [...stageCounts, ...statusCounts];
-        const allColors = ['#b0b9c6', '#f2e7a2', '#d8c9f1', '#82cbc4', '#a0c4ff', '#ffd6a5', '#ffadad'];
-        const allBorderColors = ['#8a9aaa', '#e8d670', '#c9a5e8', '#5ca9a0', '#7aacff', '#ffb873', '#ff8b8b'];
-
-        // Chart.js 형식으로 반환
         return NextResponse.json({
-            labels: allLabels,
-            datasets: [
-                {
-                    label: '진행상황',
-                    data: allData,
-                    backgroundColor: allColors,
-                    borderColor: allBorderColors,
+            stage: {
+                labels: PROGRESS_STAGES,
+                datasets: [{
+                    label: '진행단계',
+                    data: stageCounts,
+                    backgroundColor: ['#b0b9c6', '#f2e7a2', '#d8c9f1', '#e0b0ff', '#82cbc4', '#ffd6a5', '#a0c4ff'],
+                    borderColor: ['#8a9aaa', '#e8d670', '#c9a5e8', '#c990e8', '#5ca9a0', '#ffb873', '#7aacff'],
                     borderWidth: 1,
                     borderRadius: 4,
-                }
-            ]
+                }]
+            },
+            status: {
+                labels: STATUS_LIST,
+                datasets: [{
+                    label: '상태',
+                    data: statusCounts,
+                    backgroundColor: ['#a5d6a7', '#ffd6a5', '#ffadad', '#90caf9'],
+                    borderColor: ['#66bb6a', '#ffb873', '#ff8b8b', '#42a5f5'],
+                    borderWidth: 1,
+                    borderRadius: 4,
+                }]
+            }
         });
     } catch (error) {
         console.error('진행단계 통계 조회 실패:', error);

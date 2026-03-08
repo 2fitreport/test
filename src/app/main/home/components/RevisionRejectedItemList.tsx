@@ -17,11 +17,14 @@ interface DocumentLog {
     created_at: string;
     submitter_id?: string;
     submitter_name?: string;
+    staff_read?: Record<string, boolean>;
 }
 
 interface RevisionRejectedItemListProps {
     logs: DocumentLog[];
     hasScroll: boolean;
+    currentUserId: string;
+    onLogRead?: (logId: number) => void;
     onLogDeleted?: () => void;
 }
 
@@ -29,6 +32,7 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
     '정상': { label: '정상', badgeClass: styles.waiting, dotClass: styles.dotWaiting, backgroundColor: 'var(--color-normal)' },
     '보완': { label: '보완', badgeClass: styles.revision, dotClass: styles.dotRevision, backgroundColor: 'var(--color-revision)' },
     '보류': { label: '보류', badgeClass: styles.rejected, dotClass: styles.dotRejected, backgroundColor: 'var(--color-hold)' },
+    '검수': { label: '검수', badgeClass: styles.inspection, dotClass: styles.dotInspection, backgroundColor: 'var(--color-status-inspection)' },
 };
 
 function timeAgo(dateStr: string) {
@@ -43,13 +47,14 @@ function timeAgo(dateStr: string) {
 export default function RevisionRejectedItemList({
     logs,
     hasScroll,
+    currentUserId,
+    onLogRead,
     onLogDeleted
 }: RevisionRejectedItemListProps) {
     const router = useRouter();
 
     const handleLogClick = async (log: DocumentLog) => {
         try {
-            // 읽음 처리
             await fetch(`/api/documents/logs/${log.id}`, {
                 method: 'PATCH',
                 credentials: 'include'
@@ -58,7 +63,7 @@ export default function RevisionRejectedItemList({
             console.error('읽음 처리 실패:', error);
         }
 
-        // 기업관리로 이동
+        onLogRead?.(log.id);
         router.push(`/main/company_create?view=${log.document_id}`);
     };
 
@@ -70,13 +75,14 @@ export default function RevisionRejectedItemList({
             {logs.map((log, idx) => {
                 const status = STATUS_MAP[log.new_value ?? ''];
                 const dotClass = status?.dotClass ?? '';
-                const badgeClass = status?.badgeClass ?? '';
                 const label = status?.label ?? log.new_value ?? '';
                 const isLast = idx === logs.length - 1;
                 const showBorder = hasScroll || !isLast;
+                const isUnread = currentUserId && (log.staff_read || {})[currentUserId] !== true;
                 return (
                     <li
                         key={log.id}
+                        className={isUnread ? styles.unreadItem : ''}
                         style={{ borderBottom: showBorder ? '1px solid #f0f0f0' : 'none' }}
                         onClick={() => handleLogClick(log)}
                     >

@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         const revisionRejected = searchParams.get('revision_rejected') === 'true';
         const memoOnly = searchParams.get('memo_only') === 'true';
         const statusChangeOnly = searchParams.get('status_change_only') === 'true';
+        const includeRead = searchParams.get('include_read') === 'true';
 
         // 요청자 정보 추출
         const authToken = request.cookies.get('auth_token')?.value;
@@ -121,11 +122,13 @@ export async function GET(request: NextRequest) {
 
         // 상태 필터
         if (statusChangeOnly) {
-            // 모든 상태 변경 로그 (보완요청 알림 영역용)
-            query = query.eq('action_type', 'status_change');
+            // 보완/보류 상태 변경 로그만 (보완요청 알림 영역용)
+            query = query
+                .eq('action_type', 'status_change')
+                .in('new_value', ['보완', '보류']);
         } else if (memoOnly) {
-            // 메모, 진행단계 변경, 실무자 배정 (알림사항 영역용)
-            query = query.in('action_type', ['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned']);
+            // 메모, 진행단계 변경, 실무자 배정, 정상/검수 상태 변경 (알림사항 영역용)
+            query = query.or('action_type.in.(memo_add,memo_delete,progress_details_change,manager_assigned),and(action_type.eq.status_change,new_value.in.(정상,검수))');
         } else if (revisionRejected) {
             // 이전 호환성: 보완/보류만
             query = query
@@ -157,16 +160,21 @@ export async function GET(request: NextRequest) {
 
         let filteredLogs = allLogs || [];
 
-        // 읽음 상태 필터링 (모든 사용자)
-        filteredLogs = filteredLogs.filter((log: any) => {
-            const staffRead = log.staff_read || {};
-            return staffRead[userId] !== true;
-        });
+        // 읽음 상태 필터링 (include_read가 아닌 경우에만)
+        if (!includeRead) {
+            filteredLogs = filteredLogs.filter((log: any) => {
+                const staffRead = log.staff_read || {};
+                return staffRead[userId] !== true;
+            });
+        }
 
         if (limit) {
             filteredLogs = filteredLogs.slice(0, limit);
         }
 
+        if (includeRead) {
+            return NextResponse.json({ logs: filteredLogs, currentUserId: userId });
+        }
         return NextResponse.json(filteredLogs);
     } catch (error) {
         console.error('로그 조회 실패:', error);

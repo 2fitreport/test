@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
           company_name: user.company_name,
           supervisor_id: user.supervisor_id,
           is_affiliation_representative: user.is_affiliation_representative || false,
+          default_progress_filter: user.default_progress_filter || null,
         },
       },
       { status: 200 }

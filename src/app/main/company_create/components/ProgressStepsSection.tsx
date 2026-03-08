@@ -165,7 +165,8 @@ export default function ProgressStepsSection({
                     progress_end_time: null,
                     completed_date: null,
                     approval_amount: null,
-                    revenue_amount: null
+                    revenue_amount: null,
+                    reverted_from: null
                 })
             });
 
@@ -344,7 +345,8 @@ export default function ProgressStepsSection({
             // 2. 상태를 "정상"으로 변경하고 진행 단계도 함께 업데이트
             const updateData: any = {
                 status: '정상',
-                progress_details: nextStepName
+                progress_details: nextStepName,
+                reverted_from: null,
             };
 
             // 분석 단계로 이동할 때 progress_start_date 설정
@@ -619,9 +621,11 @@ export default function ProgressStepsSection({
                 updateData.progress_details = '분석';
                 updateData.manager_id = null;
                 updateData.manager_name = null;
+                updateData.reverted_from = progressDetails;
             } else {
                 // 서류요청 또는 분석 단계에서는 단계 유지, 보류 상태만 설정
                 updateData.status = '보류';
+                updateData.reverted_from = null;
             }
 
             // progress_start_date 유지

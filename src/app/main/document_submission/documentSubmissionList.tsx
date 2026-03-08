@@ -33,6 +33,7 @@ interface Document {
     stopped_time?: string | null;
     reason?: string;
     reason_read: boolean;
+    reverted_from?: string | null;
     approval_amount?: number | null;
     created_at?: string;
 }
@@ -80,6 +81,9 @@ export default function DocumentSubmissionList() {
     const [userRoleLevel, setUserRoleLevel] = useState<number | undefined>();
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [defaultProgressFilter, setDefaultProgressFilter] = useState<string>('all');
+    const [isSavingDefault, setIsSavingDefault] = useState(false);
+    const [currentUserDbId, setCurrentUserDbId] = useState<number | null>(null);
 
     useEffect(() => {
         const adminData = getAdminData();
@@ -87,14 +91,30 @@ export default function DocumentSubmissionList() {
         const userId = adminData?.user_id;
 
         setUserRoleLevel(userLevel);
+        setCurrentUserDbId(adminData?.id || null);
 
         // level이 4(영업자)인지 확인
         if (userLevel === 4) {
             setIsUserSalesManager(true);
             setCurrentUserId(userId || '');
-            // 영업자인 경우, 현재 userId로 필터링된 문서를 가져올 수 있도록
-            // 하지만 여기서는 바로 fetchDocuments를 호출해도 필터링 함수에서 처리됨
         }
+
+        // DB에서 최신 사용자 정보를 가져와 기본 필터 적용
+        const fetchDefaultFilter = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const userData = await res.json();
+                    if (userData.default_progress_filter) {
+                        setProgressDetailsFilter(userData.default_progress_filter);
+                        setDefaultProgressFilter(userData.default_progress_filter);
+                    }
+                }
+            } catch {
+                // 실패 시 무시 (전체 보기 유지)
+            }
+        };
+        fetchDefaultFilter();
 
         fetchWorkers();
     }, []);
@@ -103,6 +123,28 @@ export default function DocumentSubmissionList() {
     useEffect(() => {
         fetchDocuments();
     }, []);
+
+    const handleSaveDefaultFilter = async () => {
+        if (!currentUserDbId) return;
+        setIsSavingDefault(true);
+        try {
+            const filterValue = defaultProgressFilter === 'all' ? null : defaultProgressFilter;
+            const response = await fetch(`/api/users/${currentUserDbId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ default_progress_filter: filterValue }),
+            });
+            if (!response.ok) throw new Error('저장 실패');
+
+            setSuccessMessage('기본 필터가 저장되었습니다.');
+            setSuccessModalOpen(true);
+        } catch {
+            setErrorMessage('기본 필터 저장에 실패했습니다.');
+            setErrorModalOpen(true);
+        } finally {
+            setIsSavingDefault(false);
+        }
+    };
 
     const fetchWorkers = async () => {
         try {
@@ -380,7 +422,8 @@ export default function DocumentSubmissionList() {
                     status: '보류' as const,
                     reason: combinedReason,
                     reason_read: false,
-                    progress_start_date: doc.progress_start_date
+                    progress_start_date: doc.progress_start_date,
+                    reverted_from: null,
                 } as Document;
 
                 // DB에 저장
@@ -417,7 +460,8 @@ export default function DocumentSubmissionList() {
                     status: '보완' as const,
                     reason: combinedReason,
                     reason_read: false,
-                    progress_start_date: doc.progress_start_date
+                    progress_start_date: doc.progress_start_date,
+                    reverted_from: null,
                 } as Document;
 
                 // DB에 저장
@@ -441,13 +485,15 @@ export default function DocumentSubmissionList() {
                         ...doc,
                         status: '정상' as const,
                         inspector_id: null,
-                        reason_read: true
+                        reason_read: true,
+                        reverted_from: null,
                     };
                 } else {
                     // 기타 상태에서는 상태를 정상으로 변경
                     submittedDoc = {
                         ...doc,
-                        status: '정상' as const
+                        status: '정상' as const,
+                        reverted_from: null,
                     };
                 }
 
@@ -965,6 +1011,42 @@ export default function DocumentSubmissionList() {
                         </div>
                     </div>
 
+                    <div className={styles.defaultFilterContainer}>
+                        <div className={styles.itemsPerPageContainer}>
+                            <label className={styles.itemsLabel}>기본 필터:</label>
+                            <div className={styles.selectWrapper}>
+                                <select
+                                    className={styles.itemsSelect}
+                                    value={defaultProgressFilter}
+                                    onChange={(e) => setDefaultProgressFilter(e.target.value)}
+                                >
+                                    <option value="all">전체</option>
+                                    <option value="상담">상담</option>
+                                    <option value="서류요청">서류요청</option>
+                                    <option value="분석">분석</option>
+                                    <option value="심사">심사</option>
+                                    <option value="진행">진행</option>
+                                    <option value="승인요청">승인요청</option>
+                                    <option value="승인">승인</option>
+                                </select>
+                                <Image
+                                    src="/arrow.svg"
+                                    alt="드롭다운"
+                                    width={16}
+                                    height={16}
+                                    className={styles.selectArrow}
+                                />
+                            </div>
+                        </div>
+                        <button
+                            className={styles.saveDefaultButton}
+                            onClick={handleSaveDefaultFilter}
+                            disabled={isSavingDefault}
+                        >
+                            {isSavingDefault ? '저장 중...' : '저장'}
+                        </button>
+                    </div>
+
                     <div className={styles.selectorsContainer}>
                         <div className={styles.itemsPerPageContainer}>
                             <label className={styles.itemsLabel}>표시 개수:</label>
@@ -1141,8 +1223,13 @@ export default function DocumentSubmissionList() {
                                             </td>
                                         )}
                                         <td className={styles.companyName}>
-                                            <div className={styles.companyNameText}>{doc.company_name || '-'}</div>
-                                            <div className={styles.businessNumber}>{doc.business_number || '-'}</div>
+                                            <span className={styles.revisionAlertBadge}>
+                                                {doc.status === '보완' && (doc.reverted_from === '심사' || doc.reverted_from === '진행') ? '!' : ''}
+                                            </span>
+                                            <div className={styles.companyNameInfo}>
+                                                <div className={styles.companyNameText}>{doc.company_name || '-'}</div>
+                                                <div className={styles.businessNumber}>{doc.business_number || '-'}</div>
+                                            </div>
                                         </td>
                                         <td className={styles.representativeName}>{doc.representative_name || '-'}</td>
                                         <td className={styles.progressDetails}>

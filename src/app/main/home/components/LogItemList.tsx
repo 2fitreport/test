@@ -18,11 +18,14 @@ interface DocumentLog {
     created_at: string;
     submitter_id?: string;
     submitter_name?: string;
+    staff_read?: Record<string, boolean>;
 }
 
 interface LogItemListProps {
     logs: DocumentLog[];
     hasScroll: boolean;
+    currentUserId: string;
+    onLogRead?: (logId: number) => void;
     onLogDeleted?: () => void;
 }
 
@@ -30,6 +33,7 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
     '정상':     { label: '정상',  badgeClass: 'waiting',   dotClass: 'dotWaiting', backgroundColor: 'var(--color-normal)' },
     '보완':    { label: '보완',  badgeClass: 'revision',  dotClass: 'dotRevision', backgroundColor: 'var(--color-revision)' },
     '보류':    { label: '보류',  badgeClass: 'stopped',   dotClass: 'dotStopped', backgroundColor: 'var(--color-hold)' },
+    '검수':    { label: '검수',  badgeClass: 'inspection', dotClass: 'dotInspection', backgroundColor: 'var(--color-status-inspection)' },
     waiting:     { label: '서류수집',  badgeClass: 'waiting',   dotClass: 'dotWaiting' },
     approved:    { label: '승인',  badgeClass: 'approved',  dotClass: 'dotApproved' },
     rejected:    { label: '보류',  badgeClass: 'rejected',  dotClass: 'dotRejected' },
@@ -110,7 +114,7 @@ function getLogContent(log: DocumentLog) {
     };
 }
 
-export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemListProps) {
+export default function LogItemList({ logs, hasScroll, currentUserId, onLogRead, onLogDeleted }: LogItemListProps) {
     const router = useRouter();
     const [userLevel, setUserLevel] = useState<number>(0);
 
@@ -128,7 +132,6 @@ export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemLi
 
     const handleLogClick = async (log: DocumentLog) => {
         try {
-            // 읽음 처리
             await fetch(`/api/documents/logs/${log.id}`, {
                 method: 'PATCH',
                 credentials: 'include'
@@ -137,16 +140,14 @@ export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemLi
             console.error('읽음 처리 실패:', error);
         }
 
-        // 기업관리로 이동
+        onLogRead?.(log.id);
         router.push(`/main/company_create?view=${log.document_id}`);
     };
 
     const filteredLogs = logs.filter(log => {
-        // 메모 삭제 로그는 표시하지 않음
         if (log.action_type === 'memo_delete') {
             return false;
         }
-        // 실무자 배정 알림은 대표(1) 또는 대표실무자(2)일 때만 표시
         if (log.action_type === 'manager_assigned' && userLevel !== 1 && userLevel !== 2) {
             return false;
         }
@@ -160,12 +161,14 @@ export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemLi
             )}
             {filteredLogs.map((log, idx) => {
                 const content = getLogContent(log);
-                const { dotClass, badgeClass, label, description, backgroundColor } = content as any;
+                const { dotClass, label, description, backgroundColor } = content as any;
                 const isLast = idx === filteredLogs.length - 1;
                 const showBorder = hasScroll || !isLast;
+                const isUnread = currentUserId && (log.staff_read || {})[currentUserId] !== true;
                 return (
                     <li
                         key={log.id}
+                        className={isUnread ? styles.unreadItem : ''}
                         style={{ borderBottom: showBorder ? '1px solid #f0f0f0' : 'none' }}
                         onClick={() => handleLogClick(log)}
                     >
@@ -186,7 +189,7 @@ export default function LogItemList({ logs, hasScroll, onLogDeleted }: LogItemLi
                                 display: 'inline-block',
                                 minWidth: '102px',
                                 textAlign: 'center'
-                            } : undefined} className={backgroundColor ? undefined : badgeClass}>{label}</strong>
+                            } : undefined} className={backgroundColor ? undefined : (content as any).badgeClass}>{label}</strong>
                             {description}
                         </h4>
                         <LogDeleteButton logId={log.id} onDeleted={onLogDeleted} />

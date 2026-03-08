@@ -34,6 +34,7 @@ export async function GET(
         bank_name,
         account_holder,
         account_number,
+        default_progress_filter,
         created_at
       `)
       .eq('id', userId)
@@ -99,6 +100,22 @@ export async function PATCH(
 
       if (error) throw error;
       return NextResponse.json({ message: '비밀번호가 변경되었습니다.' }, { status: 200 });
+    }
+
+    // 자기 자신의 기본 필터 설정 변경인 경우 (모든 직급 허용)
+    if (requesterId === userId && body.default_progress_filter !== undefined && Object.keys(body).length === 1) {
+      const validValues = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인', null];
+      if (!validValues.includes(body.default_progress_filter)) {
+        return NextResponse.json({ message: '유효하지 않은 필터 값입니다.' }, { status: 400 });
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ default_progress_filter: body.default_progress_filter })
+        .eq('id', userId);
+
+      if (error) throw error;
+      return NextResponse.json({ message: '기본 필터가 저장되었습니다.' }, { status: 200 });
     }
 
     // 그 외 수정은 level 1: 대표, level 2: 대표실무자만 허용

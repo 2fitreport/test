@@ -6,26 +6,11 @@ import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, Plugin } from 'chart.js';
 import styles from './progressWrap.module.css';
 
-// 진행단계별 색상
-const PROGRESS_STAGE_COLORS: Record<string, string> = {
-    '상담': 'var(--color-consultation)',
-    '서류요청': 'var(--color-document-request)',
-    '분석': 'var(--color-analysis)',
-    '진행': 'var(--color-progress)',
-    '승인': 'var(--color-approval)',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-    '보완': 'var(--color-revision)',
-    '보류': 'var(--color-hold)',
-};
-
-// 막대 위에 값 표시하는 플러그인
 const dataLabelsPlugin: Plugin = {
     id: 'dataLabels',
     afterDatasetsDraw(chart: any) {
         const { ctx } = chart;
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 13px Arial';
         ctx.fillStyle = '#333';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
@@ -35,9 +20,7 @@ const dataLabelsPlugin: Plugin = {
             meta.data.forEach((bar: any, index: number) => {
                 const value = dataset.data[index];
                 if (value !== 0 && value !== undefined) {
-                    const x = bar.x;
-                    const y = bar.y;
-                    ctx.fillText(String(value), x, y - 8);
+                    ctx.fillText(String(value), bar.x, bar.y - 6);
                 }
             });
         });
@@ -48,7 +31,8 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function ProgressWrap() {
     const monthInputRef = useRef<HTMLInputElement>(null);
-    const [chartData, setChartData] = useState<any>(null);
+    const [stageData, setStageData] = useState<any>(null);
+    const [statusData, setStatusData] = useState<any>(null);
     const [userLevel, setUserLevel] = useState<number>(0);
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const [isRepresentative, setIsRepresentative] = useState(false);
@@ -86,10 +70,8 @@ export default function ProgressWrap() {
 
                 if (userLevel === 4) {
                     if (isRepresentative && companyName && viewMode === 'all') {
-                        // 소속대표: 같은 소속의 모든 영업자
                         params.append('companyName', companyName);
                     } else {
-                        // 일반 영업자 또는 소속대표의 내 데이터만
                         params.append('userId', currentUserId);
                     }
                 }
@@ -100,12 +82,11 @@ export default function ProgressWrap() {
                     credentials: 'include'
                 });
 
-                if (!response.ok) {
-                    throw new Error('진행단계 데이터 조회 실패');
-                }
+                if (!response.ok) throw new Error('진행단계 데이터 조회 실패');
 
                 const data = await response.json();
-                setChartData(data);
+                setStageData(data.stage);
+                setStatusData(data.status);
             } catch (error) {
                 console.error('진행단계 데이터 조회 실패:', error);
             } finally {
@@ -116,23 +97,16 @@ export default function ProgressWrap() {
         fetchProgressData();
     }, [userLevel, currentUserId, isRepresentative, companyName, selectedMonth, viewMode]);
 
-    // 대표(1), 대표실무자(2): 모든 데이터
-    // 영업자(4): 자신의 데이터만
-    // 나머지: 표시 안 함
     const shouldDisplay = userLevel === 1 || userLevel === 2 || userLevel === 4;
 
-    if (!shouldDisplay) {
-        return null;
-    }
+    if (!shouldDisplay) return null;
 
-    const options = {
+    const makeOptions = (maxVal: number) => ({
         indexAxis: 'x' as const,
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: {
-                display: false
-            },
+            legend: { display: false },
             tooltip: {
                 backgroundColor: 'rgba(0, 0, 0, 0.8)',
                 padding: 12,
@@ -140,43 +114,27 @@ export default function ProgressWrap() {
                 bodyFont: { size: 12 }
             }
         },
-        elements: {
-            bar: {
-                borderWidth: 0
-            }
-        },
+        elements: { bar: { borderWidth: 0 } },
         scales: {
             x: {
-                beginAtZero: true,
-                max: 30,
-                grid: {
-                    display: true,
-                    color: 'rgba(0, 0, 0, 0.05)'
-                },
+                grid: { display: true, color: 'rgba(0, 0, 0, 0.05)' },
                 ticks: {
-                    font: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    callback: function(value: any, index: number) {
-                        const label = (this as any).getLabelForValue(value);
-                        const dataValue = chartData?.datasets?.[0]?.data?.[index] || 0;
-                        return [label, `(${dataValue})`];
-                    }
+                    font: { size: 14, weight: 'bold' as const },
                 }
             },
             y: {
-                ticks: {
-                    display: false
-                },
-                grid: {
-                    display: false
-                }
+                beginAtZero: true,
+                max: Math.max(maxVal + 5, 10),
+                ticks: { display: false },
+                grid: { display: false }
             }
         },
         barPercentage: 0.5,
         categoryPercentage: 0.6
-    };
+    });
+
+    const stageMax = stageData ? Math.max(...stageData.datasets[0].data) : 0;
+    const statusMax = statusData ? Math.max(...statusData.datasets[0].data) : 0;
 
     const handlePrevMonth = () => {
         const [year, month] = selectedMonth.split('-');
@@ -233,85 +191,35 @@ export default function ProgressWrap() {
                     )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button
-                        onClick={handlePrevMonth}
-                        style={{
-                            padding: '8px 12px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            backgroundColor: '#fff',
-                            color: '#000',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
-                        title="이전 달"
-                    >
-                        <Image
-                            src="/arrow_left.svg"
-                            alt="이전 달"
-                            width={20}
-                            height={20}
-                        />
+                    <button onClick={handlePrevMonth} className={styles.monthButton} title="이전 달">
+                        <Image src="/arrow_left.svg" alt="이전 달" width={20} height={20} />
                     </button>
                     <input
                         ref={monthInputRef}
                         type="month"
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(e.target.value)}
-                        onClick={(e) => {
-                            const input = e.target as HTMLInputElement;
-                            input.showPicker?.();
-                        }}
-                        style={{
-                            padding: '8px 12px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            backgroundColor: '#fff',
-                            color: '#000',
-                            width: '150px',
-                            cursor: 'pointer',
-                            textAlign: 'center'
-                        }}
+                        onClick={(e) => { (e.target as HTMLInputElement).showPicker?.(); }}
+                        className={styles.monthInput}
                     />
-                    <button
-                        onClick={handleNextMonth}
-                        style={{
-                            padding: '8px 12px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            backgroundColor: '#fff',
-                            color: '#000',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
-                        title="다음 달"
-                    >
-                        <Image
-                            src="/arrow_right.svg"
-                            alt="다음 달"
-                            width={20}
-                            height={20}
-                        />
+                    <button onClick={handleNextMonth} className={styles.monthButton} title="다음 달">
+                        <Image src="/arrow_right.svg" alt="다음 달" width={20} height={20} />
                     </button>
                 </div>
             </div>
-            <div className={styles.chartContainer}>
-                {chartData && (
-                    <Bar
-                        data={chartData}
-                        options={options as any}
-                    />
-                )}
+            <div className={styles.chartsRow}>
+                <div className={styles.chartBox}>
+                    <h3 className={styles.chartTitle}>진행단계별</h3>
+                    <div className={styles.chartArea}>
+                        {stageData && <Bar data={stageData} options={makeOptions(stageMax) as any} plugins={[dataLabelsPlugin]} />}
+                    </div>
+                </div>
+                <div className={styles.chartBox}>
+                    <h3 className={styles.chartTitle}>상태별</h3>
+                    <div className={styles.chartArea}>
+                        {statusData && <Bar data={statusData} options={makeOptions(statusMax) as any} plugins={[dataLabelsPlugin]} />}
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -194,6 +194,38 @@
     flex-wrap: wrap;
 }
 
+.defaultFilterContainer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: #f0f4ff;
+    border: 1px dashed #b0c4de;
+    border-radius: 6px;
+}
+
+.saveDefaultButton {
+    padding: 7px 16px;
+    background-color: var(--main-color);
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.saveDefaultButton:hover {
+    opacity: 0.85;
+}
+
+.saveDefaultButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .selectorsContainer {
     display: flex;
     align-items: center;
@@ -548,8 +580,34 @@
 
 .companyName {
     display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.companyNameInfo {
+    display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.revisionAlertBadge {
+    min-width: 24px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.revisionAlertBadge:not(:empty) {
+    background-color: #ff3b30;
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .companyNameText {
