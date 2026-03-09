@@ -50,6 +50,17 @@ export async function GET(request: NextRequest) {
             return `${y}-${m}-${day}`;
         };
 
+        // ISO 문자열에서 연도/월/일 추출 (UTC 기준)
+        const extractYearMonthDay = (isoString: string): { year: number; month: number; day: number } => {
+            const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (!match) return { year: 0, month: 0, day: 0 };
+            return {
+                year: parseInt(match[1]),
+                month: parseInt(match[2]),
+                day: parseInt(match[3])
+            };
+        };
+
         // === 현재 달 범위 (stats 계산용) ===
         const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -114,11 +125,12 @@ export async function GET(request: NextRequest) {
         const myDocs = docsResult.data || [];
 
         // === 현재달 통계 (stats는 항상 현재 달 기준) ===
-        const monthlyApprovedForStats = myDocs.filter(d =>
-            d.progress_details === '승인' &&
-            d.updated_at >= currentMonthStartStr &&
-            d.updated_at <= currentMonthEndStr + 'T23:59:59'
-        );
+        const monthlyApprovedForStats = myDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
+            const docDateStr = d.updated_at.substring(0, 10);
+            return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
+        });
 
         const totalApprovalAmount = monthlyApprovedForStats.reduce((sum, doc) => {
             const amount = doc.approval_amount;
@@ -131,17 +143,19 @@ export async function GET(request: NextRequest) {
         const monthlyApprovalAmount = Math.round(totalApprovalAmount / 10000 * 10) / 10;
         const monthlyRevenueAmount = Math.round(monthlyRevenue / 10000 * 10) / 10;
 
-        const newRegistrations = myDocs.filter(d =>
-            d.created_at >= currentMonthStartStr &&
-            d.created_at <= currentMonthEndStr + 'T23:59:59'
-        ).length;
+        const newRegistrations = myDocs.filter(d => {
+            // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
+            const docDateStr = d.created_at.substring(0, 10);
+            return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
+        }).length;
 
         // === 요청한 달의 케이스별 매출 정산 데이터 ===
-        const monthlyApprovedForSettlement = myDocs.filter(d =>
-            d.progress_details === '승인' &&
-            d.updated_at >= targetMonthStartStr &&
-            d.updated_at <= targetMonthEndStr + 'T23:59:59'
-        );
+        const monthlyApprovedForSettlement = myDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
+            const docDateStr = d.updated_at.substring(0, 10);
+            return docDateStr >= targetMonthStartStr && docDateStr <= targetMonthEndStr;
+        });
 
         const settlementData = monthlyApprovedForSettlement.map(doc => {
             const approvalAmount = typeof doc.approval_amount === 'string'
@@ -151,14 +165,17 @@ export async function GET(request: NextRequest) {
                 ? parseInt(doc.revenue_amount)
                 : Number(doc.revenue_amount) || 0;
 
+            const inflowType = '기업등록'; // 기업등록으로 고정
+            const fee = Math.round(revenueAmount * 0.4); // 실매출의 40%
+
             return {
                 documentId: doc.id,
                 company: doc.company_name || '-',
                 approvalAmount: approvalAmount, // 만원 단위
                 realSales: revenueAmount, // 만원 단위 (실제 수입 데이터)
                 manager: doc.user_id || '-',
-                inflow: doc.progress_details === '승인' ? '기업등록' : '지원요청', // 임시로 기업등록으로 설정
-                fee: Math.round(approvalAmount * 0.03), // 만원 단위 (승인금액의 3%)
+                inflow: inflowType,
+                fee: fee, // 만원 단위 (실매출의 40%)
                 paymentDate: doc.payment_date || new Date(doc.updated_at).toISOString().split('T')[0],
                 };
                 });
@@ -168,16 +185,17 @@ export async function GET(request: NextRequest) {
         const approvedDocs = myDocs.filter(d => d.progress_details === '승인');
 
         approvedDocs.forEach(doc => {
-            const docDate = new Date(doc.updated_at);
-            const year = docDate.getFullYear();
-            const month = docDate.getMonth() + 1;
+            // UTC 기준 ISO 문자열에서 연도/월 추출
+            const { year, month } = extractYearMonthDay(doc.updated_at);
             const approvalAmount = typeof doc.approval_amount === 'string'
                 ? parseInt(doc.approval_amount)
                 : Number(doc.approval_amount) || 0;
             const revenue = Math.round(approvalAmount * 0.03 / 10000 * 10) / 10; // 3% 수수료, 억원 단위
 
-            if (!yearData[year]) yearData[year] = {};
-            yearData[year][month] = (yearData[year][month] || 0) + revenue;
+            if (year > 0 && month > 0) {
+                if (!yearData[year]) yearData[year] = {};
+                yearData[year][month] = (yearData[year][month] || 0) + revenue;
+            }
         });
 
         // 선택된 연도의 월별 데이터 추출
@@ -185,9 +203,18 @@ export async function GET(request: NextRequest) {
             return yearData[targetYear]?.[i + 1] || 0;
         });
 
+        // 이전년도 데이터 추출 (전년도 비교용)
+        const previousYearMonthlyRevenues = Array.from({ length: 12 }, (_, i) => {
+            return yearData[targetYear - 1]?.[i + 1] || 0;
+        });
+
         const revenueChartData = {
             labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
-            data: monthlyRevenues
+            currentYearData: monthlyRevenues,
+            previousYearData: previousYearMonthlyRevenues,
+            currentMonth: now.getMonth() + 1,
+            currentYear: now.getFullYear(),
+            selectedYear: targetYear
         };
 
         return NextResponse.json({

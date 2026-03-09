@@ -3,6 +3,13 @@ display: flex;
 min-height: 100vh;
 }
 
+@media (max-width: 1920px) {
+    .container {
+        zoom: 80%;
+    }
+}
+
+
 .main {
 flex: 1;
 padding: 0;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, Plugin } from 'chart.js';
@@ -49,88 +49,145 @@ export default function RevenueChart({
     revenueData
 }: Props) {
     const [chartData, setChartData] = useState<any>(null);
+    const [prevYearData, setPrevYearData] = useState<number[]>(Array(12).fill(0));
+    const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
 
     useEffect(() => {
-        if (revenueData?.labels && revenueData?.data) {
-            const data = {
-                labels: revenueData.labels,
-                datasets: [
-                    {
-                        label: '년별 매출',
-                        data: revenueData.data,
-                        backgroundColor: '#0f1a4d',
-                        borderRadius: 8,
-                    }
-                ]
-            };
-            setChartData(data);
-        } else {
-            // Mock 데이터
-            const mockData = {
-                labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
-                datasets: [
-                    {
-                        label: '년별 매출',
-                        data: [2.5, 3.2, 2.8, 4.1, 3.5, 2.9, 4.3, 3.8, 2.6, 3.9, 4.2, 3.1],
-                        backgroundColor: '#0f1a4d',
-                        borderRadius: 8,
-                    }
-                ]
-            };
-            setChartData(mockData);
+        const labels = revenueData?.labels || ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+        const currentYearData = revenueData?.currentYearData || revenueData?.data || Array(12).fill(0);
+        const previousYearData = revenueData?.previousYearData || Array(12).fill(0);
+        const currentMonth = revenueData?.currentMonth || new Date().getMonth() + 1;
+        const currentYearFromApi = revenueData?.currentYear || new Date().getFullYear();
+        const selectedYearVal = revenueData?.selectedYear || new Date().getFullYear();
+
+        // 전년도 데이터를 상태로 저장 (tooltip에서 사용)
+        setPrevYearData(previousYearData);
+        setPrevYear(selectedYearVal - 1);
+
+        // 데이터 존재 여부 확인
+        const hasData = currentYearData.some((value: number) => value > 0);
+
+        // 현재월만 메인 컬러, 나머지는 회색
+        const barColors = currentYearData.map((_: number, index: number) => {
+            // index는 0부터 시작, currentMonth는 1부터 시작
+            return (index + 1 === currentMonth && currentYearFromApi === selectedYearVal)
+                ? '#0f1a4d'
+                : '#cccccc';
+        });
+
+        const datasets: any[] = [
+            {
+                label: `${selectedYearVal}년`,
+                data: currentYearData,
+                backgroundColor: hasData ? barColors : '#e0e0e0',
+                borderRadius: 8,
+            }
+        ];
+
+        // 이전년도 데이터가 실제로 있을 때만 추가 (0이 아닌 값이 있는 경우)
+        const hasPrevData = previousYearData.some((v: number) => v > 0);
+        if (hasPrevData && selectedYearVal !== currentYearFromApi) {
+            datasets.push({
+                label: `${selectedYearVal - 1}년`,
+                data: previousYearData,
+                backgroundColor: '#e0e0e0',
+                borderRadius: 8,
+            });
         }
+
+        const data = {
+            labels,
+            datasets,
+            hasData
+        };
+        setChartData(data);
     }, [selectedYear, revenueData]);
 
-    const chartOptions = {
-        indexAxis: 'x' as const,
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                display: false
-            },
-            tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 12,
-                titleFont: { size: 13, weight: 'bold' },
-                bodyFont: { size: 12 }
-            }
-        },
-        elements: {
-            bar: {
-                borderWidth: 0
-            }
-        },
-        scales: {
-            x: {
-                ticks: {
-                    font: {
-                        size: 14,
-                        weight: 'bold' as const
-                    }
-                },
-                grid: {
+    const chartOptions = useMemo(() => {
+        // y축 최대값 자동 계산
+        const allData = [...(chartData?.datasets[0]?.data || []), ...(chartData?.datasets[1]?.data || [])];
+        const maxDataValue = Math.max(...(allData as number[]).filter(v => typeof v === 'number'), 5);
+        const yAxisMax = Math.ceil(maxDataValue * 1.2); // 최대값의 120%로 설정
+
+        return {
+            indexAxis: 'x' as const,
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
                     display: false
-                }
-            },
-            y: {
-                beginAtZero: true,
-                max: 5,
-                grid: {
-                    display: true,
-                    color: 'rgba(0, 0, 0, 0.05)'
                 },
-                ticks: {
-                    font: {
-                        size: 14,
-                        weight: 'bold' as const
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    callbacks: {
+                        label: function(context: any) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y;
+                            return `${label}: ${value.toFixed(1)}억원`;
+                        },
+                        afterLabel: function(context: any) {
+                            const dataIndex = context.dataIndex;
+                            const currentVal = context.parsed.y;
+                            const prevVal = prevYearData[dataIndex] || 0;
+                            const difference = currentVal - prevVal;
+                            const percentChange = prevVal !== 0
+                                ? Math.round((difference / prevVal) * 1000) / 10
+                                : 0;
+
+                            const arrow = difference > 0 ? '↑' : difference < 0 ? '↓' : '→';
+                            const sign = difference > 0 ? '+' : '';
+
+                            const lines: string[] = [];
+                            if (prevVal > 0) {
+                                lines.push(`${prevYear}년: ${prevVal.toFixed(1)}억원`);
+                                lines.push(`차이: ${sign}${difference.toFixed(1)}억원 (${sign}${percentChange.toFixed(1)}%${arrow})`);
+                            } else {
+                                lines.push(`${prevYear}년: 데이터 없음`);
+                            }
+                            return lines;
+                        }
                     }
                 }
-            }
-        },
-        barPercentage: 0.5,
-        categoryPercentage: 0.6
-    };
+            },
+            elements: {
+                bar: {
+                    borderWidth: 0
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        font: {
+                            size: 14,
+                            weight: 'bold' as const
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    max: yAxisMax,
+                    grid: {
+                        display: true,
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        font: {
+                            size: 14,
+                            weight: 'bold' as const
+                        }
+                    }
+                }
+            },
+            barPercentage: 0.5,
+            categoryPercentage: 0.6
+        };
+    }, [prevYearData, prevYear, chartData]);
 
     return (
         <div className={pageStyles.revenueTrendCard}>
@@ -152,9 +209,10 @@ export default function RevenueChart({
                         />
                     </button>
                     <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={selectedYear}
-                        onChange={(e) => onYearChange(e.target.value)}
+                        onChange={(e) => onYearChange(String(e.target.value))}
                         className={styles.yearInput}
                     />
                     <button
@@ -172,13 +230,24 @@ export default function RevenueChart({
                 </div>
             </div>
             <div className={styles.chartContainer}>
-                {chartData && (
+                {chartData && !chartData.hasData ? (
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: '300px',
+                        color: '#999',
+                        fontSize: '16px'
+                    }}>
+                        {selectedYear}년 데이터가 없습니다.
+                    </div>
+                ) : chartData ? (
                     <Bar
                         data={chartData}
                         options={chartOptions as any}
                         plugins={[dataLabelsPlugin]}
                     />
-                )}
+                ) : null}
             </div>
         </div>
     );

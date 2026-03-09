@@ -19,6 +19,16 @@ export async function GET(request: NextRequest) {
 
         const userIdNum = parseInt(userId);
 
+        // 0. 사용자 생성일 조회
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('created_at')
+            .eq('id', userIdNum)
+            .single();
+
+        if (userError) throw userError;
+        const userCreatedAt = userData?.created_at ? new Date(userData.created_at) : new Date();
+
         // 1. 전체 공지 (global)
         const { data: globalNotifications, error: globalError } = await supabase
             .from('notifications')
@@ -27,6 +37,12 @@ export async function GET(request: NextRequest) {
             .order('created_at', { ascending: false });
 
         if (globalError) throw globalError;
+
+        // 사용자 생성 시간 이후의 공개 알림만 필터링
+        const filteredGlobalNotifications = (globalNotifications || []).filter(n => {
+            const notificationCreatedAt = new Date(n.created_at);
+            return notificationCreatedAt >= userCreatedAt;
+        });
 
         // 2. 개인 알림 (personal) - receiver_id가 일치하는 것
         const { data: personalNotifications, error: personalError } = await supabase
@@ -39,7 +55,7 @@ export async function GET(request: NextRequest) {
         if (personalError) throw personalError;
 
         // 합치기
-        const allNotifications = [...(globalNotifications || []), ...(personalNotifications || [])]
+        const allNotifications = [...filteredGlobalNotifications, ...(personalNotifications || [])]
             .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         // 3. 해당 유저의 읽음 기록 조회
