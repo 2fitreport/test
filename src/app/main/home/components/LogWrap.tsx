@@ -52,15 +52,18 @@ export default function LogWrap({ initialLogs, initialCurrentUserId, logsLoaded 
     };
 
     const handleDeleteAll = async () => {
-        const allIds = logs.map(log => log.id);
-        if (allIds.length === 0) return;
         try {
-            await fetch('/api/documents/logs/delete-all', {
+            const response = await fetch('/api/documents/logs/delete-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ logIds: allIds }),
+                body: JSON.stringify({}),
             });
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('전체 삭제 실패:', errorData);
+                return;
+            }
             setLogs([]);
         } catch (error) {
             console.error('전체 삭제 실패:', error);

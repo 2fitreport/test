@@ -12,6 +12,7 @@ import {
     Legend,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import Spinner from '@/app/components/Spinner/Spinner';
 import styles from './userStats.module.css';
 
 ChartJS.register(
@@ -138,7 +139,7 @@ export default function UserStats() {
     };
 
     if (loading) {
-        return <div className={styles.loading}>로딩 중...</div>;
+        return <Spinner fullScreen />;
     }
 
     return (

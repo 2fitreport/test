@@ -2,6 +2,7 @@
     background: #f8f9fa;
     min-height: 100vh;
     padding: 0;
+    margin-left: var(--sidebar-width);
 }
 
 .titleWrap {
@@ -11,14 +12,14 @@
 }
 
 .pageTitle {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
     color: #1a1a1a;
     margin: 0 0 10px 0;
 }
 
 .pageSubtitle {
-    font-size: 16px;
+    font-size: 18px;
     color: #666;
     margin: 0;
 }
@@ -44,7 +45,7 @@
 }
 
 .sectionTitle {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     color: #1a1a1a;
     margin: 0 0 24px 0;
@@ -67,13 +68,13 @@
 }
 
 .infoLabel {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     color: #666;
 }
 
 .infoValue {
-    font-size: 14px;
+    font-size: 16px;
     color: #333;
 }
 
@@ -91,7 +92,7 @@
 }
 
 .formGroup label {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     color: #333;
 }
@@ -101,7 +102,7 @@
     padding: 12px 14px;
     border: 1px solid #ddd !important;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 16px;
     transition: border-color 0.2s;
 }
 
@@ -117,7 +118,7 @@
     color: #fff;
     border: none;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     transition: opacity 0.2s;
@@ -153,7 +154,7 @@
     }
 
     .pageTitle {
-        font-size: 22px;
+        font-size: 26px;
     }
 
     .contentWrap {
@@ -171,10 +172,10 @@
     }
 
     .infoLabel {
-        font-size: 13px;
+        font-size: 15px;
     }
 
     .infoValue {
-        font-size: 13px;
+        font-size: 15px;
     }
 }

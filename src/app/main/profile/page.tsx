@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import Modal from '@/components/Modal/Modal';
+import Spinner from '@/app/components/Spinner/Spinner';
 import styles from './profile.module.css';
 
 interface UserData {
@@ -107,7 +108,7 @@ export default function ProfilePage() {
     setModal({ ...modal, isOpen: false });
   };
 
-  if (isLoading) return <div className={styles.loading}>정보를 불러오는 중입니다...</div>;
+  if (isLoading) return <Spinner fullScreen />;
   if (!userData) return null;
 
   return (

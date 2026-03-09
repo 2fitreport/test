@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
+import Spinner from '@/app/components/Spinner/Spinner';
 import UserStats from './UserStats';
 import UserList from './UserList';
 import styles from './page.module.css';
@@ -38,14 +39,7 @@ export default function UserManagementPage() {
     };
 
     if (loading) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.loadingContainer}>
-                    <div className={styles.spinner}></div>
-                    <p className={styles.loadingText}>로딩 중...</p>
-                </div>
-            </div>
-        );
+        return <Spinner fullScreen />;
     }
 
     if (!isAuthorized) {

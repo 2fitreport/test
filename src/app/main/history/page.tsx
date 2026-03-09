@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAdminData } from '@/lib/auth';
 import Pagination from '@/app/components/Pagination/Pagination';
+import Spinner from '@/app/components/Spinner/Spinner';
 import styles from './history.module.css';
 
 interface HistoryDocument {
@@ -128,11 +129,7 @@ export default function HistoryPage() {
     const currentItems = historyData.slice(indexOfFirstItem, indexOfLastItem);
 
     if (loading) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.loading}>로딩 중...</div>
-            </div>
-        );
+        return <Spinner fullScreen />;
     }
 
     if (error) {

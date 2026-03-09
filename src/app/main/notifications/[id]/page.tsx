@@ -6,6 +6,7 @@ import styles from './view.module.css';
 import { Notification } from '../components/NotificationItem';
 import { getAdminData } from '@/lib/auth';
 import Modal from '@/app/components/Modal/Modal';
+import Spinner from '@/app/components/Spinner/Spinner';
 
 export default function NotificationViewPage() {
     const router = useRouter();
@@ -53,7 +54,7 @@ export default function NotificationViewPage() {
     };
 
     if (loading) {
-        return <div style={{ padding: '100px', textAlign: 'center', color: '#999' }}>로딩 중...</div>;
+        return <Spinner fullScreen />;
     }
 
     if (!notification) {

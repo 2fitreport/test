@@ -74,7 +74,7 @@ export default function ProgressWrap({ data }: Props) {
         fetchProgressData();
     }, [selectedMonth, isCustomMonth]);
 
-    const shouldDisplay = userLevel === 1 || userLevel === 2 || userLevel === 4;
+    const shouldDisplay = userLevel === 1 || userLevel === 2;
     if (!shouldDisplay) return null;
 
     const makeOptions = (maxVal: number) => ({

@@ -226,10 +226,6 @@ export default function Sidebar() {
                         if (item.path === '/main/history' && adminData?.position?.level !== 1) {
                             return null;
                         }
-                        // 성과 정산은 대표자(level=1)만 접근 가능
-                        if (item.path === '/main/performance_settlement' && adminData?.position?.level !== 1) {
-                            return null;
-                        }
 
                         const isActive = pathname === item.path ||
                             (item.path === '/main/document_submission' && pathname.startsWith('/main/company_create')) ||

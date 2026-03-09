@@ -6,6 +6,7 @@ import Image from 'next/image';
 import styles from '../notifications.module.css';
 import NotificationItem, { Notification } from './NotificationItem';
 import Pagination from '@/app/components/Pagination/Pagination';
+import Spinner from '@/app/components/Spinner/Spinner';
 import { FiInbox } from 'react-icons/fi';
 import { getAdminData } from '@/lib/auth';
 
@@ -136,7 +137,7 @@ export default function NotificationList() {
     };
 
     if (loading) {
-        return <div style={{ padding: '100px', textAlign: 'center', color: '#999' }}>로딩 중...</div>;
+        return <Spinner fullScreen />;
     }
 
     return (

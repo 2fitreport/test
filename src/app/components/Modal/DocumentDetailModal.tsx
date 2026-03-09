@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import styles from './ActionModal.module.css';
+import Spinner from '@/app/components/Spinner/Spinner';
 
 interface Document {
     id: number;
@@ -206,7 +207,9 @@ export default function DocumentDetailModal({
                             className={styles.downloadButton}
                             onClick={handleDownloadZip}
                             disabled={isDownloading}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
+                            {isDownloading && <Spinner />}
                             {isDownloading ? '다운로드 중...' : '다운로드'}
                         </button>
                     )}

@@ -9,12 +9,12 @@ import styles from './SettlementTable.module.css';
 
 interface SettlementRow {
     company: string;
-    amount: string;
-    fee: string;
-    real: string;
+    approvalAmount: string;
+    realSales: string;
     manager: string;
-    incentive: string;
-    date: string;
+    inflow: string;
+    fee: string;
+    paymentDate: string;
 }
 
 interface Props {
@@ -36,7 +36,7 @@ export default function SettlementTable({
     const [sortColumn, setSortColumn] = useState<string>('company');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 6;
+    const itemsPerPage = 10;
 
     const processTableData = (
         items: any[],
@@ -90,6 +90,49 @@ export default function SettlementTable({
                 <span style={{ display: 'block', opacity: sortColumn === column && sortOrder === 'desc' ? 1 : 0.3, color: sortColumn === column && sortOrder === 'desc' ? '#553be9' : '#ccc', fontWeight: sortColumn === column && sortOrder === 'desc' ? 'bold' : 'normal' }}>↓</span>
             </span>
         );
+    };
+
+    const formatAmount = (amount: any): string => {
+        if (typeof amount === 'string') {
+            return amount;
+        }
+        // amount는 만원 단위 (예: 14578만원 = 1.4578억원)
+        const manwon = Number(amount) || 0;
+        const eokValue = manwon / 10000;
+        const eok = Math.floor(eokValue);
+        const decimal = (eokValue - eok) * 10; // 소수점 첫자리
+        const cheonman = Math.floor(decimal);
+        const baekman = Math.floor((decimal - cheonman) * 10);
+
+        if (eok > 0) {
+            if (cheonman > 0) {
+                if (baekman > 0) {
+                    return `${eok}억 ${cheonman}천 ${baekman}백만원`;
+                } else {
+                    return `${eok}억 ${cheonman}천만원`;
+                }
+            } else {
+                if (baekman > 0) {
+                    return `${eok}억 ${baekman}백만원`;
+                } else {
+                    return `${eok}억원`;
+                }
+            }
+        } else {
+            if (cheonman > 0) {
+                if (baekman > 0) {
+                    return `${cheonman}천 ${baekman}백만원`;
+                } else {
+                    return `${cheonman}천만원`;
+                }
+            } else {
+                if (baekman > 0) {
+                    return `${baekman}백만원`;
+                } else {
+                    return '0원';
+                }
+            }
+        }
     };
 
     return (
@@ -152,24 +195,24 @@ export default function SettlementTable({
                     <thead>
                         <tr>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('company')} style={{ cursor: 'pointer' }}>업체명{getSortIcon('company')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('amount')} style={{ cursor: 'pointer' }}>승인금액{getSortIcon('amount')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('fee')} style={{ cursor: 'pointer' }}>수수료율{getSortIcon('fee')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('real')} style={{ cursor: 'pointer' }}>실제매출{getSortIcon('real')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('manager')} style={{ cursor: 'pointer' }}>담당자{getSortIcon('manager')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('incentive')} style={{ cursor: 'pointer' }}>인센티브{getSortIcon('incentive')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('date')} style={{ cursor: 'pointer' }}>지급예정일{getSortIcon('date')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('approvalAmount')} style={{ cursor: 'pointer' }}>승인금액{getSortIcon('approvalAmount')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('realSales')} style={{ cursor: 'pointer' }}>실제매출{getSortIcon('realSales')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('manager')} style={{ cursor: 'pointer' }}>영업자{getSortIcon('manager')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('inflow')} style={{ cursor: 'pointer' }}>유입방식{getSortIcon('inflow')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('fee')} style={{ cursor: 'pointer' }}>지급수수료{getSortIcon('fee')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('paymentDate')} style={{ cursor: 'pointer' }}>지급예정일{getSortIcon('paymentDate')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {processed.data.map((row, i) => (
                             <tr key={i}>
                                 <td>{row.company}</td>
-                                <td>{row.amount}</td>
-                                <td>{row.fee}</td>
-                                <td className={pageStyles.realSalesText}>{row.real}</td>
+                                <td>{formatAmount(row.approvalAmount)}</td>
+                                <td className={pageStyles.realSalesText}>{formatAmount(row.realSales)}</td>
                                 <td>{row.manager}</td>
-                                <td className={pageStyles.incentiveText}>{row.incentive}</td>
-                                <td>{row.date}</td>
+                                <td>{row.inflow}</td>
+                                <td className={pageStyles.incentiveText}>{formatAmount(row.fee)}</td>
+                                <td>{row.paymentDate}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -189,16 +232,25 @@ export default function SettlementTable({
                 <div className={styles.summaryTitle}>합계</div>
                 <div className={styles.summaryValues}>
                     <div className={styles.summaryItem}>
-                        <span>승인</span>
-                        <span className={styles.summaryValueBlue}>19억원</span>
+                        <span>승인금액</span>
+                        <span className={styles.summaryValueBlue}>{formatAmount(processed.data.reduce((sum, row) => {
+                            const amount = typeof row.approvalAmount === 'number' ? row.approvalAmount : 0;
+                            return sum + amount;
+                        }, 0))}</span>
                     </div>
                     <div className={styles.summaryItem}>
-                        <span>매출</span>
-                        <span className={styles.summaryValueBlue}>7,510만원</span>
+                        <span>실제매출</span>
+                        <span className={styles.summaryValueBlue}>{formatAmount(processed.data.reduce((sum, row) => {
+                            const amount = typeof row.realSales === 'number' ? row.realSales : 0;
+                            return sum + amount;
+                        }, 0))}</span>
                     </div>
                     <div className={styles.summaryItem}>
-                        <span>인센티브</span>
-                        <span className={styles.summaryValueGreen}>751만원</span>
+                        <span>지급수수료</span>
+                        <span className={styles.summaryValueGreen}>{formatAmount(processed.data.reduce((sum, row) => {
+                            const amount = typeof row.fee === 'number' ? row.fee : 0;
+                            return sum + amount;
+                        }, 0))}</span>
                     </div>
                 </div>
             </div>

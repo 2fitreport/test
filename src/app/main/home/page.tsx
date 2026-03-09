@@ -11,11 +11,25 @@ import ProgressWrap from './components/ProgressWrap';
 export default function Home() {
     const [homeData, setHomeData] = useState<any>(null);
 
-    useEffect(() => {
+    const fetchHomeData = () => {
         fetch('/api/home', { credentials: 'include' })
             .then(res => res.ok ? res.json() : null)
             .then(data => setHomeData(data))
             .catch(() => {});
+    };
+
+    useEffect(() => {
+        fetchHomeData();
+
+        // 페이지가 다시 보여질 때마다 데이터 새로고침
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchHomeData();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, []);
 
     return (

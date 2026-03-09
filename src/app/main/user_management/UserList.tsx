@@ -6,6 +6,7 @@ import Image from 'next/image';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import Modal from '@/app/components/Modal/Modal';
 import Pagination from '@/app/components/Pagination/Pagination';
+import Spinner from '@/app/components/Spinner/Spinner';
 import styles from './userList.module.css';
 import modalStyles from '@/app/components/Modal/Modal.module.css';
 
@@ -474,7 +475,7 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
     };
 
     if (loading) {
-        return <div className={styles.loading}>로딩 중...</div>;
+        return <Spinner fullScreen />;
     }
 
     return (

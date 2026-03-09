@@ -47,6 +47,12 @@ html {
     -o-text-size-adjust: none;
 }
 
+@media (min-width: 1920px) {
+    html {
+        zoom: 80%;
+    }
+}
+
 html,
 body,
 div,

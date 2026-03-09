@@ -6,6 +6,7 @@ import { getAdminData } from '@/lib/auth';
 import styles from './companyCreate1.module.css';
 import Modal from '@/app/components/Modal/Modal';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
+import Spinner from '@/app/components/Spinner/Spinner';
 import CompanyInfoCard, { CompanyInfoCardHandle } from './components/CompanyInfoCard';
 import CretabInfo, { CretabInfoHandle, CretabFormData } from './components/CretabInfo';
 import ProgressStepsSection from './components/ProgressStepsSection';
@@ -856,13 +857,7 @@ function Company1Content() {
     };
 
     if (isLoading) {
-        return (
-            <div className={styles.container}>
-                <div style={{ padding: '40px', textAlign: 'center' }}>
-                    <p>로딩 중...</p>
-                </div>
-            </div>
-        );
+        return <Spinner fullScreen />;
     }
 
     const handleAccessDeniedClose = () => {
@@ -1087,7 +1082,7 @@ function Company1Content() {
 
 export default function Company1() {
     return (
-        <Suspense fallback={<div style={{ padding: '40px', textAlign: 'center' }}><p>로딩 중...</p></div>}>
+        <Suspense fallback={<Spinner fullScreen />}>
             <Company1Content />
         </Suspense>
     );

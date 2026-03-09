@@ -38,30 +38,48 @@ interface Props {
     onYearChange: (year: string) => void;
     onPrevYear: () => void;
     onNextYear: () => void;
+    revenueData?: any;
 }
 
 export default function RevenueChart({
     selectedYear,
     onYearChange,
     onPrevYear,
-    onNextYear
+    onNextYear,
+    revenueData
 }: Props) {
     const [chartData, setChartData] = useState<any>(null);
 
     useEffect(() => {
-        const mockData = {
-            labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
-            datasets: [
-                {
-                    label: '년별 매출',
-                    data: [2.5, 3.2, 2.8, 4.1, 3.5, 2.9, 4.3, 3.8, 2.6, 3.9, 4.2, 3.1],
-                    backgroundColor: '#0f1a4d',
-                    borderRadius: 8,
-                }
-            ]
-        };
-        setChartData(mockData);
-    }, [selectedYear]);
+        if (revenueData?.labels && revenueData?.data) {
+            const data = {
+                labels: revenueData.labels,
+                datasets: [
+                    {
+                        label: '년별 매출',
+                        data: revenueData.data,
+                        backgroundColor: '#0f1a4d',
+                        borderRadius: 8,
+                    }
+                ]
+            };
+            setChartData(data);
+        } else {
+            // Mock 데이터
+            const mockData = {
+                labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
+                datasets: [
+                    {
+                        label: '년별 매출',
+                        data: [2.5, 3.2, 2.8, 4.1, 3.5, 2.9, 4.3, 3.8, 2.6, 3.9, 4.2, 3.1],
+                        backgroundColor: '#0f1a4d',
+                        borderRadius: 8,
+                    }
+                ]
+            };
+            setChartData(mockData);
+        }
+    }, [selectedYear, revenueData]);
 
     const chartOptions = {
         indexAxis: 'x' as const,

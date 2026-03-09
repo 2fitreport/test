@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getAdminData } from '@/lib/auth';
 import Pagination from '@/app/components/Pagination/Pagination';
+import Spinner from '@/app/components/Spinner/Spinner';
 import ConfirmModal from '@/app/components/Modal/ConfirmModal';
 import TimeAgo from './TimeAgo';
 import styles from './documentSubmissionList.module.css';
@@ -158,6 +159,28 @@ export default function DocumentSubmissionList() {
             setWorkers(workerList);
         } catch (error) {
             console.error('실무자 목록 조회 실패:', error);
+        }
+    };
+
+    const formatApprovalAmount = (num: number): string => {
+        // num은 만원 단위
+        // 1억 = 10,000만원이므로, 만원 / 10,000 = 억원
+        const eokValue = num / 10000; // 억원 단위로 변환
+        const eok = Math.floor(eokValue);
+        const cheonman = Math.round((eokValue - eok) * 10);
+
+        if (eok > 0) {
+            if (cheonman > 0) {
+                return `${eok}억 ${cheonman}천만원`;
+            } else {
+                return `${eok}억원`;
+            }
+        } else {
+            if (cheonman > 0) {
+                return `${cheonman}천만원`;
+            } else {
+                return '0원';
+            }
         }
     };
 
@@ -739,6 +762,10 @@ export default function DocumentSubmissionList() {
         const userId = adminData?.user_id;
 
         const filtered = documents.filter(doc => {
+            // 승인된 문서는 필터가 '승인'이 아닐 때만 제외
+            if (doc.progress_details === '승인' && progressDetailsFilter !== '승인') {
+                return false;
+            }
             // API에서 이미 역할별 필터링을 완료했으므로, 여기서는 상태 필터와 검색만 적용
             if (statusFilter !== 'all' && doc.status !== statusFilter) {
                 return false;
@@ -921,7 +948,7 @@ export default function DocumentSubmissionList() {
     };
 
     if (loading) {
-        return <div className={styles.loading}>로딩 중...</div>;
+        return <Spinner fullScreen />;
     }
 
     return (
@@ -1256,7 +1283,7 @@ export default function DocumentSubmissionList() {
                                             })()}
                                         </td>
                                         <td className={styles.approvalAmount}>
-                                            {doc.approval_amount ? `${doc.approval_amount.toLocaleString()}만원` : '-'}
+                                            {doc.approval_amount ? formatApprovalAmount(doc.approval_amount) : '-'}
                                         </td>
                                         {!isUserSalesManager && (
                                             <td className={styles.userName}>{doc.user_name}</td>

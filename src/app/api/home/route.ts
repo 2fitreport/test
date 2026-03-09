@@ -33,47 +33,45 @@ export async function GET(request: NextRequest) {
         // 유저 정보 + 문서 + 로그 + 영업자 최대한 병렬로
         const userPromise = supabase
             .from('users')
-            .select('id, user_id, position_id, company_name, is_affiliation_representative')
+            .select('id, user_id, position_id, company_name, is_affiliation_representative, position(level)')
             .eq('user_id', userId)
             .single();
-
-        const docsPromise = supabase.from('documents')
-            .select('id, user_id, status, progress_details, approval_amount, created_at, updated_at, inspector_id, manager_id');
 
         const logsPromise = supabase.from('document_logs')
             .select(LOG_COLUMNS)
             .order('created_at', { ascending: false })
             .limit(200);
 
-        // 1단계: 유저 + 문서 + 로그 동시 조회
-        const [userResult, docsResult, logsResult] = await Promise.all([
+        // 1단계: 유저 + 로그 조회
+        const [userResult, logsResult] = await Promise.all([
             userPromise,
-            docsPromise,
             logsPromise
         ]);
 
         const user = userResult.data;
-        const userLevel = user?.position_id || 0;
+        const userLevel = (user as any)?.position?.level || 0;
         const userDbId = user?.id || 0;
         const userCompanyName = user?.company_name || '';
         const isRep = user?.is_affiliation_representative || false;
 
-        const allDocs = docsResult.data || [];
         let allLogs = logsResult.data || [];
+        let myDocs: any[] = [];
 
-        // 권한 필터링 (JS에서 처리 - 추가 DB 호출 최소화)
-        let myDocs = allDocs;
-        let allowedDocIds: Set<number> | null = null;
+        // 2단계: 권한별로 필터링된 문서 조회
+        let docsQuery = supabase.from('documents')
+            .select('id, user_id, status, progress_details, approval_amount, revenue_amount, created_at, updated_at, inspector_id, manager_id');
 
-        // 대표실무자(2): 실무자가 admin인 문서 제외
         if (userLevel === 2) {
-            myDocs = allDocs.filter(d => d.manager_id !== 'admin');
-            allowedDocIds = new Set(myDocs.map(d => d.id));
+            // 대표실무자: admin 제외
+            docsQuery = docsQuery.neq('manager_id', 'admin');
+        } else if (userLevel === 3) {
+            // 실무자: manager_id로 배정받은 문서만
+            docsQuery = docsQuery.eq('manager_id', userId);
         } else if (userLevel === 4) {
-            myDocs = allDocs.filter(d => d.user_id === userId);
-            allowedDocIds = new Set(myDocs.map(d => d.id));
+            // 영업자: 자신이 올린 문서만
+            docsQuery = docsQuery.eq('user_id', userId);
         } else if (userLevel === 6) {
-            // 검수자: 소속 조회 필요
+            // 검수자: 소속이 같은 영업자의 문서만
             const { data: myAffiliations } = await supabase
                 .from('inspector_affiliations')
                 .select('affiliation_name')
@@ -88,23 +86,26 @@ export async function GET(request: NextRequest) {
                 allowedUserIds = (usersData || []).map((u: any) => u.user_id);
             }
 
-            const allowedUserSet = new Set(allowedUserIds);
-            myDocs = allDocs.filter(d =>
-                allowedUserSet.has(d.user_id) || d.inspector_id === userId
-            );
-            allowedDocIds = new Set(myDocs.map(d => d.id));
+            if (allowedUserIds.length > 0) {
+                docsQuery = docsQuery.in('user_id', allowedUserIds);
+            } else {
+                docsQuery = docsQuery.eq('user_id', 'no_user_found');
+            }
         }
+        // Level 1: 모든 문서 (필터 적용 안 함)
+
+        const docsResult = await docsQuery;
+        myDocs = docsResult.data || [];
+        const allowedDocIds = new Set(myDocs.map(d => d.id));
 
         // 로그 권한 필터링
-        if (allowedDocIds !== null) {
-            allLogs = allLogs.filter(log => allowedDocIds!.has(log.document_id));
-        }
+        allLogs = allLogs.filter(log => allowedDocIds.has(log.document_id));
 
         // 영업자 목록 (별도 쿼리 - 필요한 경우만)
         let salesData: any[] = [];
-        if (userLevel === 1 || userLevel === 2 || userLevel === 4) {
+        if (userLevel === 1 || userLevel === 2) {
             let salesQuery = supabase.from('users').select('user_id, name').eq('position_id', 4);
-            if (userLevel === 4) {
+            if (false) {
                 if (isRep && userCompanyName) {
                     salesQuery = salesQuery.eq('company_name', userCompanyName);
                 } else {
@@ -115,9 +116,8 @@ export async function GET(request: NextRequest) {
 
             if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
-                // 대표실무자(2)는 admin 배정 문서 제외된 myDocs 사용
-                const baseDocs = (userLevel === 2) ? myDocs : allDocs;
-                const salesDocs = baseDocs.filter(d => salesUserIds.has(d.user_id));
+                // myDocs는 이미 권한별로 필터링된 문서
+                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id));
                 const docsByUser: Record<string, any[]> = {};
                 for (const doc of salesDocs) {
                     if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
@@ -142,12 +142,18 @@ export async function GET(request: NextRequest) {
 
         // === 통계 계산 ===
         const now = new Date();
-        const firstDayStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-        const lastDayStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-        const todayStr = now.toISOString().split('T')[0];
+        const toLocalDateStr = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        const firstDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
+        const lastDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+        const todayStr = toLocalDateStr(now);
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = toLocalDateStr(yesterday);
 
         const inProgressToday = myDocs.filter(d =>
             d.progress_details === '진행' && d.updated_at >= todayStr
@@ -163,9 +169,11 @@ export async function GET(request: NextRequest) {
             d.updated_at >= firstDayStr &&
             d.updated_at <= lastDayStr + 'T23:59:59'
         );
-        const totalApprovalAmount = monthlyApproved.reduce((sum, doc) =>
-            sum + (Number(doc.approval_amount) || 0), 0
-        );
+        const totalApprovalAmount = monthlyApproved.reduce((sum, doc) => {
+            const amount = doc.approval_amount;
+            const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+            return sum + numAmount;
+        }, 0);
 
         const newRegistrations = myDocs.filter(d =>
             d.created_at >= firstDayStr &&
@@ -230,8 +238,8 @@ export async function GET(request: NextRequest) {
             stats: {
                 inProgressCount: inProgressToday,
                 inProgressDifference: inProgressToday - inProgressYesterday,
-                approvalAmount: Math.round(totalApprovalAmount / 100000000 * 10) / 10,
-                monthlyRevenue: Math.round(totalApprovalAmount * 0.03 / 100000000 * 10) / 10,
+                approvalAmount: Math.round(totalApprovalAmount / 10000 * 10) / 10,
+                monthlyRevenue: Math.round(totalApprovalAmount * 0.03 / 10000 * 10) / 10,
                 newRegistrations,
                 approvedCount: monthlyApproved.length
             },

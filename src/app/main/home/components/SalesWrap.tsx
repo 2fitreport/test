@@ -57,7 +57,7 @@ export default function SalesWrap({ data }: Props) {
     const salesData: SalesData[] = data?.salesData || [];
     const currentUserId = data?.currentUserId || '';
 
-    const shouldDisplay = userLevel === 1 || userLevel === 2 || userLevel === 4;
+    const shouldDisplay = userLevel === 1 || userLevel === 2;
     if (!shouldDisplay) return null;
 
     // viewMode === 'my'일 때 자신만 필터링

@@ -6,6 +6,7 @@ import CreateUserForm from './components/CreateUserForm';
 import AffiliationSection from './components/AffiliationSection';
 import { useCreateUserForm } from './hooks/useCreateUserForm';
 import Modal from '@/app/components/Modal/Modal';
+import Spinner from '@/app/components/Spinner/Spinner';
 import styles from './createUser.module.css';
 
 interface Position {
@@ -162,14 +163,7 @@ export default function CreateUserPageContent() {
     };
 
     if (isLoading) {
-        return (
-            <div className={styles.pageContainer}>
-                <div className={styles.loadingContainer}>
-                    <div className={styles.spinner}></div>
-                    <p className={styles.loadingText}>로딩 중...</p>
-                </div>
-            </div>
-        );
+        return <Spinner fullScreen />;
     }
 
     return (

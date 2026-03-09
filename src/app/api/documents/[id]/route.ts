@@ -373,6 +373,25 @@ export async function PUT(
             }
         }
 
+        // payment_date 자동 계산 (승인 시 다음 월요일로 지정)
+        if (body.progress_details === '승인') {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0=일, 1=월, ..., 6=토
+            let daysToAdd: number;
+
+            if (dayOfWeek === 1) {
+                daysToAdd = 7; // 월요일 → 다음주 월요일
+            } else if (dayOfWeek === 0) {
+                daysToAdd = 1; // 일요일 → 다음날 월요일
+            } else {
+                daysToAdd = 8 - dayOfWeek; // 화~토 → 이번주 다음 월요일
+            }
+
+            const paymentDate = new Date(now);
+            paymentDate.setDate(paymentDate.getDate() + daysToAdd);
+            body.payment_date = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${String(paymentDate.getDate()).padStart(2, '0')}`;
+        }
+
         const { data, error } = await supabase
             .from('documents')
             .update(body)

@@ -86,7 +86,8 @@
       "Bash(ls:*)",
       "Bash(npx vercel:*)",
       "Bash(python3:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": []
