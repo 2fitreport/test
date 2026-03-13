@@ -30,6 +30,7 @@ export interface CompanyFileHandle {
     setExistingFiles: (files: Array<{ name: string; path: string; size: number }>, type?: 'business' | 'individual') => void;
     validateFormData: () => { valid: boolean; message?: string };
     resetFiles: () => void;
+    triggerFileInput: () => void;
 }
 
 interface CompanyFileProps {
@@ -41,9 +42,10 @@ interface CompanyFileProps {
     userPositionLevel?: number;
     getBusinessNumber?: () => string;
     companyName?: string;
+    onEditClick?: () => void;
 }
 
-const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false, viewId = null, progressDetails = null, isAuthor = false, isEditMode = false, userPositionLevel = 0, getBusinessNumber, companyName = '' }, ref) {
+const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function CompanyFile({ isViewMode = false, viewId = null, progressDetails = null, isAuthor = false, isEditMode = false, userPositionLevel = 0, getBusinessNumber, companyName = '', onEditClick }, ref) {
     const [businessType, setBusinessType] = useState<BusinessType>(null);
     const [alertModal, setAlertModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
     const [uploadedFilesByType, setUploadedFilesByType] = useState<Record<'business' | 'individual', Record<string, UploadedFile>>>({
@@ -210,6 +212,10 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
             setUploadedFilesByType({ business: {}, individual: {} });
             setExistingFilesByType({ business: [], individual: [] });
             setSavedFilesByType({ business: [], individual: [] });
+        },
+        triggerFileInput: () => {
+            const firstKey = Object.keys(fileInputRefs.current)[0];
+            if (firstKey) fileInputRefs.current[firstKey]?.click();
         },
     }));
 
@@ -553,6 +559,8 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                         onDragOver={(e) => { e.preventDefault(); if (!isViewMode && businessType) setDraggingDocId(doc.id); }}
                                         onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDraggingDocId(null); }}
                                         onDrop={(e) => handleDropFile(e, doc.id)}
+                                        onClick={isViewMode && onEditClick ? onEditClick : undefined}
+                                        style={isViewMode && onEditClick ? { cursor: 'pointer' } : {}}
                                     >
                                         <div className={styles.docContent}>
                                             <File className={styles.docIcon} />
@@ -564,20 +572,24 @@ const CompanyFile = forwardRef<CompanyFileHandle, CompanyFileProps>(function Com
                                                 <p className={styles.docDescription}>{doc.description}</p>
                                             </div>
                                         </div>
-                                        <button
-                                            className={styles.uploadBtn}
-                                            onClick={() => handleUploadClick(doc.id)}
-                                        >
-                                            업로드
-                                        </button>
-                                        <input
-                                            type="file"
-                                            ref={(ref) => {
-                                                if (ref) fileInputRefs.current[doc.id] = ref;
-                                            }}
-                                            onChange={(e) => handleFileChange(e, doc.id)}
-                                            style={{ display: 'none' }}
-                                        />
+                                        {!isViewMode && (
+                                            <>
+                                                <button
+                                                    className={styles.uploadBtn}
+                                                    onClick={() => handleUploadClick(doc.id)}
+                                                >
+                                                    업로드
+                                                </button>
+                                                <input
+                                                    type="file"
+                                                    ref={(ref) => {
+                                                        if (ref) fileInputRefs.current[doc.id] = ref;
+                                                    }}
+                                                    onChange={(e) => handleFileChange(e, doc.id)}
+                                                    style={{ display: 'none' }}
+                                                />
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>

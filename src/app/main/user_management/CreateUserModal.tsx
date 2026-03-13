@@ -17,6 +17,7 @@ interface CreateUserFormData {
     status: 'active' | 'inactive';
     supervisor_id?: number | null;
     affiliations?: string[];
+    introducer?: string;
 }
 
 interface CreateUserModalProps {
@@ -569,6 +570,21 @@ export default function CreateUserModal({
                         }}
                     />
                 </div>
+
+                {/* 소개자 (영업자만) */}
+                {createFormData.position_id > 0 &&
+                 positions.find(p => p.id === createFormData.position_id)?.level === 4 && (
+                <div className={styles.createFormGroup}>
+                    <label className={styles.createLabel}>소개자</label>
+                    <input
+                        type="text"
+                        className={styles.createInput}
+                        placeholder="소개자 아이디를 입력하세요"
+                        value={createFormData.introducer ?? ''}
+                        onChange={(e) => setCreateFormData({ ...createFormData, introducer: e.target.value })}
+                    />
+                </div>
+                )}
 
                 <div className={styles.createFormGroup}>
                     <label className={styles.createLabel}>소속 (기업명) <span className={styles.required}>*</span></label>

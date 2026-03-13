@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
         bank_name,
         account_holder,
         account_number,
+        introducer,
         created_at
       `)
       .order('position_id', { ascending: true })
@@ -151,7 +152,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, is_affiliation_representative, bank_name, account_holder, account_number } = body;
+    const { user_id, name, position_id, password, phone, email_display, address, address_detail, company_name, status, affiliations, is_affiliation_representative, bank_name, account_holder, account_number, introducer } = body;
 
     // 필수 항목 검증
     if (!user_id || !name || !position_id || !password) {
@@ -233,6 +234,7 @@ export async function POST(request: NextRequest) {
           bank_name: bank_name || null,
           account_holder: account_holder || null,
           account_number: account_number || null,
+          introducer: introducer || null,
         },
       ])
       .select(`

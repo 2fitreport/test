@@ -22,6 +22,7 @@ export interface CreateUserFormData {
     bank_name: string;
     account_holder: string;
     account_number: string;
+    introducer: string;
 }
 
 interface Position {
@@ -49,6 +50,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
         bank_name: '',
         account_holder: '',
         account_number: '',
+        introducer: '',
     });
 
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -323,6 +325,7 @@ export const useCreateUserForm = (isEditMode: boolean = false, originalUserId: s
             bank_name: '',
             account_holder: '',
             account_number: '',
+            introducer: '',
         });
         setErrors({});
         setIsDuplicateUserIdChecked(false);

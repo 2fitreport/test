@@ -102,9 +102,21 @@ export async function PUT(
         // 변경 전 문서 조회
         const { data: prevDoc } = await supabase
             .from('documents')
-            .select('status, progress_details, memos, title, company_name, manager_id, manager_name, business_number, type')
+            .select('status, progress_details, memos, title, company_name, manager_id, manager_name, business_number, type, submitter_id')
             .eq('id', docId)
             .single();
+
+        // A영업자(submitter): 상담신청 단계 이후 수정 불가
+        if (
+            prevDoc?.submitter_id &&
+            prevDoc.submitter_id === actorId &&
+            prevDoc.progress_details !== '상담신청'
+        ) {
+            return NextResponse.json(
+                { error: '상담신청 등록자는 서류요청 이후 수정할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
 
         // 문서 소유자 변경 방지 (모든 역할에 대해)
         if (body.user_id !== undefined) {
@@ -325,7 +337,7 @@ export async function PUT(
 
                 if (!isGoingBackToAnalysis) {
                     // 다음 단계로 이동만 가능 (이전 단계나 초기화는 불가)
-                    const stepOrder = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+                    const stepOrder = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
                     const currentIndex = stepOrder.indexOf(currentProgress);
                     const newIndex = stepOrder.indexOf(body.progress_details);
                     if (newIndex !== currentIndex + 1) {

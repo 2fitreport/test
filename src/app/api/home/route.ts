@@ -6,7 +6,7 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const PROGRESS_STAGES = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+const PROGRESS_STAGES = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
 const STATUS_LIST = ['정상', '보완', '보류', '검수'];
 
 // 로그에서 필요한 컬럼만

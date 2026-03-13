@@ -26,6 +26,7 @@ interface CreateUserFormProps {
         bank_name: string;
         account_holder: string;
         account_number: string;
+        introducer?: string;
     };
     errors: { [key: string]: string };
     isDuplicateUserIdChecked: boolean;
@@ -486,6 +487,20 @@ export default function CreateUserForm({
                                     </label>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* 소개자 (영업자만) */}
+                    {currentLevel === 4 && (
+                        <div className={styles.formGroup}>
+                            <label className={styles.label}>소개자</label>
+                            <input
+                                type="text"
+                                className={styles.input}
+                                placeholder="소개자 아이디를 입력하세요"
+                                value={formData.introducer ?? ''}
+                                onChange={(e) => onUpdateField('introducer', e.target.value)}
+                            />
                         </div>
                     )}
 

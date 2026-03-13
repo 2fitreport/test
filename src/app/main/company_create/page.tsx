@@ -21,6 +21,8 @@ function Company1Content() {
     const viewId = searchParams.get('view');
     const editParam = searchParams.get('edit');
     const fromAdditionalParam = searchParams.get('fromAdditional');
+    const fromCompanyFileParam = searchParams.get('fromCompanyFile');
+    const isConsultationMode = searchParams.get('consultation') === 'true';
 
     const [isSaving, setIsSaving] = useState(false);
     const [successModalOpen, setSuccessModalOpen] = useState(false);
@@ -157,11 +159,15 @@ function Company1Content() {
                                 (userLevel === 2 && currentProgressDetails === '진행' && (adminData?.user_id || currentUserId) !== documentData?.manager_id);
         const isStaff = userLevel === 3 || userLevel === undefined;
         const isBowan = documentData?.status === '보완' && userLevel === 4;
+        // A영업자(submitter): 서류요청 이후 수정 불가
+        const isSubmitterOnly = !!documentData?.submitter_id &&
+                                documentData?.submitter_id === (adminData?.user_id || currentUserId) &&
+                                documentData?.progress_details !== '상담신청';
         // 분석 이후 단계 영업자는 추가서류/메모만 편집 가능
         const isAnalysisPhaseEditMode = isAnalysisPhase && editParam === 'true' && !!viewId;
         const canEdit = editParam === 'true' && !!viewId &&
                         !(isApprovedOrRequested && !isLevel1) &&
-                        !isAnalysisPhase && !isStaff && !isBowan ||
+                        !isAnalysisPhase && !isStaff && !isBowan && !isSubmitterOnly ||
                         (isAnalysisPhaseEditMode);
         setIsEditMode(canEdit);
         isEditModeRef.current = canEdit;
@@ -181,6 +187,13 @@ function Company1Content() {
                     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
                     additionalFilesRef.current?.triggerFileInput();
                 }, 300);
+            } else if (fromCompanyFileParam === 'true') {
+                router.replace(`?view=${viewId}&edit=true`);
+                setTimeout(() => {
+                    const el = document.getElementById('company-file-section');
+                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    companyFileRef.current?.triggerFileInput();
+                }, 300);
             }
         }
 
@@ -188,7 +201,7 @@ function Company1Content() {
         if (editParam === 'true' && viewId && (isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
             router.replace(`?view=${viewId}`);
         }
-    }, [editParam, viewId, documentData, router]);
+    }, [editParam, viewId, documentData, router, fromAdditionalParam, fromCompanyFileParam]);
 
     // 조회한 문서 데이터를 폼에 반영 (처음 진입할 때만)
     useEffect(() => {
@@ -330,32 +343,33 @@ function Company1Content() {
                 return false;
             }
 
-            // 2. CompanyFile 유효성 검사 (첨부파일)
-            const companyFileValidation = companyFileRef.current?.validateFormData();
-            if (!companyFileValidation?.valid) {
-                setErrorMessage(companyFileValidation?.message || '첨부파일을 모두 업로드해주세요.');
-                setErrorModalOpen(true);
-                return false;
+            // 2. CompanyFile 유효성 검사 (상담신청 단계 제외)
+            if (documentData?.progress_details !== '상담신청') {
+                const companyFileValidation = companyFileRef.current?.validateFormData();
+                if (!companyFileValidation?.valid) {
+                    setErrorMessage(companyFileValidation?.message || '첨부파일을 모두 업로드해주세요.');
+                    setErrorModalOpen(true);
+                    return false;
+                }
             }
 
-            // 3. CretabInfo 유효성 검사
-            const cretabValidation = cretabInfoRef.current?.validateFormData();
-            if (!cretabValidation?.valid) {
-                setErrorMessage(cretabValidation?.message || '크레탑 정보를 모두 입력해주세요.');
-                setErrorModalOpen(true);
-                return false;
-            }
+            // 3. CretabInfo 유효성 검사 (상담신청 단계 제외)
+            if (documentData?.progress_details !== '상담신청') {
+                const cretabValidation = cretabInfoRef.current?.validateFormData();
+                if (!cretabValidation?.valid) {
+                    setErrorMessage(cretabValidation?.message || '크레탑 정보를 모두 입력해주세요.');
+                    setErrorModalOpen(true);
+                    return false;
+                }
 
-            // 4. 크레탑 파일 확인
-            const businessType = companyFileRef.current?.getBusinessType();
-            const cretabFile = cretabInfoRef.current?.getCretabFileForUpload();
-            const cretabStatus = cretabInfoRef.current?.getCretabStatus();
-
-            // 새로 업로드된 파일이 있거나, 기존 파일이 로드되었거나, 정보없음이 선택되면 OK
-            if (!cretabFile && cretabStatus !== 'file' && cretabStatus !== 'none') {
-                setErrorMessage('크레탑 파일을 업로드하거나\n정보없음을 선택해주세요.');
-                setErrorModalOpen(true);
-                return false;
+                // 4. 크레탑 파일 확인
+                const cretabFile = cretabInfoRef.current?.getCretabFileForUpload();
+                const cretabStatus = cretabInfoRef.current?.getCretabStatus();
+                if (!cretabFile && cretabStatus !== 'file' && cretabStatus !== 'none') {
+                    setErrorMessage('크레탑 파일을 업로드하거나\n정보없음을 선택해주세요.');
+                    setErrorModalOpen(true);
+                    return false;
+                }
             }
 
             return true;
@@ -390,7 +404,7 @@ function Company1Content() {
 
     const getProgressBadgeStyle = (progress: string | null | undefined) => {
         const styleMap: Record<string, React.CSSProperties> = {
-            '상담': { backgroundColor: '#9e9e9e', color: '#ffffff' },
+            '상담신청': { backgroundColor: '#9e9e9e', color: '#ffffff' },
             '서류요청': { backgroundColor: '#ffc107', color: '#ffffff' },
             '분석': { backgroundColor: '#2196f3', color: '#ffffff' },
             '심사': { backgroundColor: '#9c27b0', color: '#ffffff' },
@@ -398,7 +412,7 @@ function Company1Content() {
             '승인요청': { backgroundColor: '#ff9800', color: '#ffffff' },
             '승인': { backgroundColor: '#4caf50', color: '#ffffff' },
         };
-        return styleMap[progress || '상담'] || styleMap['상담'];
+        return styleMap[progress || '상담신청'] || styleMap['상담신청'];
     };
 
     const handleSave = async (skipSuccessModal?: boolean) => {
@@ -441,8 +455,8 @@ function Company1Content() {
                 throw new Error('연락처를 정확히 입력해주세요.');
             }
 
-            // 크레탑 정보 검증 (CretabInfo가 있는 경우에만)
-            if (viewId && currentUserPosition?.level !== 4) {
+            // 크레탑 정보 검증 (상담신청 단계 제외, level 4 제외)
+            if (viewId && currentUserPosition?.level !== 4 && documentData?.progress_details !== '상담신청') {
                 // 크레탑 폼 데이터 검증
                 const cretabValidation = cretabInfoRef.current?.validateFormData();
                 if (!cretabValidation?.valid) {
@@ -483,45 +497,44 @@ function Company1Content() {
             const existingFiles = companyFileRef.current?.getExistingFiles() || [];
             const additionalFiles = additionalFilesRef.current?.getFilesForUpload() || [];
 
-            // 4. 사업자 유형 검증
+            // 4. 사업자 유형 검증 (상담신청 모드에서는 스킵)
             const businessType = companyFileRef.current?.getBusinessType();
-            if (!businessType) {
+            if (!isConsultationMode && !businessType) {
                 throw new Error('사업자를 선택해주세요.');
             }
 
             const isCompany = businessType === 'business';
             const isIndividual = businessType === 'individual';
 
-            // 5. 필수 서류 검증 (하나씩 체크)
-            const requiredDocs = isCompany
-                ? ['business_license', 'financial_statement', 'vat_certificate']
-                : ['business_license', 'id_copy'];
+            // 5. 필수 서류 검증 (상담신청 모드에서는 스킵)
+            if (!isConsultationMode) {
+                const requiredDocs = isCompany
+                    ? ['business_license', 'financial_statement', 'vat_certificate']
+                    : ['business_license', 'id_copy'];
 
-            const uploadedDocIds = companyFiles.map((f: any) => f.docId);
-            // existingFiles의 path에서 docId 추출 (예: 'documents/business_license/...' 형식)
-            const existingDocIds = existingFiles.map((f: any) => {
-                const pathParts = f.path?.split('/') || [];
-                // path 구조: documents/{docId}/... 또는 company_create1/{userId}/{docType}/{filename}
-                const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
-                for (const part of pathParts) {
-                    const match = part.match(docIdPattern);
-                    if (match) return match[0];
-                }
-                return null;
-            }).filter(Boolean);
-            const allDocIds = [...uploadedDocIds, ...existingDocIds];
+                const uploadedDocIds = companyFiles.map((f: any) => f.docId);
+                const existingDocIds = existingFiles.map((f: any) => {
+                    const pathParts = f.path?.split('/') || [];
+                    const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
+                    for (const part of pathParts) {
+                        const match = part.match(docIdPattern);
+                        if (match) return match[0];
+                    }
+                    return null;
+                }).filter(Boolean);
+                const allDocIds = [...uploadedDocIds, ...existingDocIds];
 
-            const docNameMap: Record<string, string> = {
-                'business_license': '사업자등록증',
-                'financial_statement': '재무제표',
-                'vat_certificate': '부가세증명원',
-                'id_copy': '신분증사본',
-            };
+                const docNameMap: Record<string, string> = {
+                    'business_license': '사업자등록증',
+                    'financial_statement': '재무제표',
+                    'vat_certificate': '부가세증명원',
+                    'id_copy': '신분증사본',
+                };
 
-            // 첫 번째 누락된 서류만 에러 표시
-            for (const docId of requiredDocs) {
-                if (!allDocIds.includes(docId)) {
-                    throw new Error(`${docNameMap[docId]} 서류를 업로드해주세요.`);
+                for (const docId of requiredDocs) {
+                    if (!allDocIds.includes(docId)) {
+                        throw new Error(`${docNameMap[docId]} 서류를 업로드해주세요.`);
+                    }
                 }
             }
 
@@ -595,11 +608,15 @@ function Company1Content() {
             // 기존 파일과 새 파일 합치기
             const allFiles = [...existingFiles, ...uploadedFiles];
 
-            // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 신규면 '서류요청')
-            let progressDetails = '서류요청';
+            // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 상담신청 모드면 '상담', 신규면 '서류요청')
+            let progressDetails = isConsultationMode ? '상담신청' : '서류요청';
             let progressStartDate: string | null = null;
             if (isEditMode && viewId && documentData?.progress_details) {
                 progressDetails = documentData.progress_details;
+                // 상담신청 문서에서 B영업자가 필수서류 등록 후 저장 시 → 서류요청으로 변경
+                if (progressDetails === '상담신청' && businessType && !isConsultationMode) {
+                    progressDetails = '서류요청';
+                }
                 // 서류요청 → 분석으로 변경되는 경우 시간 경과 시작
                 if (progressDetails === '분석' && !documentData.progress_start_date) {
                     progressStartDate = String(Date.now());
@@ -613,8 +630,10 @@ function Company1Content() {
                 ...(viewId ? {} : { user_id: userId }),
                 // 수정 모드에서는 user_name도 원본 저자 유지
                 ...(viewId ? { user_name: documentData?.user_name } : { user_name: adminData.name || userId }),
-                document_type: '기업등록',
+                document_type: isConsultationMode ? '상담신청' : '기업등록',
                 title: formData.company_name,
+                // 상담신청 모드에서는 submitter_id에 최초 등록자 기록
+                ...(isConsultationMode && !viewId ? { submitter_id: userId } : {}),
                 // 생성 모드에서만 status 설정, 수정 모드에서는 기존 상태 유지
                 ...(viewId ? {} : { status: '정상' }),
                 progress_status: 'not_started',
@@ -831,12 +850,20 @@ function Company1Content() {
 
         // 첨부파일 초기화 (저장되지 않은 변경사항 폐기)
         if (companyFileRef.current) {
+            // 업로드된 파일 먼저 초기화
+            companyFileRef.current.resetFiles();
+            // 그 다음 기존 파일 복원
             if (documentData?.type) {
                 companyFileRef.current.setBusinessType(documentData.type);
             }
             if (documentData?.files && Array.isArray(documentData.files)) {
                 companyFileRef.current.setExistingFiles(documentData.files, documentData.type);
             }
+        }
+
+        // 추가서류 초기화 (저장되지 않은 변경사항 폐기)
+        if (additionalFilesRef.current) {
+            additionalFilesRef.current.resetUploadedFiles();
         }
         // 추가서류 초기화
         if (additionalFilesRef.current) {
@@ -873,15 +900,15 @@ function Company1Content() {
                         <h2>
                             {documentData?.company_name || '기업명'}
                             <b className={styles.progressBadge} style={getProgressBadgeStyle(documentData?.progress_details)}>
-                                {documentData?.progress_details || '상담'}
+                                {documentData?.progress_details || '상담신청'}
                             </b>
                         </h2>
                         <p>고객사 상세 정보 및 업무 진행 현황</p>
                     </>
                 ) : (
                     <>
-                        <h2>기업등록</h2>
-                        <p>고객사 상세 정보 및 서류를 등록하여 심사를 진행하세요.</p>
+                        <h2>{isConsultationMode ? '상담신청' : '기업등록'}</h2>
+                        <p>{isConsultationMode ? '상담 신청 정보를 입력하세요.' : '고객사 상세 정보 및 서류를 등록하여 심사를 진행하세요.'}</p>
                     </>
                 )}
             </div>
@@ -892,6 +919,11 @@ function Company1Content() {
                      (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id));
                 const isAnalysisAdditionalFilesMode = isEditMode && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserPosition?.level === 4;
                 const isSimplifiedMode = isSupplementMode || isAnalysisAdditionalFilesMode;
+                // A영업자(submitter): 서류요청 이후 단계에서는 파일 섹션 숨김
+                const _myId = getAdminData()?.user_id || currentUserId;
+                const isSubmitterOnly = !!documentData?.submitter_id &&
+                    documentData?.submitter_id === _myId &&
+                    documentData?.progress_details !== '상담신청';
                 return (
                 <div className={styles.companyManagementWrap}>
                     {/* 분석 단계 추가서류 모드에서도 기업정보 표시 (읽기 전용) */}
@@ -904,6 +936,7 @@ function Company1Content() {
                             progressStartDate={documentData?.progress_start_date}
                             managerId={documentData?.manager_id}
                             documentStatus={documentData?.status}
+                            documentUserId={documentData?.user_id}
                             currentUserName={currentUserName}
                             currentUserId={currentUserId}
                             currentUserPositionLevel={currentUserPosition?.level}
@@ -935,29 +968,34 @@ function Company1Content() {
                         onMemosChange={handleMemosChange}
                         showOnlyLatest={documentData?.status === '보완' && (currentUserPosition?.level === 4 || (currentUserPosition?.level === 6 && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행')) || (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id))}
                     />
-                    {!isSupplementMode && (
-                        <CompanyFile
-                            ref={companyFileRef}
-                            isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode}
-                            viewId={viewId}
+                    {!isSupplementMode && !isConsultationMode && !isSubmitterOnly && (
+                        <div id="company-file-section">
+                            <CompanyFile
+                                ref={companyFileRef}
+                                isViewMode={isViewMode && !isEditMode || isAnalysisAdditionalFilesMode}
+                                viewId={viewId}
+                                progressDetails={documentData?.progress_details}
+                                isAuthor={currentUserId === documentData?.user_id}
+                                isEditMode={isEditMode && !isAnalysisAdditionalFilesMode}
+                                userPositionLevel={currentUserPosition?.level || 0}
+                                getBusinessNumber={() => companyInfoRef.current?.getFormData()?.business_number || ''}
+                                companyName={documentData?.company_name || companyInfoRef.current?.getFormData()?.company_name || ''}
+                                onEditClick={viewId && (isViewMode && !isEditMode) ? () => router.push(`?view=${viewId}&edit=true&fromCompanyFile=true`) : undefined}
+                            />
+                        </div>
+                    )}
+                    {!isSubmitterOnly && (
+                        <AdditionalFiles
+                            ref={additionalFilesRef}
+                            isViewMode={isSimplifiedMode ? false : isViewMode && !isEditMode || (documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
                             progressDetails={documentData?.progress_details}
-                            isAuthor={currentUserId === documentData?.user_id}
-                            isEditMode={isEditMode && !isAnalysisAdditionalFilesMode}
                             userPositionLevel={currentUserPosition?.level || 0}
-                            getBusinessNumber={() => companyInfoRef.current?.getFormData()?.business_number || ''}
+                            viewId={viewId}
+                            onEditClick={!isSimplifiedMode && viewId && !((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1) ? () => router.push(`?view=${viewId}&edit=true&fromAdditional=true`) : undefined}
+                            readOnly={(documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
                             companyName={documentData?.company_name || companyInfoRef.current?.getFormData()?.company_name || ''}
                         />
                     )}
-                    <AdditionalFiles
-                        ref={additionalFilesRef}
-                        isViewMode={isSimplifiedMode ? false : isViewMode && !isEditMode || (documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
-                        progressDetails={documentData?.progress_details}
-                        userPositionLevel={currentUserPosition?.level || 0}
-                        viewId={viewId}
-                        onEditClick={!isSimplifiedMode && viewId && !((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1) ? () => router.push(`?view=${viewId}&edit=true&fromAdditional=true`) : undefined}
-                        readOnly={(documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1}
-                        companyName={documentData?.company_name || companyInfoRef.current?.getFormData()?.company_name || ''}
-                    />
                 </div>
                 );
             })()}

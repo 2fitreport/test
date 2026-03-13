@@ -40,7 +40,7 @@ export default function Home() {
                     <p className={styles.subTitle}>오늘의 회사 현황을 한눈에 확인하세요.</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true&consultation=true">상담신청</a>
                     <a href="/main/company_create?create=true">기업 생성</a>
                 </div>
             </div>

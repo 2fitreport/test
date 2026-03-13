@@ -35,6 +35,7 @@ export async function GET(
         account_holder,
         account_number,
         default_progress_filter,
+        introducer,
         created_at
       `)
       .eq('id', userId)
@@ -104,7 +105,7 @@ export async function PATCH(
 
     // 자기 자신의 기본 필터 설정 변경인 경우 (모든 직급 허용)
     if (requesterId === userId && body.default_progress_filter !== undefined && Object.keys(body).length === 1) {
-      const validValues = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인', null];
+      const validValues = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인', null];
       if (!validValues.includes(body.default_progress_filter)) {
         return NextResponse.json({ message: '유효하지 않은 필터 값입니다.' }, { status: 400 });
       }
@@ -168,7 +169,7 @@ export async function PATCH(
     }
 
     // status와 함께 다른 정보(소속, 소속대표 여부 등)를 업데이트하는 경우
-    const { status, company_name, is_affiliation_representative, affiliations, name, position_id, password, phone, email_display, address, address_detail, bank_name, account_holder, account_number } = body;
+    const { status, company_name, is_affiliation_representative, affiliations, name, position_id, password, phone, email_display, address, address_detail, bank_name, account_holder, account_number, introducer } = body;
 
     // 소속대표로 선임하는 경우 기존 소속대표 해임 처리
     if (status === 'active' && is_affiliation_representative === true && company_name) {
@@ -195,6 +196,7 @@ export async function PATCH(
     if (account_holder !== undefined) updateData.account_holder = account_holder;
     if (account_number !== undefined) updateData.account_number = account_number;
     if (is_affiliation_representative !== undefined) updateData.is_affiliation_representative = is_affiliation_representative;
+    if (introducer !== undefined) updateData.introducer = introducer;
 
     // position level 확인 (새로운 position 또는 기존 position)
     let newPositionLevel = 0;

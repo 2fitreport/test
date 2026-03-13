@@ -69,9 +69,11 @@ export async function GET(request: NextRequest) {
         else if (userLevel === 3) {
             filteredDocuments = data.filter((doc: any) => doc.manager_id === userId);
         }
-        // Level 4 (영업자): 자신의 문서만
+        // Level 4 (영업자): 자신의 문서 + 자신이 등록한 상담신청 문서(submitter_id)
         else if (userLevel === 4) {
-            filteredDocuments = data.filter((doc: any) => doc.user_id === userId);
+            filteredDocuments = data.filter((doc: any) =>
+                doc.user_id === userId || doc.submitter_id === userId
+            );
         }
         // Level 6 (검수자): 자신의 담당 소속에 해당하는 영업자 문서만
         else if (userLevel === 6) {

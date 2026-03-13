@@ -165,7 +165,7 @@ export default function PerformanceSettlementPage() {
                     <p className={styles.subTitle}>성과 관리 및 정산</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true&consultation=true">상담신청</a>
                     <a href="/main/company_create?create=true">기업 생성</a>
                 </div>
             </div>

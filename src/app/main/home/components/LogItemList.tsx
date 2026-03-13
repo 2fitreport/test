@@ -45,7 +45,7 @@ const STATUS_MAP: Record<string, { label: string; badgeClass: string; dotClass: 
 };
 
 const PROGRESS_STAGE_COLORS: Record<string, string> = {
-    '상담': 'var(--color-consultation)',
+    '상담신청': 'var(--color-consultation)',
     '서류요청': 'var(--color-document-request)',
     '분석': 'var(--color-analysis)',
     '진행': 'var(--color-progress)',

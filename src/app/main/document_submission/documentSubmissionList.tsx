@@ -60,7 +60,7 @@ export default function DocumentSubmissionList() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류' | '검수'>('all');
-    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인'>('all');
+    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담신청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -883,7 +883,7 @@ export default function DocumentSubmissionList() {
 
     const getProgressDetailsBadgeClass = (progressDetails: string) => {
         switch (progressDetails) {
-            case '상담':
+            case '상담신청':
                 return styles.progressBadgeConsultation;
             case '서류요청':
                 return styles.progressBadgeWaiting;
@@ -988,12 +988,12 @@ export default function DocumentSubmissionList() {
                                     className={styles.itemsSelect}
                                     value={progressDetailsFilter}
                                     onChange={(e) => {
-                                        setProgressDetailsFilter(e.target.value as 'all' | '상담' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인');
+                                        setProgressDetailsFilter(e.target.value as 'all' | '상담신청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인');
                                         setCurrentPage(1);
                                     }}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="상담">상담</option>
+                                    <option value="상담신청">상담신청</option>
                                     <option value="서류요청">서류요청</option>
                                     <option value="분석">분석</option>
                                     <option value="심사">심사</option>
@@ -1048,7 +1048,7 @@ export default function DocumentSubmissionList() {
                                     onChange={(e) => setDefaultProgressFilter(e.target.value)}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="상담">상담</option>
+                                    <option value="상담신청">상담신청</option>
                                     <option value="서류요청">서류요청</option>
                                     <option value="분석">분석</option>
                                     <option value="심사">심사</option>

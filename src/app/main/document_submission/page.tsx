@@ -27,7 +27,7 @@ export default function DocumentSubmissionPage() {
                     <p className={styles.subTitle}>고객사 정보를 관리하고 진행 현황을 확인하세요.</p>
                 </div>
                 <div className={styles.btnWrap}>
-                    <a href="">상담신청</a>
+                    <a href="/main/company_create?create=true&consultation=true">상담신청</a>
                     {userLevel !== 6 && (
                         <a href="/main/company_create?create=true">기업 생성</a>
                     )}

@@ -24,6 +24,7 @@ interface User {
     created_at?: string;
     password?: string;
     supervisor_id?: number | null;
+    introducer?: string | null;
 }
 
 type SortColumn = 'user_id' | 'name' | 'position' | 'phone' | 'email_display' | 'address' | 'affiliation_name' | 'status' | 'created_at';
@@ -177,7 +178,8 @@ const UserList = forwardRef<UserListHandle>(function UserList(_, ref) {
                 (user.email_display || '').toLowerCase().includes(query) ||
                 (user.address || '').toLowerCase().includes(query) ||
                 (user.address_detail || '').toLowerCase().includes(query) ||
-                (user.affiliation_name || '').toLowerCase().includes(query)
+                (user.affiliation_name || '').toLowerCase().includes(query) ||
+                (user.introducer || '').toLowerCase().includes(query)
             );
         });
 

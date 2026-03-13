@@ -45,6 +45,7 @@ interface ProgressStepsSectionProps {
     progressStartDate?: string | null;
     managerId?: string | null;
     documentStatus?: string | null;
+    documentUserId?: string | null;
     currentUserName?: string;
     currentUserId?: string;
     currentUserPositionLevel?: number | null;
@@ -64,6 +65,7 @@ export default function ProgressStepsSection({
     progressStartDate,
     managerId,
     documentStatus,
+    documentUserId,
     currentUserName,
     currentUserId,
     currentUserPositionLevel,
@@ -100,6 +102,8 @@ export default function ProgressStepsSection({
     const [revenueAmount, setRevenueAmount] = useState('');
     const [approvalPassword, setApprovalPassword] = useState('');
     const [approvalApproved, setApprovalApproved] = useState(false);
+    const [salesAssignModalOpen, setSalesAssignModalOpen] = useState(false);
+    const [selectedSalesperson, setSelectedSalesperson] = useState('');
 
     const userLevel = getAdminData()?.position?.level;
 
@@ -128,7 +132,7 @@ export default function ProgressStepsSection({
         return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     };
 
-    const allSteps = ['상담', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+    const allSteps = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
     const stepOrder = allSteps.slice(0, -1); // '승인' 단계를 진행 단계 목록에서 제외
     // progressDetails가 있으면 사용 (뷰 모드, 수정 모드 모두)
     // 없으면 (신규 등록 모드) 모든 단계가 pending
@@ -136,7 +140,7 @@ export default function ProgressStepsSection({
     const currentStepIndex = stepOrder.indexOf(currentProgress || '');
 
     const steps: Step[] = [
-        { id: 1, label: '상담', status: currentStepIndex > 0 ? 'completed' : currentStepIndex === 0 ? 'current' : 'pending' },
+        { id: 1, label: '상담신청', status: currentStepIndex > 0 ? 'completed' : currentStepIndex === 0 ? 'current' : 'pending' },
         { id: 2, label: '서류요청', status: currentStepIndex > 1 ? 'completed' : currentStepIndex === 1 ? 'current' : 'pending' },
         { id: 3, label: '분석', status: currentStepIndex > 2 ? 'completed' : currentStepIndex === 2 ? 'current' : 'pending' },
         { id: 4, label: '심사', status: currentStepIndex > 3 ? 'completed' : currentStepIndex === 3 ? 'current' : 'pending' },
@@ -274,6 +278,13 @@ export default function ProgressStepsSection({
     };
 
     const handleNext = async () => {
+        // 상담신청 단계에서는 영업자 배정 모달 열기
+        if (currentProgress === '상담신청') {
+            setSelectedSalesperson('');
+            setSalesAssignModalOpen(true);
+            return;
+        }
+
         // 승인요청 단계에서는 승인 모달 열기
         if (currentProgress === '승인요청') {
             setApprovalModalOpen(true);
@@ -793,6 +804,47 @@ export default function ProgressStepsSection({
         }
     };
 
+    const handleSalesAssignConfirm = async () => {
+        if (!documentId || !selectedSalesperson) {
+            setSalesAssignModalOpen(false);
+            return;
+        }
+
+        setIsLoading(true);
+        try {
+            // 현재 문서의 user_id(A영업자)를 submitter_id에 보존하고, user_id를 B영업자로 변경
+            const selectedWorker = workers.find(w => w.user_id === selectedSalesperson);
+            const response = await fetch(`/api/documents/${documentId}/assign-salesperson`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    new_user_id: selectedSalesperson,
+                    new_user_name: selectedWorker?.name || '',
+                    submitter_id: documentUserId || '',
+                })
+            });
+
+            if (response.ok) {
+                setSuccessMessage('영업자가 배정되었습니다.');
+                setSuccessModalType('success');
+                setSuccessModalOpen(true);
+                window.dispatchEvent(new Event('notificationUpdate'));
+            } else {
+                const errData = await response.json().catch(() => ({}));
+                console.error('영업자 배정 API 실패:', response.status, errData);
+                setSuccessMessage(errData?.error || '영업자 배정에 실패했습니다.');
+                setSuccessModalType('error');
+                setSuccessModalOpen(true);
+            }
+        } catch (error) {
+            console.error('영업자 배정 실패:', error);
+        } finally {
+            setIsLoading(false);
+            setSalesAssignModalOpen(false);
+            setSelectedSalesperson('');
+        }
+    };
+
     const handleSecurityComplete = () => {
         setSecurityType('inspection');
         setSecurityCompleteModalOpen(true);
@@ -926,7 +978,7 @@ export default function ProgressStepsSection({
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && (
+                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담신청') && (
                             <div className={styles.buttonGroup}>
                                 {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
                                 <div className={styles.groupButtons}>
@@ -952,7 +1004,7 @@ export default function ProgressStepsSection({
                         {!(userLevel === 1 && currentProgress === '승인') &&
                          !(userLevel === 4 && (documentStatus !== '보완' || progressDetails === '분석')) &&
                          !(currentProgress === '승인' && !userLevel) &&
-                         !(userLevel === 6 && progressDetails !== '서류요청' && documentStatus !== '보완') &&
+                         !(userLevel === 6 && progressDetails !== '서류요청' && progressDetails !== '상담신청' && documentStatus !== '보완') &&
                          !(currentProgress === '승인요청') &&
                          !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) &&
                          !(currentProgress === '진행' && userLevel === 2 && documentStatus !== '보완' && currentUserId !== managerId) && (
@@ -966,8 +1018,19 @@ export default function ProgressStepsSection({
                                             보안완료
                                         </button>
                                     )
-                                ) : userLevel === 6 ? (
+                                ) : (userLevel === 6 || (userLevel === 1 && currentProgress === '상담신청')) ? (
                                     <>
+                                        {/* 상담신청 단계: 보완요청, 진행불가 */}
+                                        {progressDetails === '상담신청' && documentStatus !== '보류' && (
+                                            <>
+                                                <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
+                                                    보완요청
+                                                </button>
+                                                <button className={`${styles.btn} ${styles.btnDanger}`} onClick={handleEnd} disabled={isLoading}>
+                                                    진행불가
+                                                </button>
+                                            </>
+                                        )}
                                         {progressDetails === '서류요청' && documentStatus === '보완' && (
                                             <>
                                                 <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
@@ -1367,6 +1430,108 @@ export default function ProgressStepsSection({
                                     color: 'white',
                                     border: 'none',
                                     cursor: ((selectedManager || isDirectProceed) && !isLoading) ? 'pointer' : 'not-allowed'
+                                }}
+                            >
+                                {isLoading ? '배정 중...' : '확인'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 영업자 배정 모달 (상담신청 → 서류요청) */}
+            {salesAssignModalOpen && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1001
+                }}>
+                    <div style={{
+                        backgroundColor: 'white',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                    }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px' }}>영업자 배정</h3>
+                        <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>필수서류를 등록할 영업자를 선택해주세요.</p>
+                        <div style={{ position: 'relative', marginBottom: '20px' }}>
+                            <select
+                                value={selectedSalesperson}
+                                onChange={(e) => setSelectedSalesperson(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px 40px 10px 14px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    fontSize: '14px',
+                                    appearance: 'none',
+                                    backgroundColor: '#fff',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="">영업자를 선택해주세요.</option>
+                                {workers
+                                    .filter(worker => worker.position?.level === 4)
+                                    .map((worker) => (
+                                    <option key={worker.id} value={worker.user_id}>
+                                        {worker.name}({worker.user_id})
+                                    </option>
+                                ))}
+                            </select>
+                            <img
+                                src="/arrow.svg"
+                                alt="드롭다운"
+                                style={{
+                                    position: 'absolute',
+                                    right: '12px',
+                                    top: '10px',
+                                    width: '16px',
+                                    height: '16px',
+                                    pointerEvents: 'none'
+                                }}
+                            />
+                        </div>
+                        <div style={{
+                            display: 'flex',
+                            gap: '10px',
+                            justifyContent: 'flex-end'
+                        }}>
+                            <button
+                                onClick={() => {
+                                    setSalesAssignModalOpen(false);
+                                    setSelectedSalesperson('');
+                                }}
+                                disabled={isLoading}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ddd',
+                                    backgroundColor: '#f5f5f5',
+                                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                                    opacity: isLoading ? 0.6 : 1
+                                }}
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSalesAssignConfirm}
+                                disabled={!selectedSalesperson || isLoading}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    backgroundColor: (selectedSalesperson && !isLoading) ? '#1c283c' : '#ccc',
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: (selectedSalesperson && !isLoading) ? 'pointer' : 'not-allowed'
                                 }}
                             >
                                 {isLoading ? '배정 중...' : '확인'}
