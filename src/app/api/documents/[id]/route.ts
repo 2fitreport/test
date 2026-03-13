@@ -254,6 +254,14 @@ export async function PUT(
                 );
             }
 
+            // 상담신청 단계: 서류요청으로만 이동 가능 (이전단계/초기화 불가)
+            if (currentProgress === '상담신청' && body.progress_details !== undefined && body.progress_details !== '서류요청') {
+                return NextResponse.json(
+                    { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                    { status: 403 }
+                );
+            }
+
             // 분석/심사/진행 단계 보완 상태: 메모, 추가서류, status(검수로 변경)만 수정 가능
             if ((currentProgress === '분석' || currentProgress === '진행') && currentStatus === '보완') {
                 const allowedKeys = ['memos', 'supplement_files', 'status'];
@@ -278,6 +286,14 @@ export async function PUT(
             const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
             const isEndAction = body.progress_details === '보류' && Object.keys(body).length === 1;
 
+            // 상담신청 단계: 서류요청으로만 이동 가능 (이전단계/초기화 불가)
+            if (currentProgress === '상담신청' && hasProgressDetailsChange && body.progress_details !== '서류요청') {
+                return NextResponse.json(
+                    { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                    { status: 403 }
+                );
+            }
+
             // progress_details가 포함되면 모든 상태에서 가능 (이전단계, 초기화 등)
             if (hasProgressDetailsChange) {
                 // OK - 항상 가능
@@ -293,8 +309,8 @@ export async function PUT(
                     { status: 403 }
                 );
             }
-            // 서류요청, 분석, 심사, 진행 단계에서는 status 변경도 자유롭게 가능 (보완, 보류, 정상 등)
-            else if (currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행') {
+            // 상담신청, 서류요청, 분석, 심사, 진행 단계에서는 status 변경도 자유롭게 가능 (보완, 보류, 정상 등)
+            else if (currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행') {
                 // OK - 이 단계들에서는 모든 status 변경 가능
             }
             // 보완 상태: 보안완료(status='검수')만 가능

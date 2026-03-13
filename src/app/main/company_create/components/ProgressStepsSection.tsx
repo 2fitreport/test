@@ -46,6 +46,7 @@ interface ProgressStepsSectionProps {
     managerId?: string | null;
     documentStatus?: string | null;
     documentUserId?: string | null;
+    submitterId?: string | null;
     currentUserName?: string;
     currentUserId?: string;
     currentUserPositionLevel?: number | null;
@@ -66,6 +67,7 @@ export default function ProgressStepsSection({
     managerId,
     documentStatus,
     documentUserId,
+    submitterId,
     currentUserName,
     currentUserId,
     currentUserPositionLevel,
@@ -978,11 +980,11 @@ export default function ProgressStepsSection({
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담신청') && (
+                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담신청' && userLevel !== 1 && userLevel !== 6) && !(currentProgress === '상담신청' && submitterId && documentUserId && submitterId !== documentUserId) && (
                             <div className={styles.buttonGroup}>
                                 {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
                                 <div className={styles.groupButtons}>
-                                    {userLevel === 1 && (
+                                    {userLevel === 1 && !(currentProgress === '상담신청') && (
                                         <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
                                             이전 단계로 이동
                                         </button>
@@ -992,7 +994,7 @@ export default function ProgressStepsSection({
                                             {isLoading ? '처리 중...' : '다음 단계로 이동'}
                                         </button>
                                     )}
-                                    {userLevel === 1 && (
+                                    {userLevel === 1 && !(currentProgress === '상담신청') && (
                                         <button className={`${styles.btn} ${styles.btnReset}`} onClick={handleReset} disabled={isLoading}>
                                             초기화
                                         </button>

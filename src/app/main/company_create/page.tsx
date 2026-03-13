@@ -644,7 +644,7 @@ function Company1Content() {
                 ...(viewId ? {} : { manager_name: '' }),
                 progress_details: progressDetails,
                 ...(progressStartDate && { progress_start_date: progressStartDate }),
-                type: businessType,
+                type: businessType || null,
                 // 파일 경로들 (DB 컬럼명과 맞춰야 함)
                 files: allFiles, // 첨부파일
                 ...(currentUserPosition?.level !== 4 && { cretop_file: cretabFileData }), // 크레탑 파일 (영업자 제외)
@@ -937,6 +937,7 @@ function Company1Content() {
                             managerId={documentData?.manager_id}
                             documentStatus={documentData?.status}
                             documentUserId={documentData?.user_id}
+                            submitterId={documentData?.submitter_id}
                             currentUserName={currentUserName}
                             currentUserId={currentUserId}
                             currentUserPositionLevel={currentUserPosition?.level}
