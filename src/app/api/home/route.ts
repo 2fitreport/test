@@ -31,26 +31,12 @@ export async function GET(request: NextRequest) {
         const month = searchParams.get('month');
         const chartOnly = searchParams.get('chart_only') === 'true';
 
-        // 유저 정보 + 문서 + 로그 + 영업자 최대한 병렬로
-        const userPromise = supabase
+        // 유저 정보 조회
+        const userResult = await supabase
             .from('users')
             .select('id, user_id, position_id, company_name, is_affiliation_representative, position(level)')
             .eq('user_id', userId)
             .single();
-
-        // chart_only 모드에서는 로그 조회 스킵
-        const logsPromise = chartOnly
-            ? Promise.resolve({ data: [] })
-            : supabase.from('document_logs')
-                .select(LOG_COLUMNS)
-                .order('created_at', { ascending: false })
-                .limit(200);
-
-        // 1단계: 유저 + 로그 조회
-        const [userResult, logsResult] = await Promise.all([
-            userPromise,
-            logsPromise
-        ]);
 
         const user = userResult.data;
         const userLevel = (user as any)?.position?.level || 0;
@@ -63,12 +49,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
-        let allLogs = logsResult.data || [];
         let myDocs: any[] = [];
+        // 소속 정보 캐싱 (문서 필터 + 영업자 목록에서 재사용)
+        let cachedAffNames: string[] = [];
+        let cachedInspectorAffNames: string[] = [];
 
         // 2단계: 권한별로 필터링된 문서 조회
         let docsQuery = supabase.from('documents')
-            .select('id, user_id, status, progress_details, approval_amount, revenue_amount, created_at, updated_at, inspector_id, manager_id');
+            .select('id, user_id, submitter_id, status, progress_details, approval_amount, revenue_amount, created_at, updated_at, inspector_id, manager_id');
 
         if (userLevel === 2) {
             // 대표실무자: admin 제외
@@ -84,13 +72,13 @@ export async function GET(request: NextRequest) {
                     .select('affiliations(name)')
                     .eq('user_id', userDbId);
 
-                const affNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
+                cachedAffNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
 
-                if (affNames.length > 0) {
+                if (cachedAffNames.length > 0) {
                     const { data: affUsers } = await supabase
                         .from('users')
                         .select('user_id')
-                        .in('company_name', affNames);
+                        .in('company_name', cachedAffNames);
                     const affUserIds = (affUsers || []).map((u: any) => u.user_id);
                     if (affUserIds.length > 0) {
                         docsQuery = docsQuery.in('user_id', affUserIds);
@@ -121,12 +109,12 @@ export async function GET(request: NextRequest) {
                 .select('affiliation_name')
                 .eq('inspector_id', userDbId);
 
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
+            cachedInspectorAffNames = (myAffiliations || []).map((a: any) => a.affiliation_name).filter(Boolean);
 
             let allowedUserIds: string[] = [];
-            if (affiliationNames.length > 0) {
+            if (cachedInspectorAffNames.length > 0) {
                 const { data: usersData } = await supabase
-                    .from('users').select('user_id').in('company_name', affiliationNames);
+                    .from('users').select('user_id').in('company_name', cachedInspectorAffNames);
                 allowedUserIds = (usersData || []).map((u: any) => u.user_id);
             }
 
@@ -157,8 +145,25 @@ export async function GET(request: NextRequest) {
         myDocs = docsResult.data || [];
         const allowedDocIds = new Set(myDocs.map(d => d.id));
 
-        // 로그 권한 필터링
-        allLogs = allLogs.filter(log => allowedDocIds.has(log.document_id));
+        // 로그 조회: 권한 있는 문서의 로그만 DB에서 필터링
+        let allLogs: any[] = [];
+        if (!chartOnly && allowedDocIds.size > 0) {
+            const { data: logsData } = await supabase
+                .from('document_logs')
+                .select(LOG_COLUMNS)
+                .in('document_id', [...allowedDocIds])
+                .order('created_at', { ascending: false })
+                .limit(200);
+            allLogs = logsData || [];
+
+            // 역할별 로그 action_type 필터링 (백엔드에서 처리)
+            allLogs = allLogs.filter(log => {
+                if (log.action_type === 'memo_delete') return false;
+                if (log.action_type === 'manager_assigned' && userLevel !== 1 && userLevel !== 2) return false;
+                if (log.action_type === 'salesperson_assigned' && ![1, 2, 4, 6].includes(userLevel)) return false;
+                return true;
+            });
+        }
 
         // === 날짜 계산 ===
         const now = new Date();
@@ -169,7 +174,7 @@ export async function GET(request: NextRequest) {
             return `${y}-${m}-${day}`;
         };
         const firstDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
-        const lastDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+        const nextMonthFirstStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1));
 
         // === 진행상황 차트 (chartOnly에서도 필요) ===
         const chartMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -215,34 +220,76 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ progressData });
         }
 
-        // === 영업자 목록 (level 1, 2만) ===
+        // === 영업자 목록 (level 1, 2, 4, 6) ===
         let salesData: any[] = [];
+        let salespeople: any[] | null = null;
+
         if (userLevel === 1 || userLevel === 2) {
-            const { data: salespeople } = await supabase
+            // 대표자/대표실무자: 전체 영업자
+            const { data } = await supabase
                 .from('users')
                 .select('user_id, name')
                 .eq('position_id', 4);
+            salespeople = data;
+        } else if (userLevel === 4) {
+            if (isRep) {
+                // 소속대표: 캐싱된 소속 정보 재사용
+                if (cachedAffNames.length > 0) {
+                    const { data } = await supabase
+                        .from('users')
+                        .select('user_id, name')
+                        .eq('position_id', 4)
+                        .in('company_name', cachedAffNames);
+                    salespeople = data;
+                }
+            } else {
+                // 일반 영업자: 본인만
+                const { data } = await supabase
+                    .from('users')
+                    .select('user_id, name')
+                    .eq('user_id', userId);
+                salespeople = data;
+            }
+        } else if (userLevel === 6) {
+            // 검수자: 캐싱된 소속 정보 재사용
+            if (cachedInspectorAffNames.length > 0) {
+                const { data } = await supabase
+                    .from('users')
+                    .select('user_id, name')
+                    .eq('position_id', 4)
+                    .in('company_name', cachedInspectorAffNames);
+                salespeople = data;
+            }
+        }
 
-            if (salespeople && salespeople.length > 0) {
+        if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
-                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id));
+                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id) || (d.submitter_id && salesUserIds.has(d.submitter_id)));
                 const docsByUser: Record<string, any[]> = {};
                 for (const doc of salesDocs) {
-                    if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-                    docsByUser[doc.user_id].push(doc);
+                    // user_id 기준 (담당 영업자)
+                    if (salesUserIds.has(doc.user_id)) {
+                        if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
+                        docsByUser[doc.user_id].push(doc);
+                    }
+                    // submitter_id 기준 (상담신청 보낸 영업자에게도 포함, 중복 방지)
+                    if (doc.submitter_id && doc.submitter_id !== doc.user_id && salesUserIds.has(doc.submitter_id)) {
+                        if (!docsByUser[doc.submitter_id]) docsByUser[doc.submitter_id] = [];
+                        docsByUser[doc.submitter_id].push(doc);
+                    }
                 }
                 salesData = salespeople.map((person: any) => {
                     const userDocs = docsByUser[person.user_id] || [];
 
                     const monthlyDocs = userDocs.filter(d => {
                         const date = d.created_at?.substring(0, 10) || '';
-                        return date >= firstDayStr && date <= lastDayStr;
+                        return date >= firstDayStr && date < nextMonthFirstStr;
                     });
 
                     const monthlyApprovedDocs = userDocs.filter(d =>
                         d.progress_details === '승인' &&
                         d.updated_at >= firstDayStr &&
-                        d.updated_at <= lastDayStr + 'T23:59:59'
+                        d.updated_at < nextMonthFirstStr
                     );
 
                     const approvedCount = monthlyApprovedDocs.length;
@@ -273,7 +320,6 @@ export async function GET(request: NextRequest) {
                         conversionRate: registrationCount > 0 ? `${Math.round((approvedCount / registrationCount) * 100)}%` : '-'
                     };
                 });
-            }
         }
 
         // === 통계 계산 ===
@@ -286,7 +332,7 @@ export async function GET(request: NextRequest) {
         const monthlyApproved = myDocs.filter(d =>
             d.progress_details === '승인' &&
             d.updated_at >= firstDayStr &&
-            d.updated_at <= lastDayStr + 'T23:59:59'
+            d.updated_at < nextMonthFirstStr
         );
         const totalApprovalAmount = monthlyApproved.reduce((sum, doc) => {
             const amount = doc.approval_amount;
@@ -296,7 +342,7 @@ export async function GET(request: NextRequest) {
 
         const newRegistrations = myDocs.filter(d =>
             d.created_at >= firstDayStr &&
-            d.created_at <= lastDayStr + 'T23:59:59'
+            d.created_at < nextMonthFirstStr
         ).length;
 
         // === 로그 분류 (각 50개씩) ===
@@ -306,7 +352,7 @@ export async function GET(request: NextRequest) {
             if (log.action_type === 'status_change' && ['보완', '보류'].includes(log.new_value)) {
                 if (revisionLogs.length < 50) revisionLogs.push(log);
             } else if (
-                ['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned', 'salesperson_assigned'].includes(log.action_type) ||
+                ['memo_add', 'progress_details_change', 'manager_assigned', 'salesperson_assigned'].includes(log.action_type) ||
                 (log.action_type === 'status_change' && ['정상', '검수'].includes(log.new_value))
             ) {
                 if (memoLogs.length < 50) memoLogs.push(log);
@@ -318,7 +364,7 @@ export async function GET(request: NextRequest) {
             stats: {
                 inProgressCount: inProgressToday,
                 approvalAmount: Math.round(totalApprovalAmount / 10000 * 10) / 10,
-                monthlyRevenue: Math.round(monthlyApproved.reduce((sum, doc) => {
+                monthlyRevenue: [3, 6].includes(userLevel) ? 0 : Math.round(monthlyApproved.reduce((sum, doc) => {
                     const amount = doc.revenue_amount;
                     const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                     return sum + numAmount;

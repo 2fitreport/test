@@ -14,7 +14,7 @@ export default function Home() {
     const fetchHomeData = () => {
         fetch('/api/home', { credentials: 'include' })
             .then(res => res.ok ? res.json() : null)
-            .then(data => setHomeData(data))
+            .then(data => { if (data) setHomeData(data); })
             .catch(() => {});
     };
 

@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './logWrap.module.css';
 import LogDeleteButton from './LogDeleteButton';
@@ -125,19 +124,6 @@ function getLogContent(log: DocumentLog) {
 
 export default function LogItemList({ logs, hasScroll, currentUserId, onLogRead, onLogDeleted }: LogItemListProps) {
     const router = useRouter();
-    const [userLevel, setUserLevel] = useState<number>(0);
-
-    useEffect(() => {
-        const adminData = sessionStorage.getItem('admin_data');
-        if (adminData) {
-            try {
-                const data = JSON.parse(adminData);
-                setUserLevel(data.position?.level || 0);
-            } catch (error) {
-                console.error('admin_data 파싱 실패:', error);
-            }
-        }
-    }, []);
 
     const handleLogClick = async (log: DocumentLog) => {
         try {
@@ -153,28 +139,15 @@ export default function LogItemList({ logs, hasScroll, currentUserId, onLogRead,
         router.push(`/main/company_create?view=${log.document_id}`);
     };
 
-    const filteredLogs = logs.filter(log => {
-        if (log.action_type === 'memo_delete') {
-            return false;
-        }
-        if (log.action_type === 'manager_assigned' && userLevel !== 1 && userLevel !== 2) {
-            return false;
-        }
-        if (log.action_type === 'salesperson_assigned' && userLevel !== 1 && userLevel !== 2 && userLevel !== 4 && userLevel !== 6) {
-            return false;
-        }
-        return true;
-    });
-
     return (
         <ul>
-            {filteredLogs.length === 0 && (
+            {logs.length === 0 && (
                 <li className={styles.empty}>알림사항이 없습니다.</li>
             )}
-            {filteredLogs.map((log, idx) => {
+            {logs.map((log, idx) => {
                 const content = getLogContent(log);
                 const { dotClass, label, description, backgroundColor } = content as any;
-                const isLast = idx === filteredLogs.length - 1;
+                const isLast = idx === logs.length - 1;
                 const showBorder = hasScroll || !isLast;
                 const isUnread = currentUserId && (log.staff_read || {})[currentUserId] !== true;
                 return (

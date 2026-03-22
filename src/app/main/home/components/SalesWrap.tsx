@@ -47,15 +47,15 @@ function getConversionRateStyle(conversionRate: string) {
 }
 
 export default function SalesWrap({ data }: Props) {
-    const [sortColumn, setSortColumn] = useState<keyof SalesData>('userId');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortColumn, setSortColumn] = useState<keyof SalesData>('registrations');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
 
     const userLevel = data?.userLevel || 0;
     const salesData: SalesData[] = data?.salesData || [];
 
-    const shouldDisplay = userLevel === 1 || userLevel === 2;
+    const shouldDisplay = userLevel === 1 || userLevel === 2 || userLevel === 4 || userLevel === 6;
     if (!shouldDisplay) return null;
 
     const filteredSalesData = salesData;

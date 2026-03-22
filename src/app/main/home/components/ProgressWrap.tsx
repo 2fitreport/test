@@ -43,8 +43,6 @@ export default function ProgressWrap({ data }: Props) {
     });
     const [isCustomMonth, setIsCustomMonth] = useState(false);
 
-    const userLevel = data?.userLevel || 0;
-
     // 초기 데이터 설정
     useEffect(() => {
         if (data?.progressData && !isCustomMonth) {
@@ -72,9 +70,6 @@ export default function ProgressWrap({ data }: Props) {
 
         fetchProgressData();
     }, [selectedMonth, isCustomMonth]);
-
-    const shouldDisplay = userLevel === 1 || userLevel === 2;
-    if (!shouldDisplay) return null;
 
     const makeOptions = (maxVal: number) => ({
         indexAxis: 'x' as const,
