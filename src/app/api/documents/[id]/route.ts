@@ -102,18 +102,18 @@ export async function PUT(
         // 변경 전 문서 조회
         const { data: prevDoc } = await supabase
             .from('documents')
-            .select('status, progress_details, memos, title, company_name, manager_id, manager_name, business_number, type, submitter_id')
+            .select('status, progress_details, memos, title, company_name, manager_id, manager_name, business_number, type, submitter_id, user_id, files')
             .eq('id', docId)
             .single();
 
-        // A영업자(submitter): 상담신청 단계 이후 수정 불가
+        // A영업자(submitter): B영업자 배정 후 수정 불가 (모든 단계)
         if (
             prevDoc?.submitter_id &&
             prevDoc.submitter_id === actorId &&
-            prevDoc.progress_details !== '상담신청'
+            prevDoc.user_id !== actorId
         ) {
             return NextResponse.json(
-                { error: '상담신청 등록자는 서류요청 이후 수정할 수 없습니다.' },
+                { error: '영업자가 배정된 이후에는 수정할 수 없습니다.' },
                 { status: 403 }
             );
         }
@@ -254,12 +254,27 @@ export async function PUT(
                 );
             }
 
-            // 상담신청 단계: 서류요청으로만 이동 가능 (이전단계/초기화 불가)
-            if (currentProgress === '상담신청' && body.progress_details !== undefined && body.progress_details !== '서류요청') {
-                return NextResponse.json(
-                    { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
-                    { status: 403 }
-                );
+            // 상담신청 단계 제한
+            if (currentProgress === '상담신청') {
+                if (body.progress_details !== undefined && body.progress_details !== '서류요청') {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                        { status: 403 }
+                    );
+                }
+                const allowedStatusValues = ['보완', '보류'];
+                if (body.status !== undefined && !allowedStatusValues.includes(body.status)) {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 보완요청과 진행불가만 가능합니다.' },
+                        { status: 403 }
+                    );
+                }
+                if (body.manager_id !== undefined || body.manager_name !== undefined) {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 실무자를 배정할 수 없습니다.' },
+                        { status: 403 }
+                    );
+                }
             }
 
             // 분석/심사/진행 단계 보완 상태: 메모, 추가서류, status(검수로 변경)만 수정 가능
@@ -286,12 +301,30 @@ export async function PUT(
             const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
             const isEndAction = body.progress_details === '보류' && Object.keys(body).length === 1;
 
-            // 상담신청 단계: 서류요청으로만 이동 가능 (이전단계/초기화 불가)
-            if (currentProgress === '상담신청' && hasProgressDetailsChange && body.progress_details !== '서류요청') {
-                return NextResponse.json(
-                    { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
-                    { status: 403 }
-                );
+            // 상담신청 단계 제한
+            if (currentProgress === '상담신청') {
+                // progress_details 변경은 서류요청으로만 가능
+                if (hasProgressDetailsChange && body.progress_details !== '서류요청') {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                        { status: 403 }
+                    );
+                }
+                // 허용: 보완요청(보완), 진행불가(보류), 메모 수정
+                const allowedStatusValues = ['보완', '보류'];
+                if (body.status !== undefined && !allowedStatusValues.includes(body.status)) {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 보완요청과 진행불가만 가능합니다.' },
+                        { status: 403 }
+                    );
+                }
+                // 실무자배정 차단
+                if (body.manager_id !== undefined || body.manager_name !== undefined) {
+                    return NextResponse.json(
+                        { error: '상담신청 단계에서는 실무자를 배정할 수 없습니다.' },
+                        { status: 403 }
+                    );
+                }
             }
 
             // progress_details가 포함되면 모든 상태에서 가능 (이전단계, 초기화 등)
@@ -382,6 +415,49 @@ export async function PUT(
                     { error: '진행 단계를 변경할 권한이 없습니다.' },
                     { status: 403 }
                 );
+            }
+        }
+
+        // 상담신청 → 서류요청 전환 시 필수 조건 검증
+        if (prevDoc?.progress_details === '상담신청' && body.progress_details === '서류요청') {
+            const bizType = body.type ?? prevDoc?.type;
+            if (!bizType) {
+                return NextResponse.json(
+                    { error: '사업자 유형을 선택해주세요.' },
+                    { status: 400 }
+                );
+            }
+
+            const finalFiles: any[] = body.files !== undefined ? body.files : (prevDoc?.files || []);
+            const docIdPattern = /business_license|financial_statement|vat_certificate|id_copy/;
+            const fileDocIds = finalFiles.map((f: any) => {
+                if (f.doc_id) return f.doc_id;
+                const pathParts = (f.path || '').split('/');
+                for (const part of pathParts) {
+                    const match = part.match(docIdPattern);
+                    if (match) return match[0];
+                }
+                return null;
+            }).filter(Boolean);
+
+            const requiredDocs = bizType === 'business'
+                ? ['business_license', 'financial_statement', 'vat_certificate']
+                : ['business_license', 'id_copy'];
+
+            const docNameMap: Record<string, string> = {
+                'business_license': '사업자등록증',
+                'financial_statement': '재무제표',
+                'vat_certificate': '부가세과세표준증명',
+                'id_copy': '신분증사본',
+            };
+
+            for (const docId of requiredDocs) {
+                if (!fileDocIds.includes(docId)) {
+                    return NextResponse.json(
+                        { error: `${docNameMap[docId]} 서류를 업로드해주세요.` },
+                        { status: 400 }
+                    );
+                }
             }
         }
 

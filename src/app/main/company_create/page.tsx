@@ -159,10 +159,10 @@ function Company1Content() {
                                 (userLevel === 2 && currentProgressDetails === '진행' && (adminData?.user_id || currentUserId) !== documentData?.manager_id);
         const isStaff = userLevel === 3 || userLevel === undefined;
         const isBowan = documentData?.status === '보완' && userLevel === 4;
-        // A영업자(submitter): 서류요청 이후 수정 불가
+        // A영업자(submitter): B영업자 배정 후 수정 불가 (모든 단계)
         const isSubmitterOnly = !!documentData?.submitter_id &&
                                 documentData?.submitter_id === (adminData?.user_id || currentUserId) &&
-                                documentData?.progress_details !== '상담신청';
+                                documentData?.user_id !== (adminData?.user_id || currentUserId);
         // 분석 이후 단계 영업자는 추가서류/메모만 편집 가능
         const isAnalysisPhaseEditMode = isAnalysisPhase && editParam === 'true' && !!viewId;
         const canEdit = editParam === 'true' && !!viewId &&
@@ -198,7 +198,7 @@ function Company1Content() {
         }
 
         // 수정 불가 조건 시 리다이렉트 (분석 단계는 추가서류/메모 편집 가능)
-        if (editParam === 'true' && viewId && (isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
+        if (editParam === 'true' && viewId && (isSubmitterOnly || isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
             router.replace(`?view=${viewId}`);
         }
     }, [editParam, viewId, documentData, router, fromAdditionalParam, fromCompanyFileParam]);
@@ -919,11 +919,11 @@ function Company1Content() {
                      (currentUserPosition?.level === 2 && (documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserId !== documentData?.manager_id));
                 const isAnalysisAdditionalFilesMode = isEditMode && (documentData?.progress_details === '분석' || documentData?.progress_details === '심사' || documentData?.progress_details === '진행') && currentUserPosition?.level === 4;
                 const isSimplifiedMode = isSupplementMode || isAnalysisAdditionalFilesMode;
-                // A영업자(submitter): 서류요청 이후 단계에서는 파일 섹션 숨김
+                // A영업자(submitter): B영업자 배정 후 파일 섹션 숨김 (모든 단계)
                 const _myId = getAdminData()?.user_id || currentUserId;
                 const isSubmitterOnly = !!documentData?.submitter_id &&
                     documentData?.submitter_id === _myId &&
-                    documentData?.progress_details !== '상담신청';
+                    documentData?.user_id !== _myId;
                 return (
                 <div className={styles.companyManagementWrap}>
                     {/* 분석 단계 추가서류 모드에서도 기업정보 표시 (읽기 전용) */}
@@ -1025,7 +1025,7 @@ function Company1Content() {
                                         {isSaving ? '처리 중...' : '보완완료'}
                                     </button>
                                 ) : (
-                                    documentData?.progress_details !== '승인' && (documentData?.progress_details !== '승인요청' || currentUserPosition?.level === 1) && (
+                                    documentData?.progress_details !== '승인' && (documentData?.progress_details !== '승인요청' || currentUserPosition?.level === 1) && !(documentData?.submitter_id && documentData?.submitter_id === currentUserId && documentData?.user_id !== currentUserId) && (
                                         <button
                                             className={styles.saveBtn}
                                             onClick={() => router.push(`?view=${viewId}&edit=true`)}

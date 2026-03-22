@@ -10,7 +10,7 @@ interface DocumentLog {
     document_id: number;
     document_title: string;
     company_name: string;
-    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned';
+    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned' | 'salesperson_assigned';
     actor_id: string;
     actor_name: string;
     old_value: string | null;
@@ -106,6 +106,15 @@ function getLogContent(log: DocumentLog) {
             backgroundColor: '#2196f3'
         };
     }
+    if (log.action_type === 'salesperson_assigned') {
+        return {
+            dotClass: styles.dotStarted,
+            badgeClass: styles.started,
+            label: '영업자',
+            description: `가 배정되었습니다. (${log.new_value})`,
+            backgroundColor: '#ff9800'
+        };
+    }
     return {
         dotClass: styles.dotStopped,
         badgeClass: styles.stopped,
@@ -149,6 +158,9 @@ export default function LogItemList({ logs, hasScroll, currentUserId, onLogRead,
             return false;
         }
         if (log.action_type === 'manager_assigned' && userLevel !== 1 && userLevel !== 2) {
+            return false;
+        }
+        if (log.action_type === 'salesperson_assigned' && userLevel !== 1 && userLevel !== 2 && userLevel !== 4 && userLevel !== 6) {
             return false;
         }
         return true;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getAdminData } from '@/lib/auth';
 import styles from './performanceSettlement.module.css';
 import SalesPerformanceTable from './components/SalesPerformanceTable';
 import StaffPerformanceTable from './components/StaffPerformanceTable';
@@ -8,20 +9,19 @@ import RevenueChart from './components/RevenueChart';
 import SettlementTable from './components/SettlementTable';
 import Spinner from '@/app/components/Spinner/Spinner';
 
-// Mock 데이터 (API 응답이 없을 때 사용)
-const salesData = [
-    { name: '김매니저', consult: 32, case: 15, amount: '28억', rate: '78%' },
-    { name: '이매니저', consult: 28, case: 12, amount: '22억', rate: '82%' },
-    { name: '박매니저', consult: 24, case: 11, amount: '18억', rate: '85%' },
-];
-
-const settlementData = [
-    { company: '(주)테크솔루션', approvalAmount: '5억원', realSales: '1,500만원', manager: '김영업자', inflow: '소개', fee: '600만원', paymentDate: '2024-02-25' },
-];
+const settlementDataDefault: any[] = [];
 
 export default function PerformanceSettlementPage() {
     const [settleData, setSettleData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [salesPerformanceData, setSalesPerformanceData] = useState<any[]>([]);
+    const [staffPerformanceData, setStaffPerformanceData] = useState<any[]>([]);
+    const [userLevel, setUserLevel] = useState<number>(0);
+
+    useEffect(() => {
+        const adminData = getAdminData();
+        setUserLevel(adminData?.position?.level || 0);
+    }, []);
 
     const getDefaultMonth = () => {
         const now = new Date();
@@ -57,6 +57,36 @@ export default function PerformanceSettlementPage() {
 
         fetchSettlementData();
     }, [selectedYear, selectedMonthSettlement]);
+
+    useEffect(() => {
+        const fetchSalesPerformance = async () => {
+            try {
+                const response = await fetch(`/api/sales/stats?month=${selectedMonthSales}`, { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    setSalesPerformanceData(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('영업자 성과 조회 실패:', error);
+            }
+        };
+        fetchSalesPerformance();
+    }, [selectedMonthSales]);
+
+    useEffect(() => {
+        const fetchStaffPerformance = async () => {
+            try {
+                const response = await fetch(`/api/staff/stats?month=${selectedMonthStaff}`, { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    setStaffPerformanceData(Array.isArray(data) ? data : []);
+                }
+            } catch (error) {
+                console.error('실무자 성과 조회 실패:', error);
+            }
+        };
+        fetchStaffPerformance();
+    }, [selectedMonthStaff]);
 
     // 케이스별 매출 정산
     const handlePrevMonthSettlement = () => {
@@ -205,7 +235,7 @@ export default function PerformanceSettlementPage() {
                     <div className={styles.performanceGrid}>
                         {/* 케이스별 매출 정산 */}
                         <SettlementTable
-                            data={settleData?.settlementData || settlementData}
+                            data={settleData?.settlementData || settlementDataDefault}
                             selectedMonth={selectedMonthSettlement}
                             onMonthChange={setSelectedMonthSettlement}
                             onPrevMonth={handlePrevMonthSettlement}
@@ -224,21 +254,23 @@ export default function PerformanceSettlementPage() {
 
                         {/* 영업자 성과 */}
                         <SalesPerformanceTable
-                            data={salesData}
+                            data={salesPerformanceData}
                             selectedMonth={selectedMonthSales}
                             onMonthChange={setSelectedMonthSales}
                             onPrevMonth={handlePrevMonthSales}
                             onNextMonth={handleNextMonthSales}
                         />
 
-                        {/* 실무자 성과 */}
-                        <StaffPerformanceTable
-                            data={salesData}
-                            selectedMonth={selectedMonthStaff}
-                            onMonthChange={setSelectedMonthStaff}
-                            onPrevMonth={handlePrevMonthStaff}
-                            onNextMonth={handleNextMonthStaff}
-                        />
+                        {/* 실무자 성과 - 대표자(1), 대표실무자(2), 실무자(3)만 표시 */}
+                        {(userLevel === 1 || userLevel === 2 || userLevel === 3) && (
+                            <StaffPerformanceTable
+                                data={staffPerformanceData}
+                                selectedMonth={selectedMonthStaff}
+                                onMonthChange={setSelectedMonthStaff}
+                                onPrevMonth={handlePrevMonthStaff}
+                                onNextMonth={handleNextMonthStaff}
+                            />
+                        )}
                     </div>
                 </div>
 

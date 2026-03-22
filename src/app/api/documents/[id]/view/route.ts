@@ -62,8 +62,8 @@ export async function GET(
         }
 
         // 권한 확인
-        // 영업자(level=4)는 자신이 작성한 문서만
-        if (userLevel === 4 && userId !== document.user_id) {
+        // 영업자(level=4)는 자신이 작성한 문서 또는 submitter_id가 본인인 문서만
+        if (userLevel === 4 && userId !== document.user_id && userId !== document.submitter_id) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 

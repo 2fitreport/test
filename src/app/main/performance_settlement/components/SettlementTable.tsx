@@ -68,7 +68,7 @@ export default function SettlementTable({
         const startIdx = (page - 1) * itemsPerPage;
         const paginatedData = filtered.slice(startIdx, startIdx + itemsPerPage);
 
-        return { data: paginatedData, totalPages, totalCount: filtered.length };
+        return { data: paginatedData, allFiltered: filtered, totalPages, totalCount: filtered.length };
     };
 
     const processed = processTableData(data, searchTerm, sortColumn, sortOrder, currentPage);
@@ -233,21 +233,31 @@ export default function SettlementTable({
                 <div className={styles.summaryValues}>
                     <div className={styles.summaryItem}>
                         <span>승인금액</span>
-                        <span className={styles.summaryValueBlue}>{formatAmount(processed.data.reduce((sum, row) => {
-                            const amount = typeof row.approvalAmount === 'number' ? row.approvalAmount : 0;
-                            return sum + amount;
-                        }, 0))}</span>
+                        <span className={styles.summaryValueBlue}>{formatAmount((() => {
+                            const seen = new Set();
+                            return processed.allFiltered.reduce((sum, row) => {
+                                if (row.documentId && seen.has(row.documentId)) return sum;
+                                if (row.documentId) seen.add(row.documentId);
+                                const amount = typeof row.approvalAmount === 'number' ? row.approvalAmount : 0;
+                                return sum + amount;
+                            }, 0);
+                        })())}</span>
                     </div>
                     <div className={styles.summaryItem}>
                         <span>실제매출</span>
-                        <span className={styles.summaryValueBlue}>{formatAmount(processed.data.reduce((sum, row) => {
-                            const amount = typeof row.realSales === 'number' ? row.realSales : 0;
-                            return sum + amount;
-                        }, 0))}</span>
+                        <span className={styles.summaryValueBlue}>{formatAmount((() => {
+                            const seen = new Set();
+                            return processed.allFiltered.reduce((sum, row) => {
+                                if (row.documentId && seen.has(row.documentId)) return sum;
+                                if (row.documentId) seen.add(row.documentId);
+                                const amount = typeof row.realSales === 'number' ? row.realSales : 0;
+                                return sum + amount;
+                            }, 0);
+                        })())}</span>
                     </div>
                     <div className={styles.summaryItem}>
                         <span>지급수수료</span>
-                        <span className={styles.summaryValueGreen}>{formatAmount(processed.data.reduce((sum, row) => {
+                        <span className={styles.summaryValueGreen}>{formatAmount(processed.allFiltered.reduce((sum, row) => {
                             const amount = typeof row.fee === 'number' ? row.fee : 0;
                             return sum + amount;
                         }, 0))}</span>

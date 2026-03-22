@@ -16,20 +16,18 @@ export async function GET(request: NextRequest) {
         let userId = 'unknown';
         let userLevel = 0;
         let userDbId = 0;
-        let isAffiliationRep = false;
 
         try {
             const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
             userId = tokenData.user_id || 'unknown';
             const { data: userData } = await supabase
                 .from('users')
-                .select('id, is_affiliation_representative, company_name, position(level)')
+                .select('id, position(level)')
                 .eq('user_id', userId)
                 .single();
             if (userData) {
                 userLevel = (userData.position as any)?.level || 0;
                 userDbId = userData.id || 0;
-                isAffiliationRep = userData.is_affiliation_representative || false;
             }
         } catch (e) {}
 
@@ -38,34 +36,23 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
-        // 역할별 영업자 목록 조회
-        let salespeople: any[] = [];
+        // 역할별 실무자 목록 조회
+        let staffList: any[] = [];
 
-        if (userLevel === 4 && !isAffiliationRep) {
-            // 일반 영업자: 자신만
+        if (userLevel === 4) {
+            // 영업자: 실무자 성과 조회 불가
+            return NextResponse.json([]);
+        } else if (userLevel === 6) {
+            // 검수자: 실무자 성과 조회 불가
+            return NextResponse.json([]);
+        } else if (userLevel === 3) {
+            // 실무자: 본인 + 소속 관련 실무자
             const { data } = await supabase
                 .from('users')
                 .select('id, user_id, name')
                 .eq('user_id', userId)
-                .eq('position_id', 4);
-            salespeople = data || [];
-        } else if (userLevel === 4 && isAffiliationRep) {
-            // 소속대표: 같은 소속의 영업자들
-            const { data: myAffiliations } = await supabase
-                .from('user_affiliations')
-                .select('affiliations(name)')
-                .eq('user_id', userDbId);
-            const affNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
-            if (affNames.length > 0) {
-                const { data } = await supabase
-                    .from('users')
-                    .select('id, user_id, name')
-                    .in('company_name', affNames)
-                    .eq('position_id', 4);
-                salespeople = data || [];
-            }
-        } else if (userLevel === 6) {
-            // 검수자: 담당 소속 영업자
+                .eq('position_id', 3);
+            staffList = data || [];
             const { data: myAffiliations } = await supabase
                 .from('inspector_affiliations')
                 .select('affiliation_name')
@@ -78,52 +65,48 @@ export async function GET(request: NextRequest) {
                     .in('company_name', affiliationNames);
                 const affUserIds = (affUsers || []).map((u: any) => u.user_id);
                 if (affUserIds.length > 0) {
-                    const { data } = await supabase
-                        .from('users')
-                        .select('id, user_id, name')
+                    const { data: assignedDocs } = await supabase
+                        .from('documents')
+                        .select('manager_id')
                         .in('user_id', affUserIds)
-                        .eq('position_id', 4);
-                    salespeople = data || [];
+                        .not('manager_id', 'is', null)
+                        .neq('manager_id', 'admin');
+                    const managerIds = [...new Set((assignedDocs || []).map((d: any) => d.manager_id).filter(Boolean))];
+                    if (managerIds.length > 0) {
+                        const { data: affStaff } = await supabase
+                            .from('users')
+                            .select('id, user_id, name')
+                            .in('user_id', managerIds)
+                            .eq('position_id', 3);
+                        // 본인 + 소속 실무자 병합 (중복 제거)
+                        const existingIds = new Set(staffList.map((s: any) => s.user_id));
+                        for (const s of affStaff || []) {
+                            if (!existingIds.has(s.user_id)) {
+                                staffList.push(s);
+                                existingIds.add(s.user_id);
+                            }
+                        }
+                    }
                 }
             }
-        } else if (userLevel === 3) {
-            // 실무자: 자기가 담당하는 문서의 영업자만
-            const { data: managedDocs } = await supabase
-                .from('documents')
-                .select('user_id')
-                .eq('manager_id', userId)
-                .not('user_id', 'is', null);
-            const managedUserIds = [...new Set((managedDocs || []).map((d: any) => d.user_id).filter(Boolean))];
-            if (managedUserIds.length > 0) {
-                const { data } = await supabase
-                    .from('users')
-                    .select('id, user_id, name')
-                    .in('user_id', managedUserIds)
-                    .eq('position_id', 4);
-                salespeople = data || [];
-            }
         } else {
-            // level 1, 2: 모든 영업자
+            // level 1, 2: 모든 실무자
             const { data } = await supabase
                 .from('users')
                 .select('id, user_id, name')
-                .eq('position_id', 4);
-            salespeople = data || [];
+                .eq('position_id', 3);
+            staffList = data || [];
         }
 
-        if (salespeople.length === 0) return NextResponse.json([]);
+        if (staffList.length === 0) return NextResponse.json([]);
 
-        const userIds = salespeople.map((p: any) => p.user_id);
+        const staffUserIds = staffList.map((p: any) => p.user_id);
 
-        // 문서 조회 (대표실무자는 admin 배정 문서 제외)
-        let docQuery = supabase
+        // 실무자가 담당한 문서 조회 (manager_id 기준)
+        const { data: allDocuments } = await supabase
             .from('documents')
-            .select('user_id, progress_details, approval_amount, created_at, payment_date')
-            .in('user_id', userIds);
-        if (userLevel === 2) {
-            docQuery = docQuery.neq('manager_id', 'admin');
-        }
-        const { data: allDocuments } = await docQuery;
+            .select('manager_id, progress_details, approval_amount, created_at, payment_date')
+            .in('manager_id', staffUserIds);
         const docs = allDocuments || [];
 
         // 월 범위
@@ -135,28 +118,29 @@ export async function GET(request: NextRequest) {
             monthEndStr = `${y}-${String(m).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
         }
 
-        // user별 그룹핑
-        const docsByUser: Record<string, any[]> = {};
+        // manager별 그룹핑
+        const docsByManager: Record<string, any[]> = {};
         for (const doc of docs) {
-            if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-            docsByUser[doc.user_id].push(doc);
+            if (!doc.manager_id) continue;
+            if (!docsByManager[doc.manager_id]) docsByManager[doc.manager_id] = [];
+            docsByManager[doc.manager_id].push(doc);
         }
 
-        const stats = salespeople.map((person: any) => {
-            const userDocs = docsByUser[person.user_id] || [];
+        const stats = staffList.map((person: any) => {
+            const managerDocs = docsByManager[person.user_id] || [];
 
-            // 상담수: 해당 월에 생성된 문서
+            // 상담수: 해당 월에 배정된 문서 (created_at 기준)
             const consultDocs = monthStartStr
-                ? userDocs.filter(d => {
+                ? managerDocs.filter(d => {
                     const date = d.created_at?.substring(0, 10) || '';
                     return date >= monthStartStr && date <= monthEndStr;
                 })
-                : userDocs;
+                : managerDocs;
 
-            // 케이스수/승인금액: 해당 월에 payment_date 기준 승인된 문서
+            // 케이스수/승인금액: 해당 월 payment_date 기준 승인된 문서
             const approvedDocs = monthStartStr
-                ? userDocs.filter(d => d.progress_details === '승인' && d.payment_date && d.payment_date >= monthStartStr && d.payment_date <= monthEndStr)
-                : userDocs.filter(d => d.progress_details === '승인');
+                ? managerDocs.filter(d => d.progress_details === '승인' && d.payment_date && d.payment_date >= monthStartStr && d.payment_date <= monthEndStr)
+                : managerDocs.filter(d => d.progress_details === '승인');
 
             const totalApproval = approvedDocs.reduce((sum: number, d: any) => {
                 const amt = typeof d.approval_amount === 'string' ? parseInt(d.approval_amount) : Number(d.approval_amount) || 0;
@@ -189,7 +173,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(stats);
     } catch (error) {
-        console.error('영업자 통계 조회 실패:', error);
-        return NextResponse.json({ error: '영업자 통계 조회 실패' }, { status: 500 });
+        console.error('실무자 통계 조회 실패:', error);
+        return NextResponse.json({ error: '실무자 통계 조회 실패' }, { status: 500 });
     }
 }

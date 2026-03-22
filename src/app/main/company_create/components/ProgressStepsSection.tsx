@@ -13,6 +13,7 @@ interface Worker {
     name: string;
     position_id: number;
     position?: { id: number; name: string; level: number };
+    affiliation_name?: string | null;
 }
 
 interface Step {
@@ -978,13 +979,19 @@ export default function ProgressStepsSection({
                 </div>
                 )}
 
+                {documentId && currentProgress === '상담신청' && (userLevel === 4 || userLevel === 1 || userLevel === 6) && submitterId && documentUserId && submitterId !== documentUserId && currentUserId !== submitterId && (
+                    <div style={{ padding: '12px 16px', marginBottom: '12px', backgroundColor: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px', fontSize: '20px', color: '#f57c00', fontWeight: 500 }}>
+                        수정버튼을 눌러 사업자를 선택하고 필수 첨부파일 서류를 업로드해주세요.
+                    </div>
+                )}
+
                 {documentId && (
                     <div className={styles.actionButtons}>
                         {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담신청' && userLevel !== 1 && userLevel !== 6) && !(currentProgress === '상담신청' && submitterId && documentUserId && submitterId !== documentUserId) && (
                             <div className={styles.buttonGroup}>
                                 {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
                                 <div className={styles.groupButtons}>
-                                    {userLevel === 1 && !(currentProgress === '상담신청') && (
+                                    {userLevel === 1 && (
                                         <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={handlePrevious} disabled={isLoading || currentStepIndex === 0}>
                                             이전 단계로 이동
                                         </button>
@@ -994,7 +1001,7 @@ export default function ProgressStepsSection({
                                             {isLoading ? '처리 중...' : '다음 단계로 이동'}
                                         </button>
                                     )}
-                                    {userLevel === 1 && !(currentProgress === '상담신청') && (
+                                    {userLevel === 1 && (
                                         <button className={`${styles.btn} ${styles.btnReset}`} onClick={handleReset} disabled={isLoading}>
                                             초기화
                                         </button>
@@ -1134,22 +1141,22 @@ export default function ProgressStepsSection({
                                                 보완요청
                                             </button>
                                         )}
-                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
                                                 검수완료
                                             </button>
                                         )}
-                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnApprove}`} onClick={() => console.log('승인')} disabled={isLoading}>
                                                 승인
                                             </button>
                                         )}
-                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
                                                 실무자배정
                                             </button>
                                         )}
-                                        {!(currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
                                                 진행
                                             </button>
@@ -1482,7 +1489,13 @@ export default function ProgressStepsSection({
                             >
                                 <option value="">영업자를 선택해주세요.</option>
                                 {workers
-                                    .filter(worker => worker.position?.level === 4)
+                                    .filter(worker => {
+                                        if (worker.position?.level !== 4) return false;
+                                        if (worker.user_id === documentUserId) return false;
+                                        const ownerAffiliation = workers.find(w => w.user_id === documentUserId)?.affiliation_name;
+                                        if (!ownerAffiliation) return true;
+                                        return worker.affiliation_name === ownerAffiliation;
+                                    })
                                     .map((worker) => (
                                     <option key={worker.id} value={worker.user_id}>
                                         {worker.name}({worker.user_id})

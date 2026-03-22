@@ -49,12 +49,56 @@ export async function GET(request: NextRequest) {
         let allowedDocumentIds: number[] | null = null;
 
         if (userLevel === 4) {
-            // 영업자: 자신이 올린 문서만
-            const { data: myDocs } = await supabase
-                .from('documents')
-                .select('id')
-                .eq('user_id', userId);
-            allowedDocumentIds = (myDocs || []).map((d: any) => d.id);
+            // 소속대표 여부 확인
+            const { data: userInfo } = await supabase
+                .from('users')
+                .select('is_affiliation_representative')
+                .eq('user_id', userId)
+                .single();
+
+            if (userInfo?.is_affiliation_representative) {
+                // 소속대표: 본인 소속의 모든 영업자 문서 (manager_id 여부 무관)
+                const { data: myAffiliations } = await supabase
+                    .from('user_affiliations')
+                    .select('affiliations(name)')
+                    .eq('user_id', userDbId);
+
+                const affNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
+
+                if (affNames.length > 0) {
+                    const { data: affUsers } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('company_name', affNames);
+
+                    const affUserIds = (affUsers || []).map((u: any) => u.user_id);
+
+                    if (affUserIds.length > 0) {
+                        const { data: affDocs } = await supabase
+                            .from('documents')
+                            .select('id')
+                            .in('user_id', affUserIds);
+                        allowedDocumentIds = (affDocs || []).map((d: any) => d.id);
+                    } else {
+                        allowedDocumentIds = [];
+                    }
+                } else {
+                    allowedDocumentIds = [];
+                }
+            } else {
+                // 일반 영업자: 자신이 올린 문서 + submitter_id 문서
+                const { data: myDocs } = await supabase
+                    .from('documents')
+                    .select('id')
+                    .eq('user_id', userId);
+                const { data: submitterDocs } = await supabase
+                    .from('documents')
+                    .select('id')
+                    .eq('submitter_id', userId);
+                const myIds = (myDocs || []).map((d: any) => d.id);
+                const submitterIds = (submitterDocs || []).map((d: any) => d.id);
+                allowedDocumentIds = [...new Set([...myIds, ...submitterIds])];
+            }
 
         } else if (userLevel === 3) {
             // 실무자: 자신에게 배정된 문서만 (manager_id)
@@ -62,6 +106,14 @@ export async function GET(request: NextRequest) {
                 .from('documents')
                 .select('id')
                 .eq('manager_id', userId);
+            allowedDocumentIds = (myDocs || []).map((d: any) => d.id);
+
+        } else if (userLevel === 2) {
+            // 대표실무자: admin 배정 문서 제외
+            const { data: myDocs } = await supabase
+                .from('documents')
+                .select('id')
+                .neq('manager_id', 'admin');
             allowedDocumentIds = (myDocs || []).map((d: any) => d.id);
 
         } else if (userLevel === 6) {
@@ -142,7 +194,7 @@ export async function GET(request: NextRequest) {
             );
 
             const memoLogs = logs.filter((log: any) => {
-                if (['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned'].includes(log.action_type)) return true;
+                if (['memo_add', 'memo_delete', 'progress_details_change', 'manager_assigned', 'salesperson_assigned'].includes(log.action_type)) return true;
                 if (log.action_type === 'status_change' && ['정상', '검수'].includes(log.new_value)) return true;
                 return false;
             });
@@ -162,7 +214,7 @@ export async function GET(request: NextRequest) {
                 .eq('action_type', 'status_change')
                 .in('new_value', ['보완', '보류']);
         } else if (memoOnly) {
-            query = query.or('action_type.in.(memo_add,memo_delete,progress_details_change,manager_assigned),and(action_type.eq.status_change,new_value.in.(정상,검수))');
+            query = query.or('action_type.in.(memo_add,memo_delete,progress_details_change,manager_assigned,salesperson_assigned),and(action_type.eq.status_change,new_value.in.(정상,검수))');
         } else if (revisionRejected) {
             query = query
                 .eq('action_type', 'status_change')

@@ -141,6 +141,38 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
 
+        // 인증 확인 및 영업자 소속 검증
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (authToken) {
+            try {
+                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+                const actorUserId = tokenData.user_id;
+
+                const { data: actorUser } = await supabase
+                    .from('users')
+                    .select('id, position(level)')
+                    .eq('user_id', actorUserId)
+                    .single();
+
+                const actorLevel = (actorUser?.position as any)?.level;
+
+                // 영업자(level 4)는 소속 없으면 문서 등록 불가
+                if (actorLevel === 4 && actorUser) {
+                    const { data: affiliations } = await supabase
+                        .from('user_affiliations')
+                        .select('id')
+                        .eq('user_id', actorUser.id);
+
+                    if (!affiliations || affiliations.length === 0) {
+                        return NextResponse.json(
+                            { error: '소속이 없는 영업자는 문서를 등록할 수 없습니다.' },
+                            { status: 403 }
+                        );
+                    }
+                }
+            } catch {}
+        }
+
         console.log('저장될 데이터:', {
             submitted_date: body.submitted_date,
             completed_date: body.completed_date

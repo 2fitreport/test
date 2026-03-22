@@ -73,6 +73,50 @@ export async function PUT(
             );
         }
 
+        // 문서 작성자 본인은 배정 불가
+        if (new_user_id === doc.user_id) {
+            return NextResponse.json(
+                { error: '문서를 작성한 영업자는 배정할 수 없습니다.' },
+                { status: 403 }
+            );
+        }
+
+        // A영업자와 B영업자의 소속 일치 여부 확인
+        const { data: aWorkerUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('user_id', doc.user_id)
+            .single();
+
+        const { data: bWorkerUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('user_id', new_user_id)
+            .single();
+
+        if (aWorkerUser && bWorkerUser) {
+            const { data: aAffiliations } = await supabase
+                .from('user_affiliations')
+                .select('affiliations(name)')
+                .eq('user_id', aWorkerUser.id);
+
+            const { data: bAffiliations } = await supabase
+                .from('user_affiliations')
+                .select('affiliations(name)')
+                .eq('user_id', bWorkerUser.id);
+
+            const aAffNames = aAffiliations?.map((a: any) => a.affiliations?.name).filter(Boolean) || [];
+            const bAffNames = bAffiliations?.map((a: any) => a.affiliations?.name).filter(Boolean) || [];
+
+            const hasCommonAffiliation = aAffNames.some((name: string) => bAffNames.includes(name));
+            if (aAffNames.length > 0 && !hasCommonAffiliation) {
+                return NextResponse.json(
+                    { error: '같은 소속의 영업자만 배정할 수 있습니다.' },
+                    { status: 403 }
+                );
+            }
+        }
+
         // user_id를 B영업자로 변경, submitter_id에 A영업자 보존
         const updateData: any = {
             user_id: new_user_id,
@@ -100,7 +144,7 @@ export async function PUT(
             p_document_id: docId,
             p_document_title: doc.title ?? null,
             p_company_name: doc.company_name ?? null,
-            p_action_type: 'manager_assigned',
+            p_action_type: 'salesperson_assigned',
             p_actor_id: actorId,
             p_actor_name: actorName,
             p_old_value: doc.user_id || '(없음)',

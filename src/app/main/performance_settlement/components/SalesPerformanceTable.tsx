@@ -31,8 +31,8 @@ export default function SalesPerformanceTable({
     onNextMonth
 }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortColumn, setSortColumn] = useState<string>('name');
-    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+    const [sortColumn, setSortColumn] = useState<string>('case');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 6;
 
@@ -48,8 +48,10 @@ export default function SalesPerformanceTable({
         );
 
         filtered.sort((a, b) => {
-            const aValue = a[column];
-            const bValue = b[column];
+            // 문자열 컬럼은 숫자 필드로 정렬
+            const sortKey = column === 'amount' ? 'amountNum' : column === 'rate' ? 'rateNum' : column;
+            const aValue = a[sortKey];
+            const bValue = b[sortKey];
 
             if (typeof aValue === 'number' && typeof bValue === 'number') {
                 return order === 'asc' ? aValue - bValue : bValue - aValue;
