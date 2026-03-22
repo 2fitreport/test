@@ -215,7 +215,7 @@ export default function PerformanceSettlementPage() {
                     </div>
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>누적 매출</p>
-                        <p className={styles.statValue}>{formatApprovalAmount(stats.totalApprovalAmount ? stats.totalApprovalAmount * 0.03 : 0)}</p>
+                        <p className={styles.statValue}>{formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
                         <p className={styles.statSubValue}>전년도 대비</p>
                     </div>
                     <div className={styles.statCard}>

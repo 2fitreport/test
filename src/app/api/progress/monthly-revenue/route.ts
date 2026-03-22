@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
         let query = supabase
             .from('documents')
-            .select('approval_amount')
+            .select('approval_amount, revenue_amount')
             .eq('progress_details', '승인')
             .gte('updated_at', firstDayStr)
             .lte('updated_at', lastDayStr + 'T23:59:59');
@@ -59,10 +59,12 @@ export async function GET(request: NextRequest) {
             return sum + (Number(doc.approval_amount) || 0);
         }, 0);
 
-        // 승인금액의 3%를 수수료로 계산
-        const commissionAmount = totalApprovalAmount * 0.03;
+        // 실제매출(revenue_amount) 합산
+        const totalRevenueAmount = (documents || []).reduce((sum, doc) => {
+            return sum + (Number(doc.revenue_amount) || 0);
+        }, 0);
         // 억 단위로 표시
-        const eokRevenue = Math.round(commissionAmount / 100000000 * 10) / 10;
+        const eokRevenue = Math.round(totalRevenueAmount / 100000000 * 10) / 10;
 
         return NextResponse.json({ monthlyRevenue: eokRevenue });
     } catch (error) {

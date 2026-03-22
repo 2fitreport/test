@@ -179,10 +179,14 @@ export async function GET(request: NextRequest) {
             return sum + numAmount;
         }, 0);
 
-        const monthlyRevenue = totalApprovalAmount * 0.03; // 3% 수수료
+        const totalRevenueAmountRaw = monthlyApprovedForStats.reduce((sum, doc) => {
+            const amount = doc.revenue_amount;
+            const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+            return sum + numAmount;
+        }, 0);
 
         const monthlyApprovalAmount = Math.round(totalApprovalAmount / 10000 * 10) / 10;
-        const monthlyRevenueAmount = Math.round(monthlyRevenue / 10000 * 10) / 10;
+        const monthlyRevenueAmount = Math.round(totalRevenueAmountRaw / 10000 * 10) / 10;
 
         const newRegistrations = myDocs.filter(d => {
             // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
@@ -362,26 +366,26 @@ export async function GET(request: NextRequest) {
             // payment_date 기준 연도/월 추출
             if (!doc.payment_date) return;
             const { year, month } = extractYearMonthDay(doc.payment_date);
-            const approvalAmount = typeof doc.approval_amount === 'string'
-                ? parseInt(doc.approval_amount)
-                : Number(doc.approval_amount) || 0;
+            const revenueAmount = typeof doc.revenue_amount === 'string'
+                ? parseInt(doc.revenue_amount)
+                : Number(doc.revenue_amount) || 0;
 
             if (year > 0 && month > 0) {
                 if (!yearData[year]) yearData[year] = {};
-                yearData[year][month] = (yearData[year][month] || 0) + approvalAmount;
+                yearData[year][month] = (yearData[year][month] || 0) + revenueAmount;
             }
         });
 
-        // 선택된 연도의 월별 데이터 추출 (합산된 원금에서 한 번만 변환)
+        // 선택된 연도의 월별 데이터 추출 (실제매출 합산, 억원 단위)
         const monthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear]?.[i + 1] || 0;
-            return Math.round(raw * 0.03 / 10000 * 10) / 10; // 3% 수수료, 억원 단위
+            return Math.round(raw / 10000 * 10) / 10;
         });
 
         // 이전년도 데이터 추출 (전년도 비교용)
         const previousYearMonthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear - 1]?.[i + 1] || 0;
-            return Math.round(raw * 0.03 / 10000 * 10) / 10;
+            return Math.round(raw / 10000 * 10) / 10;
         });
 
         const revenueChartData = {
@@ -407,6 +411,13 @@ export async function GET(request: NextRequest) {
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.approval_amount;
+                        const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+                        return sum + numAmount;
+                    }, 0) / 10000 * 10) / 10,
+                totalRevenueAmount: Math.round(myDocs
+                    .filter(d => d.progress_details === '승인')
+                    .reduce((sum, doc) => {
+                        const amount = doc.revenue_amount;
                         const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
                         return sum + numAmount;
                     }, 0) / 10000 * 10) / 10,

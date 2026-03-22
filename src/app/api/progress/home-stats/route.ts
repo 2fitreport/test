@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         // 전체 문서를 한 번에 조회 (이번달 범위)
         let allDocsQuery = supabase
             .from('documents')
-            .select('progress_details, approval_amount, created_at, updated_at');
+            .select('progress_details, approval_amount, revenue_amount, created_at, updated_at');
 
         allDocsQuery = roleFilter(allDocsQuery);
 
@@ -77,7 +77,10 @@ export async function GET(request: NextRequest) {
         );
 
         const approvalAmountEok = Math.round(totalApprovalAmount / 100000000 * 10) / 10;
-        const monthlyRevenueEok = Math.round(totalApprovalAmount * 0.03 / 100000000 * 10) / 10;
+        const totalRevenueAmount = monthlyApproved.reduce((sum, doc) =>
+            sum + (Number(doc.revenue_amount) || 0), 0
+        );
+        const monthlyRevenueEok = Math.round(totalRevenueAmount / 100000000 * 10) / 10;
 
         // 3. 이번달 신규 등록 건수
         const newRegistrations = docs.filter(d =>

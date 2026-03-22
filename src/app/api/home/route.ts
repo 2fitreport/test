@@ -239,7 +239,11 @@ export async function GET(request: NextRequest) {
                 inProgressCount: inProgressToday,
                 inProgressDifference: inProgressToday - inProgressYesterday,
                 approvalAmount: Math.round(totalApprovalAmount / 10000 * 10) / 10,
-                monthlyRevenue: Math.round(totalApprovalAmount * 0.03 / 10000 * 10) / 10,
+                monthlyRevenue: Math.round(monthlyApproved.reduce((sum, doc) => {
+                    const amount = doc.revenue_amount;
+                    const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+                    return sum + numAmount;
+                }, 0) / 10000 * 10) / 10,
                 newRegistrations,
                 approvedCount: monthlyApproved.length
             },
