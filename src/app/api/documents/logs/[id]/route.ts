@@ -13,15 +13,16 @@ export async function PATCH(
     try {
         const { id } = await params;
         const authToken = request.cookies.get('auth_token')?.value;
-        let userId = 'unknown';
+        if (!authToken) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+        }
 
-        if (authToken) {
-            try {
-                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
-                userId = tokenData.user_id || 'unknown';
-            } catch (e) {
-                console.error('토큰 파싱 실패:', e);
-            }
+        let userId = 'unknown';
+        try {
+            const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+            userId = tokenData.user_id || 'unknown';
+        } catch {
+            return NextResponse.json({ error: '유효하지 않은 토큰입니다.' }, { status: 401 });
         }
 
         // 현재 staff_read 조회
@@ -53,10 +54,35 @@ export async function PATCH(
 }
 
 export async function DELETE(
-    _request: NextRequest,
+    request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const authToken = request.cookies.get('auth_token')?.value;
+        if (!authToken) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+        }
+
+        let userId = 'unknown';
+        try {
+            const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+            userId = tokenData.user_id || 'unknown';
+        } catch {
+            return NextResponse.json({ error: '유효하지 않은 토큰입니다.' }, { status: 401 });
+        }
+
+        // 역할 검증
+        const { data: userData } = await supabase
+            .from('users')
+            .select('position(level)')
+            .eq('user_id', userId)
+            .single();
+
+        const userLevel = (userData?.position as any)?.level || 0;
+        if (![1, 2, 3, 4, 6].includes(userLevel)) {
+            return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+        }
+
         const { id } = await params;
         const { error } = await supabase
             .from('document_logs')

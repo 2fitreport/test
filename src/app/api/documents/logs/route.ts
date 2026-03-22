@@ -18,31 +18,35 @@ export async function GET(request: NextRequest) {
 
         // 요청자 정보 추출
         const authToken = request.cookies.get('auth_token')?.value;
+        if (!authToken) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+        }
+
         let userId = 'unknown';
         let userLevel = 0;
-        let userAffiliation = '';
+        let userDbId = 0;
 
-        let userDbId = 0;  // users 테이블의 id (숫자)
-        if (authToken) {
-            try {
-                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
-                userId = tokenData.user_id || 'unknown';
+        try {
+            const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+            userId = tokenData.user_id || 'unknown';
 
-                const { data: userData } = await supabase
-                    .from('users')
-                    .select('id, *, position(level), company_name, supervisor_id')
-                    .eq('user_id', userId)
-                    .single();
+            const { data: userData } = await supabase
+                .from('users')
+                .select('id, position(level), company_name')
+                .eq('user_id', userId)
+                .single();
 
-                if (userData) {
-                    userDbId = userData.id;
-                    userLevel = (userData.position as any)?.level || 0;
-                    userAffiliation = userData.company_name || '';
-                }
-                console.log('로그 API - 사용자:', { userId, userDbId, userLevel, userAffiliation, revisionRejected });
-            } catch (e) {
-                console.error('토큰 파싱 실패:', e);
+            if (userData) {
+                userDbId = userData.id;
+                userLevel = (userData.position as any)?.level || 0;
             }
+        } catch {
+            return NextResponse.json({ error: '유효하지 않은 토큰입니다.' }, { status: 401 });
+        }
+
+        // 유효하지 않은 역할이면 차단
+        if (![1, 2, 3, 4, 6].includes(userLevel)) {
+            return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
         // level별 문서 필터링
@@ -118,52 +122,44 @@ export async function GET(request: NextRequest) {
 
         } else if (userLevel === 6) {
             // 검수자: 자신이 담당하는 소속의 영업자 문서 OR 자신이 배정받은 문서
-            console.log('검수자 필터링 시작:', { userId, userDbId });
 
             // 1. 검수자의 담당 소속 조회 (inspector_affiliations 사용)
-            const { data: myAffiliations, error: affError } = await supabase
+            const { data: myAffiliations } = await supabase
                 .from('inspector_affiliations')
                 .select('affiliation_name')
                 .eq('inspector_id', userDbId);
 
-            console.log('검수자 소속 조회:', { myAffiliations, affError });
             const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
 
             let allowedUserIds: string[] = [];
             if (affiliationNames.length > 0) {
                 // 2. 해당 소속에 속한 영업자 user_id 조회
-                const { data: usersData, error: usersError } = await supabase
+                const { data: usersData } = await supabase
                     .from('users')
                     .select('user_id')
                     .in('company_name', affiliationNames);
 
-                console.log('영업자 조회:', { affiliationNames, usersData, usersError });
                 allowedUserIds = (usersData || []).map((u: any) => u.user_id);
             }
 
             // 3. 담당 소속 영업자의 문서 조회
-            const { data: myDocs, error: docError } = await supabase
-                .from('documents')
-                .select('id')
-                .in('user_id', allowedUserIds);
-
-            console.log('문서 조회:', { allowedUserIds, myDocs, docError });
-
-            // 4. 현재 사용자가 배정받은 문서도 포함
-            if (myDocs) {
-                allowedDocumentIds = myDocs.map((d: any) => d.id);
+            let affiliationDocIds: number[] = [];
+            if (allowedUserIds.length > 0) {
+                const { data: myDocs } = await supabase
+                    .from('documents')
+                    .select('id')
+                    .in('user_id', allowedUserIds);
+                affiliationDocIds = (myDocs || []).map((d: any) => d.id);
             }
 
-            // 5. inspector_id가 자신인 문서도 추가 (과거에 배정받은 문서)
-            const { data: assignedDocs, error: assignedError } = await supabase
+            // 4. inspector_id가 자신인 문서도 추가 (과거에 배정받은 문서)
+            const { data: assignedDocs } = await supabase
                 .from('documents')
                 .select('id')
                 .eq('inspector_id', userId);
 
-            if (assignedDocs) {
-                const assignedIds = assignedDocs.map((d: any) => d.id);
-                allowedDocumentIds = [...new Set([...(allowedDocumentIds || []), ...assignedIds])];
-            }
+            const assignedIds = (assignedDocs || []).map((d: any) => d.id);
+            allowedDocumentIds = [...new Set([...affiliationDocIds, ...assignedIds])];
         }
 
         // home_all: 보완요청 + 알림사항 한번에 조회

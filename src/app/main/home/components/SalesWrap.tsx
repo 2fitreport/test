@@ -12,6 +12,7 @@ interface SalesData {
     approved: number;
     rejected: number;
     approvalAmount: string;
+    approvalAmountRaw: number;
     conversionRate: string;
 }
 
@@ -46,24 +47,18 @@ function getConversionRateStyle(conversionRate: string) {
 }
 
 export default function SalesWrap({ data }: Props) {
-    const [viewMode, setViewMode] = useState<'all' | 'my'>('all');
     const [sortColumn, setSortColumn] = useState<keyof SalesData>('userId');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
 
     const userLevel = data?.userLevel || 0;
-    const isRepresentative = data?.isRepresentative || false;
     const salesData: SalesData[] = data?.salesData || [];
-    const currentUserId = data?.currentUserId || '';
 
     const shouldDisplay = userLevel === 1 || userLevel === 2;
     if (!shouldDisplay) return null;
 
-    // viewMode === 'my'일 때 자신만 필터링
-    const filteredSalesData = (isRepresentative && userLevel === 4 && viewMode === 'my')
-        ? salesData.filter(s => s.userId === currentUserId)
-        : salesData;
+    const filteredSalesData = salesData;
 
     const handleSort = (column: keyof SalesData) => {
         if (sortColumn === column) {
@@ -81,8 +76,8 @@ export default function SalesWrap({ data }: Props) {
             let bVal: any = b[sortColumn];
 
             if (sortColumn === 'approvalAmount') {
-                aVal = parseInt(String(aVal).replace(/[^0-9]/g, '')) || 0;
-                bVal = parseInt(String(bVal).replace(/[^0-9]/g, '')) || 0;
+                aVal = a.approvalAmountRaw || 0;
+                bVal = b.approvalAmountRaw || 0;
             } else if (sortColumn === 'conversionRate') {
                 aVal = parseFloat(String(aVal).replace(/[^0-9.]/g, '')) || 0;
                 bVal = parseFloat(String(bVal).replace(/[^0-9.]/g, '')) || 0;
@@ -107,7 +102,6 @@ export default function SalesWrap({ data }: Props) {
         );
     };
 
-    const isAffiliationRepresentative = isRepresentative && userLevel === 4;
     const sortedData = getSortedData();
     const startIdx = (currentPage - 1) * itemsPerPage;
     const paginatedData = sortedData.slice(startIdx, startIdx + itemsPerPage);
@@ -116,38 +110,6 @@ export default function SalesWrap({ data }: Props) {
         <div className={styles.salesWrap}>
             <div className={styles.salesHeader}>
                 <h2>영업자 현황</h2>
-                {isAffiliationRepresentative && (
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <button
-                            onClick={() => setViewMode('all')}
-                            style={{
-                                padding: '8px 16px',
-                                border: viewMode === 'all' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
-                                borderRadius: '4px',
-                                backgroundColor: viewMode === 'all' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontWeight: viewMode === 'all' ? '600' : '500'
-                            }}
-                        >
-                            소속 영업자
-                        </button>
-                        <button
-                            onClick={() => setViewMode('my')}
-                            style={{
-                                padding: '8px 16px',
-                                border: viewMode === 'my' ? '2px solid #fff' : '1px solid rgba(255, 255, 255, 0.3)',
-                                borderRadius: '4px',
-                                backgroundColor: viewMode === 'my' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                color: '#fff',
-                                cursor: 'pointer',
-                                fontWeight: viewMode === 'my' ? '600' : '500'
-                            }}
-                        >
-                            내 현황
-                        </button>
-                    </div>
-                )}
             </div>
             <div className={styles.tableWrapper}>
                 <table className={styles.salesTable}>

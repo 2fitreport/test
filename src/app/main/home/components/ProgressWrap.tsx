@@ -44,7 +44,6 @@ export default function ProgressWrap({ data }: Props) {
     const [isCustomMonth, setIsCustomMonth] = useState(false);
 
     const userLevel = data?.userLevel || 0;
-    const isRepresentative = data?.isRepresentative || false;
 
     // 초기 데이터 설정
     useEffect(() => {
@@ -60,7 +59,7 @@ export default function ProgressWrap({ data }: Props) {
 
         const fetchProgressData = async () => {
             try {
-                const res = await fetch(`/api/home?month=${selectedMonth}`, { credentials: 'include' });
+                const res = await fetch(`/api/home?month=${selectedMonth}&chart_only=true`, { credentials: 'include' });
                 if (res.ok) {
                     const result = await res.json();
                     setStageData(result.progressData.stage);
@@ -128,31 +127,10 @@ export default function ProgressWrap({ data }: Props) {
         setIsCustomMonth(true);
     };
 
-    const isAffiliationRepresentative = isRepresentative && userLevel === 4;
-
     return (
         <div className={styles.progressWrap}>
             <div className={styles.progressHeader}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <h2>진행상황</h2>
-                    {isAffiliationRepresentative && (
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <button
-                                style={{
-                                    padding: '8px 16px',
-                                    border: '2px solid #fff',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                                    color: '#fff',
-                                    cursor: 'pointer',
-                                    fontWeight: '600'
-                                }}
-                            >
-                                소속 영업자
-                            </button>
-                        </div>
-                    )}
-                </div>
+                <h2>진행상황</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <button onClick={handlePrevMonth} className={styles.monthButton} title="이전 달">
                         <Image src="/arrow_left.svg" alt="이전 달" width={20} height={20} />

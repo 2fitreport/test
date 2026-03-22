@@ -14,32 +14,20 @@ export async function PATCH(
         const { id } = await params;
         const logId = parseInt(id);
 
-        // 요청자 정보 추출
         const authToken = request.cookies.get('auth_token')?.value;
-        let userId = 'unknown';
-        let userLevel = 0;
-
-        if (authToken) {
-            try {
-                const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
-                userId = tokenData.user_id || 'unknown';
-
-                // 사용자 정보 조회
-                const { data: userData } = await supabase
-                    .from('users')
-                    .select('*, position(level)')
-                    .eq('user_id', userId)
-                    .single();
-
-                if (userData) {
-                    userLevel = (userData.position as any)?.level || 0;
-                }
-            } catch (e) {
-                // 토큰 파싱 실패 무시
-            }
+        if (!authToken) {
+            return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
         }
 
-        // 모든 사용자: staff_read[userId] = true
+        let userId = 'unknown';
+        try {
+            const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
+            userId = tokenData.user_id || 'unknown';
+        } catch {
+            return NextResponse.json({ error: '유효하지 않은 토큰입니다.' }, { status: 401 });
+        }
+
+        // staff_read[userId] = true
         const { data: log } = await supabase
             .from('document_logs')
             .select('staff_read')

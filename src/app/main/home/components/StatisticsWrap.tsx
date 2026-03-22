@@ -9,13 +9,11 @@ interface Props {
 export default function StatisticsWrap({ data }: Props) {
     const stats = data?.stats;
     const userLevel = data?.userLevel || 0;
-    const isRepresentative = data?.isRepresentative || false;
     const isInspector = userLevel === 6;
     const isOperatorWithoutRepresentative = userLevel === 3;
     const loading = !data;
 
     const inProgressCount = stats?.inProgressCount || 0;
-    const inProgressDifference = stats?.inProgressDifference || 0;
     const approvalAmount = stats?.approvalAmount || 0;
     const monthlyRevenue = stats?.monthlyRevenue || 0;
     const newRegistrations = stats?.newRegistrations || 0;

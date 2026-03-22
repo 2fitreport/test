@@ -9,7 +9,7 @@ interface DocumentLog {
     document_id: number;
     document_title: string;
     company_name: string;
-    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned';
+    action_type: 'status_change' | 'memo_add' | 'memo_delete' | 'progress_details_change' | 'manager_assigned' | 'salesperson_assigned';
     actor_id: string;
     actor_name: string;
     old_value: string | null;
@@ -52,12 +52,14 @@ export default function LogWrap({ initialLogs, initialCurrentUserId, logsLoaded 
     };
 
     const handleDeleteAll = async () => {
+        const allIds = logs.map(log => log.id);
+        if (allIds.length === 0) return;
         try {
             const response = await fetch('/api/documents/logs/delete-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({}),
+                body: JSON.stringify({ logIds: allIds }),
             });
             if (!response.ok) {
                 const errorData = await response.json();
@@ -74,12 +76,16 @@ export default function LogWrap({ initialLogs, initialCurrentUserId, logsLoaded 
         const unreadIds = unreadLogs.map(log => log.id);
         if (unreadIds.length === 0) return;
         try {
-            await fetch('/api/documents/logs/read-all', {
+            const response = await fetch('/api/documents/logs/read-all', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({ logIds: unreadIds }),
             });
+            if (!response.ok) {
+                console.error('전체 읽음 처리 실패:', await response.json());
+                return;
+            }
             setLogs(prev => prev.map(log => ({
                 ...log,
                 staff_read: { ...(log.staff_read || {}), [currentUserId]: true }
