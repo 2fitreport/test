@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
                 : managerDocs.filter(d => d.progress_details === '승인');
 
             const totalApproval = approvedDocs.reduce((sum: number, d: any) => {
-                const amt = typeof d.approval_amount === 'string' ? parseInt(d.approval_amount) : Number(d.approval_amount) || 0;
+                const amt = typeof d.approval_amount === 'string' ? (parseInt(d.approval_amount) || 0) : Number(d.approval_amount) || 0;
                 return sum + amt;
             }, 0);
 

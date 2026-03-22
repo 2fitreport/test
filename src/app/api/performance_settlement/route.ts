@@ -175,13 +175,13 @@ export async function GET(request: NextRequest) {
 
         const totalApprovalAmount = monthlyApprovedForStats.reduce((sum, doc) => {
             const amount = doc.approval_amount;
-            const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+            const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
             return sum + numAmount;
         }, 0);
 
         const totalRevenueAmountRaw = monthlyApprovedForStats.reduce((sum, doc) => {
             const amount = doc.revenue_amount;
-            const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+            const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
             return sum + numAmount;
         }, 0);
 
@@ -235,10 +235,10 @@ export async function GET(request: NextRequest) {
         const settlementData: any[] = [];
         for (const doc of monthlyApprovedForSettlement) {
             const approvalAmount = typeof doc.approval_amount === 'string'
-                ? parseInt(doc.approval_amount)
+                ? (parseInt(doc.approval_amount) || 0)
                 : Number(doc.approval_amount) || 0;
             const revenueAmount = typeof doc.revenue_amount === 'string'
-                ? parseInt(doc.revenue_amount)
+                ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;
             const paymentDate = doc.payment_date || new Date(doc.updated_at).toISOString().split('T')[0];
 
@@ -338,10 +338,10 @@ export async function GET(request: NextRequest) {
 
                 for (const doc of introducedDocs || []) {
                     const approvalAmount = typeof doc.approval_amount === 'string'
-                        ? parseInt(doc.approval_amount)
+                        ? (parseInt(doc.approval_amount) || 0)
                         : Number(doc.approval_amount) || 0;
                     const revenueAmount = typeof doc.revenue_amount === 'string'
-                        ? parseInt(doc.revenue_amount)
+                        ? (parseInt(doc.revenue_amount) || 0)
                         : Number(doc.revenue_amount) || 0;
                     filteredSettlementData.push({
                         documentId: doc.id,
@@ -367,7 +367,7 @@ export async function GET(request: NextRequest) {
             if (!doc.payment_date) return;
             const { year, month } = extractYearMonthDay(doc.payment_date);
             const revenueAmount = typeof doc.revenue_amount === 'string'
-                ? parseInt(doc.revenue_amount)
+                ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;
 
             if (year > 0 && month > 0) {
@@ -411,14 +411,14 @@ export async function GET(request: NextRequest) {
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.approval_amount;
-                        const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+                        const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
                     }, 0) / 10000 * 10) / 10,
                 totalRevenueAmount: Math.round(myDocs
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.revenue_amount;
-                        const numAmount = typeof amount === 'string' ? parseInt(amount) : Number(amount) || 0;
+                        const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
                     }, 0) / 10000 * 10) / 10,
             },

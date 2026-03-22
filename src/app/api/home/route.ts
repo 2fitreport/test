@@ -264,19 +264,12 @@ export async function GET(request: NextRequest) {
 
         if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
-                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id) || (d.submitter_id && salesUserIds.has(d.submitter_id)));
+                // 영업자 현황: user_id 기준만 (상담신청 문서는 B영업자에게 귀속)
+                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id));
                 const docsByUser: Record<string, any[]> = {};
                 for (const doc of salesDocs) {
-                    // user_id 기준 (담당 영업자)
-                    if (salesUserIds.has(doc.user_id)) {
-                        if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-                        docsByUser[doc.user_id].push(doc);
-                    }
-                    // submitter_id 기준 (상담신청 보낸 영업자에게도 포함, 중복 방지)
-                    if (doc.submitter_id && doc.submitter_id !== doc.user_id && salesUserIds.has(doc.submitter_id)) {
-                        if (!docsByUser[doc.submitter_id]) docsByUser[doc.submitter_id] = [];
-                        docsByUser[doc.submitter_id].push(doc);
-                    }
+                    if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
+                    docsByUser[doc.user_id].push(doc);
                 }
                 salesData = salespeople.map((person: any) => {
                     const userDocs = docsByUser[person.user_id] || [];
