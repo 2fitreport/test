@@ -196,8 +196,8 @@ export async function GET(request: NextRequest) {
             return sum + numAmount;
         }, 0);
 
-        const monthlyApprovalAmount = Math.round(totalApprovalAmount / 10000 * 10) / 10;
-        const monthlyRevenueAmount = Math.round(totalRevenueAmountRaw / 10000 * 10) / 10;
+        const monthlyApprovalAmount = totalApprovalAmount / 100000000;
+        const monthlyRevenueAmount = totalRevenueAmountRaw / 10000;
 
         const newRegistrations = myDocs.filter(d => {
             // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
@@ -390,13 +390,13 @@ export async function GET(request: NextRequest) {
         // 선택된 연도의 월별 데이터 추출 (실제매출 합산, 억원 단위)
         const monthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear]?.[i + 1] || 0;
-            return Math.round(raw / 10000 * 10) / 10;
+            return raw / 10000;
         });
 
         // 이전년도 데이터 추출 (전년도 비교용)
         const previousYearMonthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear - 1]?.[i + 1] || 0;
-            return Math.round(raw / 10000 * 10) / 10;
+            return raw / 10000;
         });
 
         const revenueChartData = {
@@ -418,20 +418,20 @@ export async function GET(request: NextRequest) {
                     ? Math.round((monthlyApprovedForStats.length / newRegistrations) * 100)
                     : 0,
                 totalApprovedCount: myDocs.filter(d => d.progress_details === '승인').length,
-                totalApprovalAmount: Math.round(myDocs
+                totalApprovalAmount: myDocs
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.approval_amount;
                         const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
-                    }, 0) / 10000 * 10) / 10,
-                totalRevenueAmount: Math.round(myDocs
+                    }, 0) / 100000000,
+                totalRevenueAmount: myDocs
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.revenue_amount;
                         const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
-                    }, 0) / 10000 * 10) / 10,
+                    }, 0) / 10000,
             },
             settlementData: filteredSettlementData,
             revenueChartData,
