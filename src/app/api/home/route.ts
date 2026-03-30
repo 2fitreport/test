@@ -293,12 +293,13 @@ export async function GET(request: NextRequest) {
                         return sum + amt;
                     }, 0);
 
+                    // totalApproval은 만원 단위 → 억 단위 변환
                     const eok = Math.floor(totalApproval / 10000);
-                    const man = Math.round((totalApproval % 10000) / 1000);
+                    const man = Math.floor((totalApproval % 10000) / 1000);
                     let amountStr = '-';
                     if (totalApproval > 0) {
                         if (eok > 0) amountStr = man > 0 ? `${eok}억 ${man}천만원` : `${eok}억원`;
-                        else amountStr = `${Math.round(totalApproval / 1000)}천만원`;
+                        else amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
                     }
 
                     return {
@@ -356,7 +357,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             stats: {
                 inProgressCount: inProgressToday,
-                approvalAmount: totalApprovalAmount / 100000000,
+                approvalAmount: totalApprovalAmount / 10000,
                 monthlyRevenue: [3, 6].includes(userLevel) ? 0 : monthlyApproved.reduce((sum, doc) => {
                     const amount = doc.revenue_amount;
                     const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;

@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
             return sum + numAmount;
         }, 0);
 
-        const monthlyApprovalAmount = totalApprovalAmount / 100000000;
+        const monthlyApprovalAmount = totalApprovalAmount / 10000;
         const monthlyRevenueAmount = totalRevenueAmountRaw / 10000;
 
         const newRegistrations = myDocs.filter(d => {
@@ -424,7 +424,7 @@ export async function GET(request: NextRequest) {
                         const amount = doc.approval_amount;
                         const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
-                    }, 0) / 100000000,
+                    }, 0) / 10000,
                 totalRevenueAmount: myDocs
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
