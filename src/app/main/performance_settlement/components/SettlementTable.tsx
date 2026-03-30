@@ -128,6 +128,8 @@ export default function SettlementTable({
             } else {
                 if (baekman > 0) {
                     return `${baekman}백만원`;
+                } else if (manwon > 0) {
+                    return `${manwon}만원`;
                 } else {
                     return '0원';
                 }
