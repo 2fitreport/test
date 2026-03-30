@@ -75,28 +75,39 @@ export async function GET(request: NextRequest) {
                 doc.user_id === userId || doc.submitter_id === userId
             );
         }
-        // Level 6 (검수자): 자신의 담당 소속에 해당하는 영업자 문서만
+        // Level 6 (검수자): 자신의 소속에 해당하는 영업자 문서만
         else if (userLevel === 6) {
-            // 검수자의 담당 소속 조회
+            // 검수자의 소속 조회 (user_affiliations 기준)
             const { data: affiliationsData, error: affiliationsError } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userIdNumber);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userIdNumber);
 
-            if (!affiliationsError && affiliationsData) {
-                const affiliationNames = affiliationsData.map((a: any) => a.affiliation_name);
+            if (!affiliationsError && affiliationsData && affiliationsData.length > 0) {
+                const affiliationIds = affiliationsData.map((a: any) => a.affiliation_id);
 
                 // 해당 소속에 속한 영업자들의 user_id 조회
                 const { data: usersData, error: usersError } = await supabase
-                    .from('users')
+                    .from('user_affiliations')
                     .select('user_id')
-                    .in('company_name', affiliationNames);
+                    .in('affiliation_id', affiliationIds);
 
                 if (!usersError && usersData) {
-                    const assignedUserIds = usersData.map((u: any) => u.user_id);
-                    // 담당 소속의 영업자가 올린 문서 OR 과거에 배정받은 문서
+                    const assignedUserIds = usersData.map((u: any) => {
+                        // user_affiliations.user_id는 users.id (숫자)이므로 users 테이블에서 user_id(문자) 매핑 필요
+                        return u.user_id;
+                    });
+
+                    // 같은 소속의 users.id 목록으로 users.user_id 조회
+                    const { data: userIdData } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', assignedUserIds);
+
+                    const assignedUserStringIds = (userIdData || []).map((u: any) => u.user_id);
+
                     filteredDocuments = data.filter((doc: any) =>
-                        assignedUserIds.includes(doc.user_id) ||
+                        assignedUserStringIds.includes(doc.user_id) ||
                         doc.inspector_id === userId
                     );
                 }
@@ -105,7 +116,9 @@ export async function GET(request: NextRequest) {
         // Level 1 (대표자): 필터링 없음 (모든 문서)
         // Level 2 (대표실무자): 서류요청 단계 이전의 문서는 제외
         else if (userLevel === 2) {
-            filteredDocuments = data.filter((doc: any) => doc.progress_details !== '서류요청');
+            filteredDocuments = data.filter((doc: any) =>
+                doc.progress_details !== '서류요청' && doc.progress_details !== '상담신청'
+            );
         }
 
         // progress_start_date를 string으로 변환하여 반환 (TimeAgo 컴포넌트용)
