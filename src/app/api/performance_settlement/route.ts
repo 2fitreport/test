@@ -140,19 +140,30 @@ export async function GET(request: NextRequest) {
                 }
             }
         } else if (userLevel === 6) {
-            // 검수자: 소속이 같은 영업자의 문서만
+            // 검수자: 소속이 같은 영업자의 문서만 (user_affiliations 기준)
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
 
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
+            const affiliationIds = (myAffiliations || []).map((a: any) => a.affiliation_id);
 
             let allowedUserIds: string[] = [];
-            if (affiliationNames.length > 0) {
-                const { data: usersData } = await supabase
-                    .from('users').select('user_id').in('company_name', affiliationNames);
-                allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+            if (affiliationIds.length > 0) {
+                const { data: sameAffUsers } = await supabase
+                    .from('user_affiliations')
+                    .select('user_id')
+                    .in('affiliation_id', affiliationIds);
+
+                const sameAffUserDbIds = (sameAffUsers || []).map((u: any) => u.user_id);
+
+                if (sameAffUserDbIds.length > 0) {
+                    const { data: usersData } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', sameAffUserDbIds);
+                    allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                }
             }
 
             if (allowedUserIds.length > 0) {
@@ -169,8 +180,8 @@ export async function GET(request: NextRequest) {
         // === 현재달 통계 (stats는 항상 현재 달 기준) ===
         const monthlyApprovedForStats = myDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
-            if (!d.payment_date) return false;
-            return d.payment_date >= currentMonthStartStr && d.payment_date <= currentMonthEndStr;
+            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
+            return approvedDateStr >= currentMonthStartStr && approvedDateStr <= currentMonthEndStr;
         });
 
         const totalApprovalAmount = monthlyApprovedForStats.reduce((sum, doc) => {
@@ -194,11 +205,11 @@ export async function GET(request: NextRequest) {
             return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
         }).length;
 
-        // === 요청한 달의 케이스별 매출 정산 데이터 ===
+        // === 요청한 달의 케이스별 매출 정산 데이터 (승인된 날짜 기준) ===
         const monthlyApprovedForSettlement = myDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
-            if (!d.payment_date) return false;
-            return d.payment_date >= targetMonthStartStr && d.payment_date <= targetMonthEndStr;
+            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
+            return approvedDateStr >= targetMonthStartStr && approvedDateStr <= targetMonthEndStr;
         });
 
         // 영업자 정보 (이름 + 소개자) 일괄 조회 (user_id + submitter_id 모두)
@@ -363,9 +374,9 @@ export async function GET(request: NextRequest) {
         const approvedDocs = myDocs.filter(d => d.progress_details === '승인');
 
         approvedDocs.forEach(doc => {
-            // payment_date 기준 연도/월 추출
-            if (!doc.payment_date) return;
-            const { year, month } = extractYearMonthDay(doc.payment_date);
+            // updated_at 기준 연도/월 추출 (승인날짜)
+            if (!doc.updated_at) return;
+            const { year, month } = extractYearMonthDay(doc.updated_at?.substring(0, 10));
             const revenueAmount = typeof doc.revenue_amount === 'string'
                 ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;

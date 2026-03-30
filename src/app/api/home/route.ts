@@ -356,12 +356,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             stats: {
                 inProgressCount: inProgressToday,
-                approvalAmount: Math.round(totalApprovalAmount / 10000 * 10) / 10,
-                monthlyRevenue: [3, 6].includes(userLevel) ? 0 : Math.round(monthlyApproved.reduce((sum, doc) => {
+                approvalAmount: totalApprovalAmount / 100000000,
+                monthlyRevenue: [3, 6].includes(userLevel) ? 0 : monthlyApproved.reduce((sum, doc) => {
                     const amount = doc.revenue_amount;
                     const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                     return sum + numAmount;
-                }, 0) / 10000 * 10) / 10,
+                }, 0) / 10000,
                 newRegistrations,
                 approvedCount: monthlyApproved.length
             },
