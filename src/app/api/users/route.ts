@@ -87,22 +87,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([], { status: 200 });
     }
 
-    // 소속 정보 조회 (inspector_affiliations + user_affiliations)
-    const { data: inspectorAffData } = await supabase
-      .from('inspector_affiliations')
-      .select('inspector_id, affiliation_name');
-
+    // 소속 정보 조회 (user_affiliations 기준)
     const { data: userAffData } = await supabase
       .from('user_affiliations')
       .select('user_id, affiliations(name)');
-
-    // inspector_id → affiliation_name 맵
-    const inspectorAffMap = new Map<number, string>();
-    inspectorAffData?.forEach((ia: any) => {
-      if (!inspectorAffMap.has(ia.inspector_id)) {
-        inspectorAffMap.set(ia.inspector_id, ia.affiliation_name);
-      }
-    });
 
     // user_id → affiliation name 맵
     const userAffMap = new Map<number, string>();
@@ -115,7 +103,7 @@ export async function GET(request: NextRequest) {
     // 각 유저에 affiliation_name 추가
     data = data.map((u: any) => ({
       ...u,
-      affiliation_name: inspectorAffMap.get(u.id) || userAffMap.get(u.id) || null
+      affiliation_name: userAffMap.get(u.id) || null
     }));
 
     // 역할별 필터링
@@ -123,15 +111,20 @@ export async function GET(request: NextRequest) {
       // 영업자: 자신의 정보만
       data = data.filter((u: any) => u.user_id === userId);
     } else if (userLevel === 6) {
-      // 검수자: 자신의 담당 소속에 해당하는 사용자들만
+      // 검수자: 자신과 같은 소속의 사용자들만 (user_affiliations 기준)
       const { data: affiliationsData } = await supabase
-        .from('inspector_affiliations')
-        .select('affiliation_name')
-        .eq('inspector_id', userIdNumber);
+        .from('user_affiliations')
+        .select('affiliation_id')
+        .eq('user_id', userIdNumber);
 
-      if (affiliationsData) {
-        const affiliationNames = affiliationsData.map((a: any) => a.affiliation_name);
-        data = data.filter((u: any) => affiliationNames.includes(u.affiliation_name));
+      if (affiliationsData && affiliationsData.length > 0) {
+        const affiliationIds = affiliationsData.map((a: any) => a.affiliation_id);
+        const { data: sameAffUsers } = await supabase
+          .from('user_affiliations')
+          .select('user_id')
+          .in('affiliation_id', affiliationIds);
+        const sameAffUserIds = (sameAffUsers || []).map((u: any) => u.user_id);
+        data = data.filter((u: any) => sameAffUserIds.includes(u.id));
       } else {
         data = [];
       }
