@@ -68,20 +68,24 @@ export async function GET(
         }
 
         // 검수자(level=6) 권한 확인
-        let inspectorAffiliations: string[] = [];
+        let inspectorAffiliations: number[] = [];
         if (userLevel === 6) {
             const { data: affiliationsData } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userIdNumber);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userIdNumber);
 
-            inspectorAffiliations = affiliationsData?.map((a: any) => a.affiliation_name) || [];
+            inspectorAffiliations = affiliationsData?.map((a: any) => a.affiliation_id) || [];
 
             // 문서 작성자의 소속 확인
-            const documentAuthor = users?.find((u: any) => u.user_id === document.user_id);
-            const authorCompanyName = documentAuthor?.company_name || '';
+            const { data: authorAffiliations } = await supabase
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', users?.find((u: any) => u.user_id === document.user_id)?.id || 0);
 
-            const isAffiliatedDocument = inspectorAffiliations.includes(authorCompanyName);
+            const authorAffiliationIds = authorAffiliations?.map((a: any) => a.affiliation_id) || [];
+
+            const isAffiliatedDocument = inspectorAffiliations.some((id: number) => authorAffiliationIds.includes(id));
             const isPastInspector = document.inspector_id === userId;
 
             if (!isAffiliatedDocument && !isPastInspector) {
@@ -89,8 +93,8 @@ export async function GET(
             }
         }
 
-        // 대표실무자(level 2) 권한 확인: 서류요청 단계 문서 접근 불가
-        if (userLevel === 2 && document.progress_details === '서류요청') {
+        // 대표실무자(level 2) 권한 확인: 서류요청, 상담신청 단계 문서 접근 불가
+        if (userLevel === 2 && (document.progress_details === '서류요청' || document.progress_details === '상담신청')) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
