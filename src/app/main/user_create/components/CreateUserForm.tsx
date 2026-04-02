@@ -586,9 +586,6 @@ export default function CreateUserForm({
                                                     backgroundColor: formData.introducer === u.user_id ? '#e3f2fd' : 'transparent',
                                                     fontSize: '14px',
                                                     borderBottom: '1px solid #f0f0f0',
-                                                    ':hover': {
-                                                        backgroundColor: '#f5f5f5'
-                                                    }
                                                 }}
                                                 onClick={() => {
                                                     onUpdateField('introducer', u.user_id);
