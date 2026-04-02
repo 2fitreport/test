@@ -101,18 +101,18 @@ export async function GET(request: NextRequest) {
                     docsQuery = docsQuery.eq('user_id', 'no_user_found');
                 }
             } else {
-                // 일반 영업자: 자신의 문서 + submitter_id 문서
-                const { data: submitterDocs } = await supabase
-                    .from('documents')
-                    .select('id')
-                    .eq('submitter_id', userId);
+                // 일반 영업자: 자신의 문서 + submitter_id 문서 + 소개한 영업자의 문서
+                const [{ data: submitterDocs }, { data: introducedUsers }] = await Promise.all([
+                    supabase.from('documents').select('id').eq('submitter_id', userId),
+                    supabase.from('users').select('user_id').eq('introducer', userId),
+                ]);
                 const submitterIds = (submitterDocs || []).map((d: any) => d.id);
+                const introducedUserIds = (introducedUsers || []).map((u: any) => u.user_id);
 
-                if (submitterIds.length > 0) {
-                    docsQuery = docsQuery.or(`user_id.eq.${userId},id.in.(${submitterIds.join(',')})`);
-                } else {
-                    docsQuery = docsQuery.eq('user_id', userId);
-                }
+                const orParts: string[] = [`user_id.eq.${userId}`];
+                if (submitterIds.length > 0) orParts.push(`id.in.(${submitterIds.join(',')})`);
+                if (introducedUserIds.length > 0) orParts.push(`user_id.in.(${introducedUserIds.join(',')})`);
+                docsQuery = docsQuery.or(orParts.join(','));
             }
         } else if (userLevel === 6) {
             // 검수자: 소속이 같은 영업자의 문서 + inspector_id로 배정받은 문서
@@ -375,15 +375,48 @@ export async function GET(request: NextRequest) {
             if (revisionLogs.length >= 50 && memoLogs.length >= 50) break;
         }
 
+        // Level 4 일반 영업자: 지급수수료 계산
+        let monthlyRevenueValue: number;
+        if (userLevel === 4 && !isRep) {
+            const approvedDocUserIds = [...new Set([
+                ...monthlyApproved.map((d: any) => d.user_id),
+                ...monthlyApproved.map((d: any) => d.submitter_id),
+            ].filter(Boolean))];
+            let userIntroducerMap: Record<string, string> = {};
+            if (approvedDocUserIds.length > 0) {
+                const { data: usersData } = await supabase
+                    .from('users').select('user_id, introducer').in('user_id', approvedDocUserIds);
+                for (const u of usersData || []) {
+                    if (u.introducer) userIntroducerMap[u.user_id] = u.introducer;
+                }
+            }
+            let feeRaw = 0;
+            for (const doc of monthlyApproved) {
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                if (doc.submitter_id === userId) {
+                    feeRaw += Math.round(rev * 0.2 * 10) / 10;
+                } else if (doc.user_id === userId && !doc.submitter_id) {
+                    feeRaw += Math.round(rev * 0.4 * 10) / 10;
+                }
+                const docOwnerId = doc.submitter_id || doc.user_id;
+                if (userIntroducerMap[docOwnerId] === userId) {
+                    feeRaw += Math.round(rev * 0.05 * 10) / 10;
+                }
+            }
+            monthlyRevenueValue = feeRaw / 10000;
+        } else {
+            monthlyRevenueValue = [3, 6].includes(userLevel) ? 0 : monthlyApproved.reduce((sum: number, doc: any) => {
+                const amount = doc.revenue_amount;
+                const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
+                return sum + numAmount;
+            }, 0) / 10000;
+        }
+
         return NextResponse.json({
             stats: {
                 inProgressCount: inProgressToday,
                 approvalAmount: totalApprovalAmount / 10000,
-                monthlyRevenue: [3, 6].includes(userLevel) ? 0 : monthlyApproved.reduce((sum, doc) => {
-                    const amount = doc.revenue_amount;
-                    const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
-                    return sum + numAmount;
-                }, 0) / 10000,
+                monthlyRevenue: monthlyRevenueValue,
                 newRegistrations,
                 approvedCount: monthlyApproved.length
             },

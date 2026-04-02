@@ -213,7 +213,7 @@ export default function PerformanceSettlementPage() {
                 {/* Stats Section */}
                 <div className={styles.statsGrid}>
                     <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{settleData?.userLevel === 4 ? '이번달 지급수수료' : '이번달 매출'}</p>
+                        <p className={styles.statLabel}>이번달 매출</p>
                         <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.monthlyRevenue || 0) * 10000) : formatApprovalAmount(stats.monthlyRevenue || 0)}</p>
                         <p className={styles.statSubValue}>전월 대비</p>
                     </div>
@@ -223,8 +223,8 @@ export default function PerformanceSettlementPage() {
                         <p className={styles.statSubValue}>{stats.monthlyApprovedCount || 0}건</p>
                     </div>
                     <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{settleData?.userLevel === 4 ? '누적 지급수수료' : '누적 매출'}</p>
-                        <p className={styles.statValue}>{formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
+                        <p className={styles.statLabel}>누적 매출</p>
+                        <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.totalRevenueAmount || 0) * 10000) : formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
                         <p className={styles.statSubValue}>전년도 대비</p>
                     </div>
                     <div className={styles.statCard}>

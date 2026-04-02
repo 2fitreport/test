@@ -19,6 +19,16 @@ export default function StatisticsWrap({ data }: Props) {
     const newRegistrations = stats?.newRegistrations || 0;
     const approvedCount = stats?.approvedCount || 0;
 
+    const formatManwon = (manwon: number): { main: string; sub: string } => {
+        if (manwon === 0) return { main: '0', sub: '원' };
+        const rounded = Math.round(manwon * 10) / 10;
+        const intPart = Math.floor(rounded);
+        const decPart = Math.round((rounded - intPart) * 10);
+        const intFormatted = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        const main = decPart > 0 ? `${intFormatted}.${decPart}` : intFormatted;
+        return { main, sub: '만원' };
+    };
+
     const formatNumber = (num: number | null | undefined): { main: string; sub: string } => {
         // num은 이미 억원 단위
         if (num === null || num === undefined || isNaN(num)) {
@@ -93,8 +103,8 @@ export default function StatisticsWrap({ data }: Props) {
                 {!isInspector && !isOperatorWithoutRepresentative && (
                     <li>
                         <h2>이번달 매출</h2>
-                        <span>{formatNumber(monthlyRevenue).main}</span>
-                        <p>{formatNumber(monthlyRevenue).sub}</p>
+                        <span>{(userLevel === 4 ? formatManwon(monthlyRevenue * 10000) : formatNumber(monthlyRevenue)).main}</span>
+                        <p>{(userLevel === 4 ? formatManwon(monthlyRevenue * 10000) : formatNumber(monthlyRevenue)).sub}</p>
                     </li>
                 )}
                 <li>

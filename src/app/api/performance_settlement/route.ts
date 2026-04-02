@@ -52,14 +52,16 @@ export async function GET(request: NextRequest) {
             return `${y}-${m}-${day}`;
         };
 
-        // ISO 문자열에서 연도/월/일 추출 (UTC 기준)
+        // ISO 문자열에서 연도/월/일 추출 (KST 기준, UTC+9)
         const extractYearMonthDay = (isoString: string): { year: number; month: number; day: number } => {
-            const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (!match) return { year: 0, month: 0, day: 0 };
+            if (!isoString) return { year: 0, month: 0, day: 0 };
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return { year: 0, month: 0, day: 0 };
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
             return {
-                year: parseInt(match[1]),
-                month: parseInt(match[2]),
-                day: parseInt(match[3])
+                year: kst.getUTCFullYear(),
+                month: kst.getUTCMonth() + 1,
+                day: kst.getUTCDate()
             };
         };
 
@@ -232,10 +234,10 @@ export async function GET(request: NextRequest) {
                 const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 if (doc.submitter_id === userId) {
                     // 상담신청 A영업자: 20%
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.2);
+                    monthlyFeeRaw += Math.round(revenueAmount * 0.2 * 10) / 10;
                 } else if (doc.user_id === userId && !doc.submitter_id) {
                     // 기업등록 영업자: 40%
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.4);
+                    monthlyFeeRaw += Math.round(revenueAmount * 0.4 * 10) / 10;
                 } else if (doc.user_id === userId && doc.submitter_id === userId) {
                     // 자신이 작성한 상담신청 (이미 20% 계산됨, 중복 제외)
                     monthlyFeeRaw += 0;
@@ -244,7 +246,7 @@ export async function GET(request: NextRequest) {
                 const docUserId = doc.submitter_id || doc.user_id;
                 const userInfo = statsUserInfoMap[docUserId] || {};
                 if (userInfo.introducer === userId) {
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.05);
+                    monthlyFeeRaw += Math.round(revenueAmount * 0.05 * 10) / 10;
                 }
             }
             monthlyRevenueAmount = monthlyFeeRaw / 10000;
@@ -252,11 +254,21 @@ export async function GET(request: NextRequest) {
 
         const monthlyApprovalAmount = totalApprovalAmount / 10000;
 
-        const newRegistrations = myDocs.filter(d => {
-            // UTC 기준 ISO 문자열에서 YYYY-MM-DD 추출
+        // Level 4 비대표: 건수/금액 통계는 본인 직접 건만 (소개 영업자 문서 제외)
+        const ownDocs = (userLevel === 4 && !isAffiliationRep)
+            ? myDocs.filter(d => d.user_id === userId || d.submitter_id === userId)
+            : myDocs;
+
+        const newRegistrations = ownDocs.filter(d => {
             const docDateStr = d.created_at?.substring(0, 10) || '';
             return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
         }).length;
+
+        const ownMonthlyApproved = ownDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
+            return approvedDateStr >= currentMonthStartStr && approvedDateStr <= currentMonthEndStr;
+        });
 
         // === 요청한 달의 케이스별 매출 정산 데이터 (승인된 날짜 기준) ===
         const monthlyApprovedForSettlement = myDocs.filter(d => {
@@ -314,9 +326,9 @@ export async function GET(request: NextRequest) {
                     company: doc.company_name || '-',
                     approvalAmount,
                     realSales: revenueAmount,
-                    manager: doc.submitter_id,
+                    manager: aInfo.name || doc.submitter_id,
                     inflow: '상담신청',
-                    fee: Math.round(revenueAmount * 0.2),
+                    fee: Math.round(revenueAmount * 0.2 * 10) / 10,
                     paymentDate,
                     settlementUserId: doc.submitter_id,
                 });
@@ -327,9 +339,9 @@ export async function GET(request: NextRequest) {
                         company: doc.company_name || '-',
                         approvalAmount,
                         realSales: revenueAmount,
-                        manager: aInfo.introducer,
+                        manager: introducerNameMap[aInfo.introducer] || aInfo.introducer,
                         inflow: '인센티브',
-                        fee: Math.round(revenueAmount * 0.05),
+                        fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: aInfo.introducer,
                     });
@@ -342,9 +354,9 @@ export async function GET(request: NextRequest) {
                     company: doc.company_name || '-',
                     approvalAmount,
                     realSales: revenueAmount,
-                    manager: doc.user_id || '-',
+                    manager: userInfo.name || doc.user_id || '-',
                     inflow: '기업등록',
-                    fee: Math.round(revenueAmount * 0.4),
+                    fee: Math.round(revenueAmount * 0.4 * 10) / 10,
                     paymentDate,
                     settlementUserId: doc.user_id,
                 });
@@ -355,9 +367,9 @@ export async function GET(request: NextRequest) {
                         company: doc.company_name || '-',
                         approvalAmount,
                         realSales: revenueAmount,
-                        manager: userInfo.introducer,
+                        manager: introducerNameMap[userInfo.introducer] || userInfo.introducer,
                         inflow: '인센티브',
-                        fee: Math.round(revenueAmount * 0.05),
+                        fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: userInfo.introducer,
                     });
@@ -399,14 +411,14 @@ export async function GET(request: NextRequest) {
             for (const doc of approvedDocs) {
                 const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 if (doc.submitter_id === userId) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.2);
+                    totalFeeRaw += Math.round(revenueAmount * 0.2 * 10) / 10;
                 } else if (doc.user_id === userId && !doc.submitter_id) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.4);
+                    totalFeeRaw += Math.round(revenueAmount * 0.4 * 10) / 10;
                 }
                 const docUserId = doc.submitter_id || doc.user_id;
                 const userInfo = totalUserInfoMap[docUserId] || {};
                 if (userInfo.introducer === userId) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.05);
+                    totalFeeRaw += Math.round(revenueAmount * 0.05 * 10) / 10;
                 }
             }
             totalRevenueAmountForReturn = totalFeeRaw / 10000;
@@ -458,13 +470,13 @@ export async function GET(request: NextRequest) {
             stats: {
                 monthlyRevenue: monthlyRevenueAmount,
                 monthlyApprovalAmount: monthlyApprovalAmount,
-                monthlyApprovedCount: monthlyApprovedForStats.length,
+                monthlyApprovedCount: ownMonthlyApproved.length,
                 newRegistrations,
                 conversionRate: newRegistrations > 0
-                    ? Math.round((monthlyApprovedForStats.length / newRegistrations) * 100)
+                    ? Math.round((ownMonthlyApproved.length / newRegistrations) * 100)
                     : 0,
-                totalApprovedCount: myDocs.filter(d => d.progress_details === '승인').length,
-                totalApprovalAmount: myDocs
+                totalApprovedCount: ownDocs.filter(d => d.progress_details === '승인').length,
+                totalApprovalAmount: ownDocs
                     .filter(d => d.progress_details === '승인')
                     .reduce((sum, doc) => {
                         const amount = doc.approval_amount;

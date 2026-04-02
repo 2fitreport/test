@@ -12,6 +12,7 @@ const dataLabelsPlugin: Plugin = {
     id: 'dataLabels',
     afterDatasetsDraw(chart: any) {
         const { ctx } = chart;
+        ctx.save();
         ctx.font = 'bold 14px Arial';
         ctx.fillStyle = '#333';
         ctx.textAlign = 'center';
@@ -28,6 +29,7 @@ const dataLabelsPlugin: Plugin = {
                 }
             });
         });
+        ctx.restore();
     }
 };
 
@@ -49,6 +51,7 @@ export default function RevenueChart({
     revenueData
 }: Props) {
     const [chartData, setChartData] = useState<any>(null);
+    const [hasData, setHasData] = useState<boolean>(false);
     const [prevYearData, setPrevYearData] = useState<number[]>(Array(12).fill(0));
     const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
 
@@ -95,12 +98,8 @@ export default function RevenueChart({
             });
         }
 
-        const data = {
-            labels,
-            datasets,
-            hasData
-        };
-        setChartData(data);
+        setHasData(hasData);
+        setChartData({ labels, datasets });
     }, [selectedYear, revenueData]);
 
     const chartOptions = useMemo(() => {
@@ -110,7 +109,6 @@ export default function RevenueChart({
         const yAxisMax = Math.ceil(maxDataValue * 1.2); // 최대값의 120%로 설정
 
         return {
-            indexAxis: 'x' as const,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -118,6 +116,8 @@ export default function RevenueChart({
                     display: false
                 },
                 tooltip: {
+                    mode: 'index' as const,
+                    intersect: false,
                     backgroundColor: 'rgba(0, 0, 0, 0.8)',
                     padding: 12,
                     titleFont: { size: 13, weight: 'bold' },
@@ -126,13 +126,13 @@ export default function RevenueChart({
                         label: function(context: any) {
                             const label = context.dataset.label || '';
                             const value = context.parsed.y;
-                            return `${label}: ${value.toFixed(1)}억원`;
+                            return `${label}: ${value}억원`;
                         },
                         afterLabel: function(context: any) {
                             const dataIndex = context.dataIndex;
                             const currentVal = context.parsed.y;
                             const prevVal = prevYearData[dataIndex] || 0;
-                            const difference = currentVal - prevVal;
+                            const difference = Math.round((currentVal - prevVal) * 10000) / 10000;
                             const percentChange = prevVal !== 0
                                 ? Math.round((difference / prevVal) * 1000) / 10
                                 : 0;
@@ -142,8 +142,8 @@ export default function RevenueChart({
 
                             const lines: string[] = [];
                             if (prevVal > 0) {
-                                lines.push(`${prevYear}년: ${prevVal.toFixed(1)}억원`);
-                                lines.push(`차이: ${sign}${difference.toFixed(1)}억원 (${sign}${percentChange.toFixed(1)}%${arrow})`);
+                                lines.push(`${prevYear}년: ${prevVal}억원`);
+                                lines.push(`차이: ${sign}${difference}억원 (${sign}${percentChange.toFixed(1)}%${arrow})`);
                             } else {
                                 lines.push(`${prevYear}년: 데이터 없음`);
                             }
@@ -230,7 +230,7 @@ export default function RevenueChart({
                 </div>
             </div>
             <div className={styles.chartContainer}>
-                {chartData && !chartData.hasData ? (
+                {chartData && !hasData ? (
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',

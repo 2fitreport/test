@@ -93,6 +93,8 @@ export default function CreateUserForm({
         representative: null
     });
     const [checkingRepresentative, setCheckingRepresentative] = useState(false);
+    const [introducerSearch, setIntroducerSearch] = useState('');
+    const [showIntroducerDropdown, setShowIntroducerDropdown] = useState(false);
 
     // 영업자가 소속을 선택했을 때 소속대표 확인
     const currentLevel = positions.find(p => p.id === formData.position_id)?.level || 0;
@@ -156,6 +158,18 @@ export default function CreateUserForm({
             setShowAddressLoadingError(true);
         }
     };
+
+    // 선택된 소개자 변경 시 검색필드 업데이트
+    useEffect(() => {
+        if (formData.introducer) {
+            const selected = salespeople.find(u => u.user_id === formData.introducer);
+            if (selected) {
+                setIntroducerSearch(`${selected.user_id} (${selected.name})`);
+            }
+        } else {
+            setIntroducerSearch('');
+        }
+    }, [formData.introducer, salespeople]);
 
     useEffect(() => {
         const scrollContainer = document.querySelector(`.${styles.formContent}`);
@@ -513,20 +527,82 @@ export default function CreateUserForm({
 
                     {/* 소개자 (영업자만) */}
                     {currentLevel === 4 && (
-                        <div className={styles.formGroup}>
+                        <div className={styles.formGroup} style={{ position: 'relative' }}>
                             <label className={styles.label}>소개자</label>
-                            <select
-                                className={styles.select}
-                                value={formData.introducer ?? ''}
-                                onChange={(e) => onUpdateField('introducer', e.target.value)}
-                            >
-                                <option value="">소개자 없음</option>
-                                {salespeople.map(u => (
-                                    <option key={u.user_id} value={u.user_id}>
-                                        {u.user_id} ({u.name})
-                                    </option>
-                                ))}
-                            </select>
+                            <input
+                                type="text"
+                                className={styles.input}
+                                placeholder="영업자 검색 (ID 또는 이름)"
+                                value={introducerSearch}
+                                onChange={(e) => {
+                                    setIntroducerSearch(e.target.value);
+                                    setShowIntroducerDropdown(true);
+                                }}
+                                onFocus={() => setShowIntroducerDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowIntroducerDropdown(false), 100)}
+                            />
+                            {showIntroducerDropdown && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    right: 0,
+                                    backgroundColor: '#fff',
+                                    border: '1px solid #ddd',
+                                    borderTop: 'none',
+                                    borderRadius: '0 0 4px 4px',
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    zIndex: 10,
+                                    marginTop: '-4px',
+                                }}>
+                                    <div
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            backgroundColor: formData.introducer === '' ? '#f0f0f0' : 'transparent',
+                                            fontSize: '14px',
+                                        }}
+                                        onClick={() => {
+                                            onUpdateField('introducer', '');
+                                            setIntroducerSearch('');
+                                            setShowIntroducerDropdown(false);
+                                        }}
+                                    >
+                                        소개자 없음
+                                    </div>
+                                    {salespeople
+                                        .filter(u =>
+                                            introducerSearch === '' ||
+                                            u.user_id.toLowerCase().includes(introducerSearch.toLowerCase()) ||
+                                            u.name.toLowerCase().includes(introducerSearch.toLowerCase())
+                                        )
+                                        .map(u => (
+                                            <div
+                                                key={u.user_id}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: formData.introducer === u.user_id ? '#e3f2fd' : 'transparent',
+                                                    fontSize: '14px',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    ':hover': {
+                                                        backgroundColor: '#f5f5f5'
+                                                    }
+                                                }}
+                                                onClick={() => {
+                                                    onUpdateField('introducer', u.user_id);
+                                                    setIntroducerSearch(`${u.user_id} (${u.name})`);
+                                                    setShowIntroducerDropdown(false);
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = formData.introducer === u.user_id ? '#e3f2fd' : 'transparent'}
+                                            >
+                                                {u.user_id} ({u.name})
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
