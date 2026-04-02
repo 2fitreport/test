@@ -23,6 +23,7 @@ interface Props {
     onMonthChange: (month: string) => void;
     onPrevMonth: () => void;
     onNextMonth: () => void;
+    userLevel?: number;
 }
 
 export default function SettlementTable({
@@ -30,7 +31,8 @@ export default function SettlementTable({
     selectedMonth,
     onMonthChange,
     onPrevMonth,
-    onNextMonth
+    onNextMonth,
+    userLevel = 0,
 }: Props) {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortColumn, setSortColumn] = useState<string>('company');
@@ -90,6 +92,16 @@ export default function SettlementTable({
                 <span style={{ display: 'block', opacity: sortColumn === column && sortOrder === 'desc' ? 1 : 0.3, color: sortColumn === column && sortOrder === 'desc' ? '#553be9' : '#ccc', fontWeight: sortColumn === column && sortOrder === 'desc' ? 'bold' : 'normal' }}>↓</span>
             </span>
         );
+    };
+
+    const formatManwon = (amount: any): string => {
+        const manwon = typeof amount === 'number' ? amount : Number(amount) || 0;
+        if (manwon === 0) return '0만원';
+        const rounded = Math.round(manwon * 10) / 10;
+        const intPart = Math.floor(rounded);
+        const decPart = Math.round((rounded - intPart) * 10);
+        const intFormatted = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return decPart > 0 ? `${intFormatted}.${decPart}만원` : `${intFormatted}만원`;
     };
 
     const formatAmount = (amount: any): string => {
@@ -213,7 +225,7 @@ export default function SettlementTable({
                                 <td className={pageStyles.realSalesText}>{formatAmount(row.realSales)}</td>
                                 <td>{row.manager}</td>
                                 <td>{row.inflow}</td>
-                                <td className={pageStyles.incentiveText}>{formatAmount(row.fee)}</td>
+                                <td className={pageStyles.incentiveText}>{userLevel === 4 ? formatManwon(row.fee) : formatAmount(row.fee)}</td>
                                 <td>{row.paymentDate}</td>
                             </tr>
                         ))}
@@ -259,7 +271,7 @@ export default function SettlementTable({
                     </div>
                     <div className={styles.summaryItem}>
                         <span>지급수수료</span>
-                        <span className={styles.summaryValueGreen}>{formatAmount(processed.allFiltered.reduce((sum, row) => {
+                        <span className={styles.summaryValueGreen}>{(userLevel === 4 ? formatManwon : formatAmount)(processed.allFiltered.reduce((sum, row) => {
                             const amount = typeof row.fee === 'number' ? row.fee : 0;
                             return sum + amount;
                         }, 0))}</span>

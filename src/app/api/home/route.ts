@@ -51,8 +51,8 @@ export async function GET(request: NextRequest) {
 
         let myDocs: any[] = [];
         // 소속 정보 캐싱 (문서 필터 + 영업자 목록에서 재사용)
-        let cachedAffNames: string[] = [];
-        let cachedInspectorAffNames: string[] = [];
+        let cachedAffDbIds: number[] = [];
+        let cachedInspectorAffDbIds: number[] = [];
 
         // 2단계: 권한별로 필터링된 문서 조회
         let docsQuery = supabase.from('documents')
@@ -69,19 +69,31 @@ export async function GET(request: NextRequest) {
                 // 소속대표: 본인 소속의 모든 영업자 문서
                 const { data: myAffiliations } = await supabase
                     .from('user_affiliations')
-                    .select('affiliations(name)')
+                    .select('affiliation_id')
                     .eq('user_id', userDbId);
 
-                cachedAffNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
+                const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
 
-                if (cachedAffNames.length > 0) {
-                    const { data: affUsers } = await supabase
-                        .from('users')
+                if (myAffIds.length > 0) {
+                    // 같은 소속의 모든 유저 조회
+                    const { data: affUserLinks } = await supabase
+                        .from('user_affiliations')
                         .select('user_id')
-                        .in('company_name', cachedAffNames);
-                    const affUserIds = (affUsers || []).map((u: any) => u.user_id);
-                    if (affUserIds.length > 0) {
-                        docsQuery = docsQuery.in('user_id', affUserIds);
+                        .in('affiliation_id', myAffIds);
+                    const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                    cachedAffDbIds = affDbIds;
+
+                    if (affDbIds.length > 0) {
+                        const { data: affUsers } = await supabase
+                            .from('users')
+                            .select('user_id')
+                            .in('id', affDbIds);
+                        const affUserIds = (affUsers || []).map((u: any) => u.user_id);
+                        if (affUserIds.length > 0) {
+                            docsQuery = docsQuery.in('user_id', affUserIds);
+                        } else {
+                            docsQuery = docsQuery.eq('user_id', 'no_user_found');
+                        }
                     } else {
                         docsQuery = docsQuery.eq('user_id', 'no_user_found');
                     }
@@ -105,17 +117,26 @@ export async function GET(request: NextRequest) {
         } else if (userLevel === 6) {
             // 검수자: 소속이 같은 영업자의 문서 + inspector_id로 배정받은 문서
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
 
-            cachedInspectorAffNames = (myAffiliations || []).map((a: any) => a.affiliation_name).filter(Boolean);
+            const myInspAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
 
             let allowedUserIds: string[] = [];
-            if (cachedInspectorAffNames.length > 0) {
-                const { data: usersData } = await supabase
-                    .from('users').select('user_id').in('company_name', cachedInspectorAffNames);
-                allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+            if (myInspAffIds.length > 0) {
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
+                    .select('user_id')
+                    .in('affiliation_id', myInspAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                cachedInspectorAffDbIds = affDbIds;
+
+                if (affDbIds.length > 0) {
+                    const { data: usersData } = await supabase
+                        .from('users').select('user_id').in('id', affDbIds);
+                    allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                }
             }
 
             // inspector_id로 직접 배정받은 문서도 포함
@@ -233,13 +254,13 @@ export async function GET(request: NextRequest) {
             salespeople = data;
         } else if (userLevel === 4) {
             if (isRep) {
-                // 소속대표: 캐싱된 소속 정보 재사용
-                if (cachedAffNames.length > 0) {
+                // 소속대표: 캐싱된 소속 DB ID 재사용
+                if (cachedAffDbIds.length > 0) {
                     const { data } = await supabase
                         .from('users')
                         .select('user_id, name')
                         .eq('position_id', 4)
-                        .in('company_name', cachedAffNames);
+                        .in('id', cachedAffDbIds);
                     salespeople = data;
                 }
             } else {
@@ -251,13 +272,13 @@ export async function GET(request: NextRequest) {
                 salespeople = data;
             }
         } else if (userLevel === 6) {
-            // 검수자: 캐싱된 소속 정보 재사용
-            if (cachedInspectorAffNames.length > 0) {
+            // 검수자: 캐싱된 소속 DB ID 재사용
+            if (cachedInspectorAffDbIds.length > 0) {
                 const { data } = await supabase
                     .from('users')
                     .select('user_id, name')
                     .eq('position_id', 4)
-                    .in('company_name', cachedInspectorAffNames);
+                    .in('id', cachedInspectorAffDbIds);
                 salespeople = data;
             }
         }

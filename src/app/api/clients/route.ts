@@ -57,19 +57,26 @@ export async function GET(request: NextRequest) {
             // 검수자: 소속이 같은 영업자의 문서만
             // 먼저 소속 조회
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
 
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
 
             let allowedUserIds: string[] = [];
-            if (affiliationNames.length > 0) {
-                const { data: usersData } = await supabase
-                    .from('users')
+            if (myAffIds.length > 0) {
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
                     .select('user_id')
-                    .in('company_name', affiliationNames);
-                allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                    .in('affiliation_id', myAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                if (affDbIds.length > 0) {
+                    const { data: usersData } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', affDbIds);
+                    allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                }
             }
 
             if (allowedUserIds.length > 0) {

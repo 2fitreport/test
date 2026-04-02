@@ -58,7 +58,7 @@ export default function CreateUserPageContent() {
                 if (!affiliationsRes.ok) throw new Error('소속 조회 실패');
                 const affiliationsData = await affiliationsRes.json();
                 setAllAffiliations(affiliationsData.allAffiliations || []);
-                setTakenAffiliations([]);
+                setTakenAffiliations(affiliationsData.takenAffiliations || []);
 
                 // 편집 모드인 경우 사용자 데이터 로드
                 if (isEditMode && userId) {
@@ -81,6 +81,12 @@ export default function CreateUserPageContent() {
                         if (userAffRes.ok) {
                             const affData = await userAffRes.json();
                             userAffiliations = affData.affiliations || [];
+                        }
+                        // 편집 모드: 현재 검수자 제외하고 다른 검수자의 소속 로드
+                        const takenRes = await fetch(`/api/affiliations?get_all=true&exclude_inspector_id=${userData.id}`);
+                        if (takenRes.ok) {
+                            const takenData = await takenRes.json();
+                            setTakenAffiliations(takenData.takenAffiliations || []);
                         }
                     }
 
@@ -228,7 +234,19 @@ export default function CreateUserPageContent() {
                         onUpdateName={form.updateName}
                         onUpdatePhone={form.updatePhone}
                         onUpdateEmail={form.updateEmail}
-                        onUpdatePosition={form.updatePosition}
+                        onUpdatePosition={(posId) => {
+                            const oldPos = positions.find(p => p.id === form.formData.position_id);
+                            const newPos = positions.find(p => p.id === posId);
+                            
+                            // 직급이 변경되고, 둘 중 하나가 영업자(4) 또는 검수자(6)인 경우 소속 초기화
+                            if (oldPos?.id !== newPos?.id) {
+                                if ([4, 6].includes(oldPos?.level || 0) || [4, 6].includes(newPos?.level || 0)) {
+                                    form.updateField('affiliations', []);
+                                    form.updateField('is_affiliation_representative', false);
+                                }
+                            }
+                            form.updatePosition(posId);
+                        }}
                         onUpdateCompanyName={form.updateCompanyName}
                         onUpdateAddress={form.updateAddress}
                         onUpdateAddressDetail={form.updateAddressDetail}

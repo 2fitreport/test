@@ -53,35 +53,42 @@ export async function GET(request: NextRequest) {
             // 소속대표: 같은 소속의 영업자들
             const { data: myAffiliations } = await supabase
                 .from('user_affiliations')
-                .select('affiliations(name)')
+                .select('affiliation_id')
                 .eq('user_id', userDbId);
-            const affNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
-            if (affNames.length > 0) {
-                const { data } = await supabase
-                    .from('users')
-                    .select('id, user_id, name')
-                    .in('company_name', affNames)
-                    .eq('position_id', 4);
-                salespeople = data || [];
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
+            if (myAffIds.length > 0) {
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
+                    .select('user_id')
+                    .in('affiliation_id', myAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                if (affDbIds.length > 0) {
+                    const { data } = await supabase
+                        .from('users')
+                        .select('id, user_id, name')
+                        .in('id', affDbIds)
+                        .eq('position_id', 4);
+                    salespeople = data || [];
+                }
             }
         } else if (userLevel === 6) {
             // 검수자: 담당 소속 영업자
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
-            if (affiliationNames.length > 0) {
-                const { data: affUsers } = await supabase
-                    .from('users')
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
+            if (myAffIds.length > 0) {
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
                     .select('user_id')
-                    .in('company_name', affiliationNames);
-                const affUserIds = (affUsers || []).map((u: any) => u.user_id);
-                if (affUserIds.length > 0) {
+                    .in('affiliation_id', myAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                if (affDbIds.length > 0) {
                     const { data } = await supabase
                         .from('users')
                         .select('id, user_id, name')
-                        .in('user_id', affUserIds)
+                        .in('id', affDbIds)
                         .eq('position_id', 4);
                     salespeople = data || [];
                 }

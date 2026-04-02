@@ -87,6 +87,7 @@ export default function CreateUserForm({
 }: CreateUserFormProps) {
     const [showKoreanWarning, setShowKoreanWarning] = useState(false);
     const [showAddressLoadingError, setShowAddressLoadingError] = useState(false);
+    const [salespeople, setSalespeople] = useState<Array<{ user_id: string; name: string }>>([]);
     const [representativeInfo, setRepresentativeInfo] = useState<{ hasRepresentative: boolean; representative: { user_id: string; name: string } | null }>({
         hasRepresentative: false,
         representative: null
@@ -95,6 +96,19 @@ export default function CreateUserForm({
 
     // 영업자가 소속을 선택했을 때 소속대표 확인
     const currentLevel = positions.find(p => p.id === formData.position_id)?.level || 0;
+
+    useEffect(() => {
+        if (currentLevel !== 4) return;
+        fetch('/api/users')
+            .then(r => r.json())
+            .then((data: any[]) => {
+                const filtered = (data || []).filter(
+                    (u: any) => u.position?.level === 4 && u.user_id !== formData.user_id
+                );
+                setSalespeople(filtered.map((u: any) => ({ user_id: u.user_id, name: u.name })));
+            })
+            .catch(console.error);
+    }, [currentLevel, formData.user_id]);
     const selectedAffiliation = formData.affiliations?.[0] || '';
 
     useEffect(() => {
@@ -387,6 +401,8 @@ export default function CreateUserForm({
                                                 const isChecked = isSalesPerson
                                                     ? selectedAffiliation === affName
                                                     : formData.affiliations?.includes(affName) || false;
+                                                const isTaken = takenAffiliations.includes(affName);
+                                                const isDisabled = !isSalesPerson && isTaken && !isChecked;
                                                 return (
                                                     <label
                                                         key={affName}
@@ -397,18 +413,22 @@ export default function CreateUserForm({
                                                             padding: '6px 12px',
                                                             borderRadius: '4px',
                                                             backgroundColor: isChecked ? 'var(--main-color)' : '#fff',
-                                                            color: isChecked ? '#fff' : '#333',
-                                                            border: `1px solid ${isChecked ? 'var(--main-color)' : '#ddd'}`,
-                                                            cursor: 'pointer',
+                                                            color: isDisabled ? '#ccc' : (isChecked ? '#fff' : '#333'),
+                                                            border: `1px solid ${isChecked ? 'var(--main-color)' : (isDisabled ? '#eee' : '#ddd')}`,
+                                                            cursor: isDisabled ? 'not-allowed' : 'pointer',
                                                             transition: 'all 0.2s ease',
-                                                            fontWeight: isChecked ? '500' : '400'
+                                                            fontWeight: isChecked ? '500' : '400',
+                                                            opacity: isDisabled ? 0.6 : 1,
+                                                            pointerEvents: isDisabled ? 'none' : 'auto'
                                                         }}
                                                     >
                                                         <input
                                                             type={isSalesPerson ? 'radio' : 'checkbox'}
                                                             name={isSalesPerson ? 'affiliation' : undefined}
                                                             checked={isChecked}
+                                                            disabled={isDisabled}
                                                             onChange={() => {
+                                                                if (isDisabled) return;
                                                                 if (isSalesPerson) {
                                                                     // 영업자: 단일선택 (첫번째 항목만)
                                                                     onToggleAffiliation(affName);
@@ -430,8 +450,9 @@ export default function CreateUserForm({
                                                             }}
                                                             style={{ display: 'none' }}
                                                         />
-                                                        <span style={{ cursor: 'pointer' }}>
+                                                        <span style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}>
                                                             {affName}
+                                                            {(!isSalesPerson && isTaken && !isChecked) && ' (배정됨)'}
                                                         </span>
                                                     </label>
                                                 );
@@ -494,13 +515,18 @@ export default function CreateUserForm({
                     {currentLevel === 4 && (
                         <div className={styles.formGroup}>
                             <label className={styles.label}>소개자</label>
-                            <input
-                                type="text"
-                                className={styles.input}
-                                placeholder="소개자 아이디를 입력하세요"
+                            <select
+                                className={styles.select}
                                 value={formData.introducer ?? ''}
                                 onChange={(e) => onUpdateField('introducer', e.target.value)}
-                            />
+                            >
+                                <option value="">소개자 없음</option>
+                                {salespeople.map(u => (
+                                    <option key={u.user_id} value={u.user_id}>
+                                        {u.user_id} ({u.name})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     )}
 

@@ -187,23 +187,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 검수자인 경우 이미 사용 중인 소속 확인 ('소속없음'은 중복 허용)
+    // 검수자인 경우 이미 사용 중인 소속 확인 ('소속없음'은 중복 허용, user_affiliations 기준)
     if (isInspector && affiliations && affiliations.length > 0) {
       const affiliationsToCheck = affiliations.filter((a: string) => a !== '소속없음');
       if (affiliationsToCheck.length > 0) {
-        const { data: takenData, error: takenError } = await supabase
-          .from('inspector_affiliations')
-          .select('affiliation_name')
-          .in('affiliation_name', affiliationsToCheck);
+        // 소속 이름 → ID 매핑
+        const { data: affIdData } = await supabase
+          .from('affiliations')
+          .select('id, name')
+          .in('name', affiliationsToCheck);
+        const checkAffIds = (affIdData || []).map((a: any) => a.id);
 
-        if (takenError) throw takenError;
+        if (checkAffIds.length > 0) {
+          // 해당 소속을 가진 다른 검수자(Level 6) 확인
+          const { data: existingLinks } = await supabase
+            .from('user_affiliations')
+            .select('user_id, affiliation_id')
+            .in('affiliation_id', checkAffIds);
 
-        const takenAffiliations = takenData?.map((item: any) => item.affiliation_name).filter(Boolean) || [];
-        if (takenAffiliations.length > 0) {
-          return NextResponse.json(
-            { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
-            { status: 400 }
-          );
+          if (existingLinks && existingLinks.length > 0) {
+            const otherUserDbIds = [...new Set(existingLinks.map((l: any) => l.user_id))];
+            const { data: otherUsers } = await supabase
+              .from('users')
+              .select('id, position(level)')
+              .in('id', otherUserDbIds);
+            const inspectorDbIds = (otherUsers || []).filter((u: any) => (u.position as any)?.level === 6).map((u: any) => u.id);
+
+            if (inspectorDbIds.length > 0) {
+              // 중복된 소속명 찾기
+              const takenAffIds = existingLinks
+                .filter((l: any) => inspectorDbIds.includes(l.user_id))
+                .map((l: any) => l.affiliation_id);
+              const takenNames = (affIdData || [])
+                .filter((a: any) => takenAffIds.includes(a.id))
+                .map((a: any) => a.name);
+              if (takenNames.length > 0) {
+                return NextResponse.json(
+                  { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenNames.join(', ')}` },
+                  { status: 400 }
+                );
+              }
+            }
+          }
         }
       }
     }

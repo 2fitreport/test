@@ -143,6 +143,15 @@ export default function PerformanceSettlementPage() {
         setSelectedYear(`${year + 1}`);
     };
 
+    const formatManwon = (manwon: number): string => {
+        if (manwon === 0) return '0만원';
+        const rounded = Math.round(manwon * 10) / 10;
+        const intPart = Math.floor(rounded);
+        const decPart = Math.round((rounded - intPart) * 10);
+        const intFormatted = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return decPart > 0 ? `${intFormatted}.${decPart}만원` : `${intFormatted}만원`;
+    };
+
     const formatApprovalAmount = (manwon: number): string => {
         const eokValue = manwon / 1;
         const eok = Math.floor(eokValue);
@@ -204,8 +213,8 @@ export default function PerformanceSettlementPage() {
                 {/* Stats Section */}
                 <div className={styles.statsGrid}>
                     <div className={styles.statCard}>
-                        <p className={styles.statLabel}>이번달 매출</p>
-                        <p className={styles.statValue}>{formatApprovalAmount(stats.monthlyRevenue || 0)}</p>
+                        <p className={styles.statLabel}>{settleData?.userLevel === 4 ? '이번달 지급수수료' : '이번달 매출'}</p>
+                        <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.monthlyRevenue || 0) * 10000) : formatApprovalAmount(stats.monthlyRevenue || 0)}</p>
                         <p className={styles.statSubValue}>전월 대비</p>
                     </div>
                     <div className={styles.statCard}>
@@ -214,7 +223,7 @@ export default function PerformanceSettlementPage() {
                         <p className={styles.statSubValue}>{stats.monthlyApprovedCount || 0}건</p>
                     </div>
                     <div className={styles.statCard}>
-                        <p className={styles.statLabel}>누적 매출</p>
+                        <p className={styles.statLabel}>{settleData?.userLevel === 4 ? '누적 지급수수료' : '누적 매출'}</p>
                         <p className={styles.statValue}>{formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
                         <p className={styles.statSubValue}>전년도 대비</p>
                     </div>
@@ -240,6 +249,7 @@ export default function PerformanceSettlementPage() {
                             onMonthChange={setSelectedMonthSettlement}
                             onPrevMonth={handlePrevMonthSettlement}
                             onNextMonth={handleNextMonthSettlement}
+                            userLevel={settleData?.userLevel || 0}
                         />
 
                         {/* 년별 매출 추이 */}

@@ -234,24 +234,46 @@ export async function PATCH(
       );
     }
 
-    // 검수자인 경우 이미 사용 중인 소속 확인 (자신의 소속 제외, '소속없음'은 중복 허용)
+    // 검수자인 경우 이미 사용 중인 소속 확인 (자신의 소속 제외, '소속없음'은 중복 허용, user_affiliations 기준)
     if (isInspector && affiliations !== undefined && affiliations.length > 0) {
       const affiliationsToCheck = affiliations.filter((a: string) => a !== '소속없음');
       if (affiliationsToCheck.length > 0) {
-        const { data: takenData, error: takenError } = await supabase
-          .from('inspector_affiliations')
-          .select('affiliation_name, inspector_id')
-          .in('affiliation_name', affiliationsToCheck)
-          .neq('inspector_id', userId);
+        const { data: affIdData } = await supabase
+          .from('affiliations')
+          .select('id, name')
+          .in('name', affiliationsToCheck);
+        const checkAffIds = (affIdData || []).map((a: any) => a.id);
 
-        if (takenError) throw takenError;
+        if (checkAffIds.length > 0) {
+          const { data: existingLinks } = await supabase
+            .from('user_affiliations')
+            .select('user_id, affiliation_id')
+            .in('affiliation_id', checkAffIds)
+            .neq('user_id', userId);
 
-        const takenAffiliations = takenData?.map((item: any) => item.affiliation_name).filter(Boolean) || [];
-        if (takenAffiliations.length > 0) {
-          return NextResponse.json(
-            { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenAffiliations.join(', ')}` },
-            { status: 400 }
-          );
+          if (existingLinks && existingLinks.length > 0) {
+            const otherUserDbIds = [...new Set(existingLinks.map((l: any) => l.user_id))];
+            const { data: otherUsers } = await supabase
+              .from('users')
+              .select('id, position(level)')
+              .in('id', otherUserDbIds);
+            const inspectorDbIds = (otherUsers || []).filter((u: any) => (u.position as any)?.level === 6).map((u: any) => u.id);
+
+            if (inspectorDbIds.length > 0) {
+              const takenAffIds = existingLinks
+                .filter((l: any) => inspectorDbIds.includes(l.user_id))
+                .map((l: any) => l.affiliation_id);
+              const takenNames = (affIdData || [])
+                .filter((a: any) => takenAffIds.includes(a.id))
+                .map((a: any) => a.name);
+              if (takenNames.length > 0) {
+                return NextResponse.json(
+                  { message: `이미 다른 검수자에게 배정된 소속입니다: ${takenNames.join(', ')}` },
+                  { status: 400 }
+                );
+              }
+            }
+          }
         }
       }
     }
@@ -282,33 +304,8 @@ export async function PATCH(
 
     if (error) throw error;
 
-    // 검수자인 경우 inspector_affiliations에 소속 업데이트
-    if (isInspector && affiliations !== undefined) {
-      // 기존 소속 삭제
-      const { error: deleteError } = await supabase
-        .from('inspector_affiliations')
-        .delete()
-        .eq('inspector_id', userId);
-
-      if (deleteError) throw deleteError;
-
-      // 새 소속 추가
-      if (affiliations.length > 0) {
-        const insertData = affiliations.map((affName: string) => ({
-          inspector_id: userId,
-          affiliation_name: affName
-        }));
-
-        const { error: affError } = await supabase
-          .from('inspector_affiliations')
-          .insert(insertData);
-
-        if (affError) throw affError;
-      }
-    }
-
-    // 영업자인 경우 user_affiliations에 소속 업데이트
-    if (isSalesPerson && affiliations !== undefined) {
+    // 영업자/검수자 소속 업데이트 (user_affiliations 통합)
+    if ((isSalesPerson || isInspector) && affiliations !== undefined) {
       // 기존 소속 삭제
       const { error: deleteError } = await supabase
         .from('user_affiliations')
@@ -399,11 +396,11 @@ export async function DELETE(
       .update({ inspector_id: null })
       .eq('inspector_id', userData.user_id);
 
-    // 검수자 소속 정보 삭제
+    // 소속 정보 삭제 (user_affiliations)
     await supabase
-      .from('inspector_affiliations')
+      .from('user_affiliations')
       .delete()
-      .eq('inspector_id', userId);
+      .eq('user_id', userId);
 
     const { data, error } = await supabase
       .from('users')

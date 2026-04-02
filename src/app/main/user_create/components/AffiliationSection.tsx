@@ -162,20 +162,17 @@ export default function AffiliationSection({
                                         backgroundColor: isSelected ? '#ff4444' : '#fff',
                                         color: isSelected ? '#fff' : '#333',
                                         borderColor: isSelected ? '#ff4444' : '#e5e7eb',
-                                        opacity: isTaken ? 0.5 : 1,
-                                        cursor: isTaken ? 'not-allowed' : 'pointer',
+                                        opacity: 1,
+                                        cursor: 'pointer',
                                     }}
                                     onClick={() => {
-                                        if (!isTaken) {
-                                            toggleSelectForDelete(affName);
-                                        }
+                                        toggleSelectForDelete(affName);
                                     }}
-                                    disabled={isSubmitting || isTaken}
+                                    disabled={isSubmitting}
                                     type="button"
                                     title={isTaken ? '다른 검수자에게 배정된 소속입니다' : ''}
                                 >
                                     {affName}
-                                    {isTaken && ' (배정됨)'}
                                 </button>
                             );
                         })}

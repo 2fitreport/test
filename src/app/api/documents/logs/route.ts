@@ -64,25 +64,34 @@ export async function GET(request: NextRequest) {
                 // 소속대표: 본인 소속의 모든 영업자 문서 (manager_id 여부 무관)
                 const { data: myAffiliations } = await supabase
                     .from('user_affiliations')
-                    .select('affiliations(name)')
+                    .select('affiliation_id')
                     .eq('user_id', userDbId);
 
-                const affNames = (myAffiliations || []).map((a: any) => a.affiliations?.name).filter(Boolean);
+                const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
 
-                if (affNames.length > 0) {
-                    const { data: affUsers } = await supabase
-                        .from('users')
+                if (myAffIds.length > 0) {
+                    const { data: affUserLinks } = await supabase
+                        .from('user_affiliations')
                         .select('user_id')
-                        .in('company_name', affNames);
+                        .in('affiliation_id', myAffIds);
+                    const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
 
-                    const affUserIds = (affUsers || []).map((u: any) => u.user_id);
+                    if (affDbIds.length > 0) {
+                        const { data: affUsers } = await supabase
+                            .from('users')
+                            .select('user_id')
+                            .in('id', affDbIds);
+                        const affUserIds = (affUsers || []).map((u: any) => u.user_id);
 
-                    if (affUserIds.length > 0) {
-                        const { data: affDocs } = await supabase
-                            .from('documents')
-                            .select('id')
-                            .in('user_id', affUserIds);
-                        allowedDocumentIds = (affDocs || []).map((d: any) => d.id);
+                        if (affUserIds.length > 0) {
+                            const { data: affDocs } = await supabase
+                                .from('documents')
+                                .select('id')
+                                .in('user_id', affUserIds);
+                            allowedDocumentIds = (affDocs || []).map((d: any) => d.id);
+                        } else {
+                            allowedDocumentIds = [];
+                        }
                     } else {
                         allowedDocumentIds = [];
                     }
@@ -123,23 +132,30 @@ export async function GET(request: NextRequest) {
         } else if (userLevel === 6) {
             // 검수자: 자신이 담당하는 소속의 영업자 문서 OR 자신이 배정받은 문서
 
-            // 1. 검수자의 담당 소속 조회 (inspector_affiliations 사용)
+            // 1. 검수자의 담당 소속 조회 (user_affiliations 사용)
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
 
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
 
             let allowedUserIds: string[] = [];
-            if (affiliationNames.length > 0) {
-                // 2. 해당 소속에 속한 영업자 user_id 조회
-                const { data: usersData } = await supabase
-                    .from('users')
+            if (myAffIds.length > 0) {
+                // 2. 같은 소속의 유저 DB ID 조회
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
                     .select('user_id')
-                    .in('company_name', affiliationNames);
+                    .in('affiliation_id', myAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
 
-                allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                if (affDbIds.length > 0) {
+                    const { data: usersData } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', affDbIds);
+                    allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                }
             }
 
             // 3. 담당 소속 영업자의 문서 조회

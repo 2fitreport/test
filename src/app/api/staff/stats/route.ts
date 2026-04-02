@@ -54,37 +54,45 @@ export async function GET(request: NextRequest) {
                 .eq('position_id', 3);
             staffList = data || [];
             const { data: myAffiliations } = await supabase
-                .from('inspector_affiliations')
-                .select('affiliation_name')
-                .eq('inspector_id', userDbId);
-            const affiliationNames = (myAffiliations || []).map((a: any) => a.affiliation_name);
-            if (affiliationNames.length > 0) {
-                const { data: affUsers } = await supabase
-                    .from('users')
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId);
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
+            let affUserIds: string[] = [];
+            if (myAffIds.length > 0) {
+                const { data: affUserLinks } = await supabase
+                    .from('user_affiliations')
                     .select('user_id')
-                    .in('company_name', affiliationNames);
-                const affUserIds = (affUsers || []).map((u: any) => u.user_id);
-                if (affUserIds.length > 0) {
-                    const { data: assignedDocs } = await supabase
-                        .from('documents')
-                        .select('manager_id')
-                        .in('user_id', affUserIds)
-                        .not('manager_id', 'is', null)
-                        .neq('manager_id', 'admin');
-                    const managerIds = [...new Set((assignedDocs || []).map((d: any) => d.manager_id).filter(Boolean))];
-                    if (managerIds.length > 0) {
-                        const { data: affStaff } = await supabase
-                            .from('users')
-                            .select('id, user_id, name')
-                            .in('user_id', managerIds)
-                            .eq('position_id', 3);
-                        // 본인 + 소속 실무자 병합 (중복 제거)
-                        const existingIds = new Set(staffList.map((s: any) => s.user_id));
-                        for (const s of affStaff || []) {
-                            if (!existingIds.has(s.user_id)) {
-                                staffList.push(s);
-                                existingIds.add(s.user_id);
-                            }
+                    .in('affiliation_id', myAffIds);
+                const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                if (affDbIds.length > 0) {
+                    const { data: affUsers } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', affDbIds);
+                    affUserIds = (affUsers || []).map((u: any) => u.user_id);
+                }
+            }
+            if (affUserIds.length > 0) {
+                const { data: assignedDocs } = await supabase
+                    .from('documents')
+                    .select('manager_id')
+                    .in('user_id', affUserIds)
+                    .not('manager_id', 'is', null)
+                    .neq('manager_id', 'admin');
+                const managerIds = [...new Set((assignedDocs || []).map((d: any) => d.manager_id).filter(Boolean))];
+                if (managerIds.length > 0) {
+                    const { data: affStaff } = await supabase
+                        .from('users')
+                        .select('id, user_id, name')
+                        .in('user_id', managerIds)
+                        .eq('position_id', 3);
+                    // 본인 + 소속 실무자 병합 (중복 제거)
+                    const existingIds = new Set(staffList.map((s: any) => s.user_id));
+                    for (const s of affStaff || []) {
+                        if (!existingIds.has(s.user_id)) {
+                            staffList.push(s);
+                            existingIds.add(s.user_id);
                         }
                     }
                 }
