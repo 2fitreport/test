@@ -294,27 +294,29 @@ export async function GET(request: NextRequest) {
 
         const ownDocs = ownDocsBase;
 
-        const newRegistrations = ownDocs.filter(d => {
+        // 이번달 신규 등록 문서 (created_at 기준)
+        const thisMonthNewDocs = ownDocs.filter(d => {
             const docDateStr = toKSTDateStr(d.created_at || '');
             return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
-        }).length;
+        });
+        const newRegistrations = thisMonthNewDocs.length;
 
-        // 전월 전환율 계산
-        const prevMonthRegistrations = ownDocs.filter(d => {
+        // 전환율: 이번달 신규 등록 문서 중 (언제든) 승인된 비율
+        const thisMonthNewApproved = thisMonthNewDocs.filter(d => d.progress_details === '승인').length;
+        const currentConversionRate = newRegistrations > 0
+            ? Math.round((thisMonthNewApproved / newRegistrations) * 100)
+            : 0;
+
+        // 전월 전환율: 전월 신규 등록 문서 중 (언제든) 승인된 비율
+        const prevMonthNewDocs = ownDocs.filter(d => {
             const docDateStr = toKSTDateStr(d.created_at || '');
             return docDateStr >= prevMonthStartStr && docDateStr <= prevMonthEndStr;
-        }).length;
-        const prevMonthApprovedCount = ownDocs.filter(d => {
-            if (d.progress_details !== '승인') return false;
-            const approvedDateStr = toKSTDateStr(d.updated_at || '');
-            return approvedDateStr >= prevMonthStartStr && approvedDateStr <= prevMonthEndStr;
-        }).length;
-        const prevMonthConversionRate = prevMonthRegistrations > 0
-            ? Math.round((prevMonthApprovedCount / prevMonthRegistrations) * 100)
+        });
+        const prevMonthNewApproved = prevMonthNewDocs.filter(d => d.progress_details === '승인').length;
+        const prevMonthConversionRate = prevMonthNewDocs.length > 0
+            ? Math.round((prevMonthNewApproved / prevMonthNewDocs.length) * 100)
             : 0;
-        const currentConversionRate = newRegistrations > 0
-            ? Math.round((ownMonthlyApproved.length / newRegistrations) * 100)
-            : 0;
+
         const conversionDiff = currentConversionRate - prevMonthConversionRate;
         const conversionChangeRate = (currentConversionRate > 0 || prevMonthConversionRate > 0)
             ? `${conversionDiff > 0 ? '+' : ''}${conversionDiff}%`
@@ -447,12 +449,12 @@ export async function GET(request: NextRequest) {
 
         // === 누적 매출 계산 (전체 기간) ===
         let totalRevenueAmountForReturn = 0;
+        let totalUserInfoMap: Record<string, { introducer?: string }> = {};
         if (userLevel === 4 && !isAffiliationRep) {
             const totalUserIds = [...new Set([
                 ...approvedDocs.map(d => d.user_id),
                 ...approvedDocs.map(d => d.submitter_id),
             ].filter(Boolean))];
-            let totalUserInfoMap: Record<string, { introducer?: string }> = {};
             if (totalUserIds.length > 0) {
                 const { data: totalUsersData } = await supabase
                     .from('users')
@@ -550,9 +552,24 @@ export async function GET(request: NextRequest) {
                 ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;
 
+            let chartAmount = revenueAmount;
+            if (userLevel === 4 && !isAffiliationRep) {
+                let fee = 0;
+                if (doc.submitter_id === userId) {
+                    fee = Math.round(revenueAmount * 0.2 * 10) / 10;
+                } else if (doc.user_id === userId && !doc.submitter_id) {
+                    fee = Math.round(revenueAmount * 0.4 * 10) / 10;
+                }
+                const docUserId = doc.submitter_id || doc.user_id;
+                if ((totalUserInfoMap[docUserId] || {}).introducer === userId) {
+                    fee += Math.round(revenueAmount * 0.05 * 10) / 10;
+                }
+                chartAmount = fee;
+            }
+
             if (year > 0 && month > 0) {
                 if (!yearData[year]) yearData[year] = {};
-                yearData[year][month] = (yearData[year][month] || 0) + revenueAmount;
+                yearData[year][month] = (yearData[year][month] || 0) + chartAmount;
             }
         });
 
