@@ -164,7 +164,7 @@ export default function CreateUserForm({
         if (formData.introducer) {
             const selected = salespeople.find(u => u.user_id === formData.introducer);
             if (selected) {
-                setIntroducerSearch(`${selected.user_id} (${selected.name})`);
+                setIntroducerSearch(selected.user_id);
             }
         } else {
             setIntroducerSearch('');
@@ -539,7 +539,11 @@ export default function CreateUserForm({
                                     setShowIntroducerDropdown(true);
                                 }}
                                 onFocus={() => setShowIntroducerDropdown(true)}
-                                onBlur={() => setTimeout(() => setShowIntroducerDropdown(false), 100)}
+                                onBlur={() => setTimeout(() => {
+                                    setShowIntroducerDropdown(false);
+                                    // 드롭다운에서 선택하지 않고 직접 타이핑한 경우 원래 값으로 복원
+                                    setIntroducerSearch(formData.introducer || '');
+                                }, 150)}
                             />
                             {showIntroducerDropdown && (
                                 <div style={{
@@ -563,7 +567,7 @@ export default function CreateUserForm({
                                             backgroundColor: formData.introducer === '' ? '#f0f0f0' : 'transparent',
                                             fontSize: '14px',
                                         }}
-                                        onClick={() => {
+                                        onMouseDown={() => {
                                             onUpdateField('introducer', '');
                                             setIntroducerSearch('');
                                             setShowIntroducerDropdown(false);
@@ -587,9 +591,9 @@ export default function CreateUserForm({
                                                     fontSize: '14px',
                                                     borderBottom: '1px solid #f0f0f0',
                                                 }}
-                                                onClick={() => {
+                                                onMouseDown={() => {
                                                     onUpdateField('introducer', u.user_id);
-                                                    setIntroducerSearch(`${u.user_id} (${u.name})`);
+                                                    setIntroducerSearch(u.user_id);
                                                     setShowIntroducerDropdown(false);
                                                 }}
                                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}

@@ -152,6 +152,13 @@ export default function PerformanceSettlementPage() {
         return decPart > 0 ? `${intFormatted}.${decPart}만원` : `${intFormatted}만원`;
     };
 
+    const getRateColor = (rate: string | null | undefined) => {
+        if (!rate || rate === '-') return undefined;
+        if (rate.startsWith('+')) return '#2f9e44';
+        if (rate.startsWith('-')) return '#e03131';
+        return undefined;
+    };
+
     const formatApprovalAmount = (manwon: number): string => {
         const eokValue = manwon / 1;
         const eok = Math.floor(eokValue);
@@ -215,7 +222,7 @@ export default function PerformanceSettlementPage() {
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>이번달 매출</p>
                         <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.monthlyRevenue || 0) * 10000) : formatApprovalAmount(stats.monthlyRevenue || 0)}</p>
-                        <p className={styles.statSubValue}>전월 대비</p>
+                        <p className={styles.statSubValue}>전월 대비 <span style={{ color: getRateColor(stats.prevMonthChangeRate) }}>{stats.prevMonthChangeRate ?? '-'}</span></p>
                     </div>
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>이번달 승인금액</p>
@@ -225,7 +232,7 @@ export default function PerformanceSettlementPage() {
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>누적 매출</p>
                         <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.totalRevenueAmount || 0) * 10000) : formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
-                        <p className={styles.statSubValue}>전년도 대비</p>
+                        <p className={styles.statSubValue}>전년도 대비 <span style={{ color: getRateColor(stats.prevYearChangeRate) }}>{stats.prevYearChangeRate ?? '-'}</span></p>
                     </div>
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>누적 승인금액</p>
@@ -235,7 +242,7 @@ export default function PerformanceSettlementPage() {
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>전환율</p>
                         <p className={styles.statValue}>{stats.conversionRate || 0}%</p>
-                        <p className={styles.statSubValue}>상담 대비 승인율</p>
+                        <p className={styles.statSubValue}>전월 대비 <span style={{ color: getRateColor(stats.conversionChangeRate) }}>{stats.conversionChangeRate ?? '-'}</span></p>
                     </div>
                 </div>
 

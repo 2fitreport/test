@@ -113,9 +113,17 @@ export async function GET(request: NextRequest) {
         // 실무자가 담당한 문서 조회 (manager_id 기준)
         const { data: allDocuments } = await supabase
             .from('documents')
-            .select('manager_id, progress_details, approval_amount, created_at, payment_date')
+            .select('manager_id, progress_details, approval_amount, created_at, updated_at')
             .in('manager_id', staffUserIds);
         const docs = allDocuments || [];
+
+        const toKSTDateStr = (isoString: string): string => {
+            if (!isoString) return '';
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return '';
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
+        };
 
         // 월 범위
         let monthStartStr = '', monthEndStr = '';
@@ -137,17 +145,21 @@ export async function GET(request: NextRequest) {
         const stats = staffList.map((person: any) => {
             const managerDocs = docsByManager[person.user_id] || [];
 
-            // 상담수: 해당 월에 배정된 문서 (created_at 기준)
+            // 상담수: 해당 월에 배정된 문서 (created_at KST 기준)
             const consultDocs = monthStartStr
                 ? managerDocs.filter(d => {
-                    const date = d.created_at?.substring(0, 10) || '';
+                    const date = toKSTDateStr(d.created_at || '');
                     return date >= monthStartStr && date <= monthEndStr;
                 })
                 : managerDocs;
 
-            // 케이스수/승인금액: 해당 월 payment_date 기준 승인된 문서
+            // 케이스수/승인금액: 해당 월 승인된 문서 (updated_at KST 기준)
             const approvedDocs = monthStartStr
-                ? managerDocs.filter(d => d.progress_details === '승인' && d.payment_date && d.payment_date >= monthStartStr && d.payment_date <= monthEndStr)
+                ? managerDocs.filter(d => {
+                    if (d.progress_details !== '승인') return false;
+                    const date = toKSTDateStr(d.updated_at || '');
+                    return date >= monthStartStr && date <= monthEndStr;
+                })
                 : managerDocs.filter(d => d.progress_details === '승인');
 
             const totalApproval = approvedDocs.reduce((sum: number, d: any) => {
@@ -161,11 +173,12 @@ export async function GET(request: NextRequest) {
 
             // 금액 포맷
             const eok = Math.floor(totalApproval / 10000);
-            const man = Math.round((totalApproval % 10000) / 1000);
+            const man = Math.floor((totalApproval % 10000) / 1000);
             let amountStr = '-';
             if (totalApproval > 0) {
                 if (eok > 0) amountStr = man > 0 ? `${eok}억 ${man}천만원` : `${eok}억원`;
-                else amountStr = `${Math.round(totalApproval / 1000)}천만원`;
+                else if (Math.floor(totalApproval / 1000) > 0) amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
+                else amountStr = `${totalApproval}만원`;
             }
 
             return {

@@ -194,17 +194,38 @@ export async function GET(request: NextRequest) {
             const day = String(d.getDate()).padStart(2, '0');
             return `${y}-${m}-${day}`;
         };
+        // ISO 문자열을 KST 기준 YYYY-MM-DD 문자열로 변환
+        const toKSTDateStr = (isoString: string): string => {
+            if (!isoString) return '';
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return '';
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
+        };
         const firstDayStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
         const nextMonthFirstStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+        const prevMonthFirstStr = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+        const formatChangeRate = (current: number, prev: number): string | null => {
+            if (prev > 0) {
+                const rate = Math.round(((current - prev) / prev) * 100);
+                return `${rate > 0 ? '+' : ''}${rate}%`;
+            }
+            return null;
+        };
 
         // === 진행상황 차트 (chartOnly에서도 필요) ===
         const chartMonth = month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const [cYear, cMonth] = chartMonth.split('-');
-        const filteredDocs = myDocs.filter((doc: any) => {
+        // Level 4 비대표: 차트는 본인 문서만 (소개받은 영업자 문서 제외)
+        const ownDocs = (userLevel === 4 && !isRep)
+            ? myDocs.filter((d: any) => d.user_id === userId || d.submitter_id === userId)
+            : myDocs;
+        const filteredDocs = ownDocs.filter((doc: any) => {
             if (!doc.created_at) return false;
-            const docDate = new Date(doc.created_at);
-            return docDate.getFullYear() === parseInt(cYear) &&
-                   docDate.getMonth() + 1 === parseInt(cMonth);
+            const dateStr = toKSTDateStr(doc.created_at);
+            const [y, m] = dateStr.split('-');
+            return y === cYear && m === cMonth.padStart(2, '0');
         });
 
         const progressData = {
@@ -296,15 +317,15 @@ export async function GET(request: NextRequest) {
                     const userDocs = docsByUser[person.user_id] || [];
 
                     const monthlyDocs = userDocs.filter(d => {
-                        const date = d.created_at?.substring(0, 10) || '';
+                        const date = toKSTDateStr(d.created_at || '');
                         return date >= firstDayStr && date < nextMonthFirstStr;
                     });
 
-                    const monthlyApprovedDocs = userDocs.filter(d =>
-                        d.progress_details === '승인' &&
-                        d.updated_at >= firstDayStr &&
-                        d.updated_at < nextMonthFirstStr
-                    );
+                    const monthlyApprovedDocs = userDocs.filter(d => {
+                        if (d.progress_details !== '승인') return false;
+                        const date = toKSTDateStr(d.updated_at || '');
+                        return date >= firstDayStr && date < nextMonthFirstStr;
+                    });
 
                     const approvedCount = monthlyApprovedDocs.length;
                     const registrationCount = monthlyDocs.length;
@@ -320,7 +341,8 @@ export async function GET(request: NextRequest) {
                     let amountStr = '-';
                     if (totalApproval > 0) {
                         if (eok > 0) amountStr = man > 0 ? `${eok}억 ${man}천만원` : `${eok}억원`;
-                        else amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
+                        else if (Math.floor(totalApproval / 1000) > 0) amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
+                        else amountStr = `${totalApproval}만원`;
                     }
 
                     return {
@@ -338,27 +360,52 @@ export async function GET(request: NextRequest) {
         }
 
         // === 통계 계산 ===
-        const todayStr = toLocalDateStr(now);
-
-        const inProgressToday = myDocs.filter(d =>
-            d.progress_details === '진행' && d.updated_at >= todayStr
+        // 현재 진행중인 케이스 전체 (날짜 무관)
+        const inProgressCount = ownDocs.filter(d =>
+            d.progress_details === '진행'
         ).length;
 
-        const monthlyApproved = myDocs.filter(d =>
-            d.progress_details === '승인' &&
-            d.updated_at >= firstDayStr &&
-            d.updated_at < nextMonthFirstStr
-        );
-        const totalApprovalAmount = monthlyApproved.reduce((sum, doc) => {
+        // monthlyApproved는 수수료 계산 때문에 소개받은 문서 포함(myDocs 기준)
+        const monthlyApproved = myDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const date = toKSTDateStr(d.updated_at || '');
+            return date >= firstDayStr && date < nextMonthFirstStr;
+        });
+        const prevMonthApproved = myDocs.filter((d: any) => {
+            if (d.progress_details !== '승인') return false;
+            const date = toKSTDateStr(d.updated_at || '');
+            return date >= prevMonthFirstStr && date < firstDayStr;
+        });
+
+        const totalApprovalAmount = ownDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const date = toKSTDateStr(d.updated_at || '');
+            return date >= firstDayStr && date < nextMonthFirstStr;
+        }).reduce((sum, doc) => {
             const amount = doc.approval_amount;
             const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
             return sum + numAmount;
         }, 0);
 
-        const newRegistrations = myDocs.filter(d =>
-            d.created_at >= firstDayStr &&
-            d.created_at < nextMonthFirstStr
-        ).length;
+        const newRegistrations = ownDocs.filter(d => {
+            const date = toKSTDateStr(d.created_at || '');
+            return date >= firstDayStr && date < nextMonthFirstStr;
+        }).length;
+        const prevNewRegistrations = ownDocs.filter(d => {
+            const date = toKSTDateStr(d.created_at || '');
+            return date >= prevMonthFirstStr && date < firstDayStr;
+        }).length;
+
+        const approvedCount = ownDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const date = toKSTDateStr(d.updated_at || '');
+            return date >= firstDayStr && date < nextMonthFirstStr;
+        }).length;
+        const prevApprovedCount = ownDocs.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const date = toKSTDateStr(d.updated_at || '');
+            return date >= prevMonthFirstStr && date < firstDayStr;
+        }).length;
 
         // === 로그 분류 (각 50개씩) ===
         const revisionLogs: any[] = [];
@@ -375,50 +422,60 @@ export async function GET(request: NextRequest) {
             if (revisionLogs.length >= 50 && memoLogs.length >= 50) break;
         }
 
-        // Level 4 일반 영업자: 지급수수료 계산
-        let monthlyRevenueValue: number;
-        if (userLevel === 4 && !isRep) {
-            const approvedDocUserIds = [...new Set([
-                ...monthlyApproved.map((d: any) => d.user_id),
-                ...monthlyApproved.map((d: any) => d.submitter_id),
+        // 수수료 계산 헬퍼 (Level 4 비대표 전용)
+        const calcFee = async (docs: any[]): Promise<number> => {
+            const docUserIds = [...new Set([
+                ...docs.map((d: any) => d.user_id),
+                ...docs.map((d: any) => d.submitter_id),
             ].filter(Boolean))];
-            let userIntroducerMap: Record<string, string> = {};
-            if (approvedDocUserIds.length > 0) {
+            let introMap: Record<string, string> = {};
+            if (docUserIds.length > 0) {
                 const { data: usersData } = await supabase
-                    .from('users').select('user_id, introducer').in('user_id', approvedDocUserIds);
+                    .from('users').select('user_id, introducer').in('user_id', docUserIds);
                 for (const u of usersData || []) {
-                    if (u.introducer) userIntroducerMap[u.user_id] = u.introducer;
+                    if (u.introducer) introMap[u.user_id] = u.introducer;
                 }
             }
-            let feeRaw = 0;
-            for (const doc of monthlyApproved) {
+            let fee = 0;
+            for (const doc of docs) {
                 const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
-                if (doc.submitter_id === userId) {
-                    feeRaw += Math.round(rev * 0.2 * 10) / 10;
-                } else if (doc.user_id === userId && !doc.submitter_id) {
-                    feeRaw += Math.round(rev * 0.4 * 10) / 10;
-                }
+                if (doc.submitter_id === userId) fee += Math.round(rev * 0.2 * 10) / 10;
+                else if (doc.user_id === userId && !doc.submitter_id) fee += Math.round(rev * 0.4 * 10) / 10;
                 const docOwnerId = doc.submitter_id || doc.user_id;
-                if (userIntroducerMap[docOwnerId] === userId) {
-                    feeRaw += Math.round(rev * 0.05 * 10) / 10;
-                }
+                if (introMap[docOwnerId] === userId) fee += Math.round(rev * 0.05 * 10) / 10;
             }
-            monthlyRevenueValue = feeRaw / 10000;
+            return fee / 10000;
+        };
+
+        const sumRevenue = (docs: any[]) => docs.reduce((sum: number, doc: any) => {
+            const amount = doc.revenue_amount;
+            const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
+            return sum + numAmount;
+        }, 0) / 10000;
+
+        let monthlyRevenueValue: number;
+        let prevMonthRevenueValue: number;
+        if (userLevel === 4 && !isRep) {
+            [monthlyRevenueValue, prevMonthRevenueValue] = await Promise.all([
+                calcFee(monthlyApproved),
+                calcFee(prevMonthApproved),
+            ]);
         } else {
-            monthlyRevenueValue = [3, 6].includes(userLevel) ? 0 : monthlyApproved.reduce((sum: number, doc: any) => {
-                const amount = doc.revenue_amount;
-                const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
-                return sum + numAmount;
-            }, 0) / 10000;
+            monthlyRevenueValue = sumRevenue(monthlyApproved);
+            prevMonthRevenueValue = sumRevenue(prevMonthApproved);
         }
 
         return NextResponse.json({
             stats: {
-                inProgressCount: inProgressToday,
+                inProgressCount,
                 approvalAmount: totalApprovalAmount / 10000,
                 monthlyRevenue: monthlyRevenueValue,
                 newRegistrations,
-                approvedCount: monthlyApproved.length
+                approvedCount,
+                inProgressChangeRate: null,
+                revenueChangeRate: formatChangeRate(monthlyRevenueValue, prevMonthRevenueValue),
+                newRegistrationsChangeRate: formatChangeRate(newRegistrations, prevNewRegistrations),
+                approvedCountChangeRate: formatChangeRate(approvedCount, prevApprovedCount),
             },
             revisionLogs,
             memoLogs,

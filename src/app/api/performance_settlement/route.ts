@@ -65,11 +65,37 @@ export async function GET(request: NextRequest) {
             };
         };
 
+        // ISO 문자열을 KST 기준 YYYY-MM-DD 문자열로 변환 (날짜 비교용)
+        const toKSTDateStr = (isoString: string): string => {
+            if (!isoString) return '';
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return '';
+            const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}-${String(kst.getUTCDate()).padStart(2, '0')}`;
+        };
+
         // === 현재 달 범위 (stats 계산용) ===
         const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const currentMonthStartStr = toLocalDateStr(currentMonthStart);
         const currentMonthEndStr = toLocalDateStr(currentMonthEnd);
+
+        // === 전월 범위 ===
+        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        const prevMonthStartStr = toLocalDateStr(prevMonthStart);
+        const prevMonthEndStr = toLocalDateStr(prevMonthEnd);
+        const prevYearNum = now.getFullYear() - 1;
+        const thisYearStartStr = `${now.getFullYear()}-01-01`;
+        const prevYearSamePeriodEndStr = toLocalDateStr(new Date(prevYearNum, now.getMonth() + 1, 0));
+
+        const formatChangeRate = (current: number, prev: number): string | null => {
+            if (prev > 0) {
+                const rate = Math.round(((current - prev) / prev) * 100);
+                return `${rate > 0 ? '+' : ''}${rate}%`;
+            }
+            return null;
+        };
 
         // === 요청한 달 범위 (settlementData 조회용) ===
         let targetMonthStart: Date, targetMonthEnd: Date;
@@ -188,14 +214,27 @@ export async function GET(request: NextRequest) {
         const docsResult = await docsQuery;
         const myDocs = docsResult.data || [];
 
+        // Level 4 비대표: 본인 직접 문서만 (승인금액/건수 통계용)
+        const ownDocsBase = (userLevel === 4 && !isAffiliationRep)
+            ? myDocs.filter(d => d.user_id === userId || d.submitter_id === userId)
+            : myDocs;
+
         // === 현재달 통계 (stats는 항상 현재 달 기준) ===
+        // 수수료 계산용: myDocs 전체 (소개받은 영업자 문서 포함)
         const monthlyApprovedForStats = myDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
-            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
+            const approvedDateStr = toKSTDateStr(d.updated_at || '');
             return approvedDateStr >= currentMonthStartStr && approvedDateStr <= currentMonthEndStr;
         });
 
-        const totalApprovalAmount = monthlyApprovedForStats.reduce((sum, doc) => {
+        // ownDocs 기준 이번달 승인 (승인금액/건수/전환율 통계용, 인센티브 문서 제외)
+        const ownMonthlyApproved = ownDocsBase.filter(d => {
+            if (d.progress_details !== '승인') return false;
+            const approvedDateStr = toKSTDateStr(d.updated_at || '');
+            return approvedDateStr >= currentMonthStartStr && approvedDateStr <= currentMonthEndStr;
+        });
+
+        const totalApprovalAmount = ownMonthlyApproved.reduce((sum, doc) => {
             const amount = doc.approval_amount;
             const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
             return sum + numAmount;
@@ -209,7 +248,6 @@ export async function GET(request: NextRequest) {
 
         // === Level 4 일반 영업자: 본인이 받는 수수료 계산 ===
         let monthlyRevenueAmount = totalRevenueAmountRaw / 10000;
-        let totalRevenueAmountForAll = monthlyApprovedForStats.reduce((sum, doc) => sum + (typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0), 0);
 
         if (userLevel === 4 && !isAffiliationRep) {
             // 영업자 정보 조회 (이번달 문서들)
@@ -254,26 +292,38 @@ export async function GET(request: NextRequest) {
 
         const monthlyApprovalAmount = totalApprovalAmount / 10000;
 
-        // Level 4 비대표: 건수/금액 통계는 본인 직접 건만 (소개 영업자 문서 제외)
-        const ownDocs = (userLevel === 4 && !isAffiliationRep)
-            ? myDocs.filter(d => d.user_id === userId || d.submitter_id === userId)
-            : myDocs;
+        const ownDocs = ownDocsBase;
 
         const newRegistrations = ownDocs.filter(d => {
-            const docDateStr = d.created_at?.substring(0, 10) || '';
+            const docDateStr = toKSTDateStr(d.created_at || '');
             return docDateStr >= currentMonthStartStr && docDateStr <= currentMonthEndStr;
         }).length;
 
-        const ownMonthlyApproved = ownDocs.filter(d => {
+        // 전월 전환율 계산
+        const prevMonthRegistrations = ownDocs.filter(d => {
+            const docDateStr = toKSTDateStr(d.created_at || '');
+            return docDateStr >= prevMonthStartStr && docDateStr <= prevMonthEndStr;
+        }).length;
+        const prevMonthApprovedCount = ownDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
-            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
-            return approvedDateStr >= currentMonthStartStr && approvedDateStr <= currentMonthEndStr;
-        });
+            const approvedDateStr = toKSTDateStr(d.updated_at || '');
+            return approvedDateStr >= prevMonthStartStr && approvedDateStr <= prevMonthEndStr;
+        }).length;
+        const prevMonthConversionRate = prevMonthRegistrations > 0
+            ? Math.round((prevMonthApprovedCount / prevMonthRegistrations) * 100)
+            : 0;
+        const currentConversionRate = newRegistrations > 0
+            ? Math.round((ownMonthlyApproved.length / newRegistrations) * 100)
+            : 0;
+        const conversionDiff = currentConversionRate - prevMonthConversionRate;
+        const conversionChangeRate = (currentConversionRate > 0 || prevMonthConversionRate > 0)
+            ? `${conversionDiff > 0 ? '+' : ''}${conversionDiff}%`
+            : null;
 
         // === 요청한 달의 케이스별 매출 정산 데이터 (승인된 날짜 기준) ===
         const monthlyApprovedForSettlement = myDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
-            const approvedDateStr = d.updated_at?.substring(0, 10) || '';
+            const approvedDateStr = toKSTDateStr(d.updated_at || '');
             return approvedDateStr >= targetMonthStartStr && approvedDateStr <= targetMonthEndStr;
         });
 
@@ -316,7 +366,7 @@ export async function GET(request: NextRequest) {
             const revenueAmount = typeof doc.revenue_amount === 'string'
                 ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;
-            const paymentDate = doc.payment_date || new Date(doc.updated_at).toISOString().split('T')[0];
+            const paymentDate = doc.payment_date || toKSTDateStr(doc.updated_at || '');
 
             if (doc.submitter_id) {
                 // 상담신청 케이스: A영업자(submitter_id) 20%, B영업자(user_id) 0%
@@ -389,8 +439,13 @@ export async function GET(request: NextRequest) {
         // === 년별 월별 매출 추이 ===
         const yearData: Record<number, Record<number, number>> = {};
         const approvedDocs = myDocs.filter(d => d.progress_details === '승인');
+        // 올해 1월~현재달 YTD (누적 매출 계산용)
+        const ytdApprovedDocs = approvedDocs.filter(d => {
+            const dateStr = toKSTDateStr(d.updated_at || '');
+            return dateStr >= thisYearStartStr && dateStr <= currentMonthEndStr;
+        });
 
-        // === Level 4 일반 영업자: 누적 수수료 계산 ===
+        // === 누적 매출 계산 (전체 기간) ===
         let totalRevenueAmountForReturn = 0;
         if (userLevel === 4 && !isAffiliationRep) {
             const totalUserIds = [...new Set([
@@ -423,7 +478,7 @@ export async function GET(request: NextRequest) {
             }
             totalRevenueAmountForReturn = totalFeeRaw / 10000;
         } else {
-            // 나머지 직급: 실제 매출
+            // 나머지 직급: 실제 매출 (전체 기간)
             totalRevenueAmountForReturn = approvedDocs.reduce((sum, doc) => {
                 const amount = doc.revenue_amount;
                 const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
@@ -431,10 +486,66 @@ export async function GET(request: NextRequest) {
             }, 0) / 10000;
         }
 
+        // === 전월/전년도 매출 계산 (변화율용) ===
+        const prevMonthApprovedDocs = approvedDocs.filter(d => {
+            const dateStr = toKSTDateStr(d.updated_at || '');
+            return dateStr >= prevMonthStartStr && dateStr <= prevMonthEndStr;
+        });
+        const prevYearApprovedDocs = approvedDocs.filter(d => {
+            const dateStr = toKSTDateStr(d.updated_at || '');
+            return dateStr >= `${prevYearNum}-01-01` && dateStr <= prevYearSamePeriodEndStr;
+        });
+
+        let prevMonthRevenue = 0;
+        let prevYearRevenue = 0;
+        let ytdRevenue = 0;
+
+        if (userLevel === 4 && !isAffiliationRep) {
+            // Level 4 비대표: 수수료 기준
+            const allDocUserIds = [...new Set([
+                ...approvedDocs.map(d => d.user_id),
+                ...approvedDocs.map(d => d.submitter_id),
+            ].filter(Boolean))];
+            let feeUserInfoMap: Record<string, { introducer?: string }> = {};
+            if (allDocUserIds.length > 0) {
+                const { data: feeUsersData } = await supabase
+                    .from('users').select('user_id, introducer').in('user_id', allDocUserIds);
+                for (const u of feeUsersData || []) {
+                    feeUserInfoMap[u.user_id] = { introducer: u.introducer };
+                }
+            }
+            const calcFee = (docs: any[]) => {
+                let fee = 0;
+                for (const doc of docs) {
+                    const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                    if (doc.submitter_id === userId) fee += Math.round(rev * 0.2 * 10) / 10;
+                    else if (doc.user_id === userId && !doc.submitter_id) fee += Math.round(rev * 0.4 * 10) / 10;
+                    const docUserId = doc.submitter_id || doc.user_id;
+                    if ((feeUserInfoMap[docUserId] || {}).introducer === userId) fee += Math.round(rev * 0.05 * 10) / 10;
+                }
+                return fee / 10000;
+            };
+            prevMonthRevenue = calcFee(prevMonthApprovedDocs);
+            prevYearRevenue = calcFee(prevYearApprovedDocs);
+            ytdRevenue = calcFee(ytdApprovedDocs);
+        } else {
+            const sumRevenue = (docs: any[]) => docs.reduce((sum, doc) => {
+                const amt = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                return sum + amt;
+            }, 0) / 10000;
+            prevMonthRevenue = sumRevenue(prevMonthApprovedDocs);
+            prevYearRevenue = sumRevenue(prevYearApprovedDocs);
+            ytdRevenue = sumRevenue(ytdApprovedDocs);
+        }
+
+        const prevMonthChangeRate = formatChangeRate(monthlyRevenueAmount, prevMonthRevenue);
+        // 전년도 대비: 올해 YTD vs 작년 동일 기간 비교
+        const prevYearChangeRate = formatChangeRate(ytdRevenue, prevYearRevenue);
+
         approvedDocs.forEach(doc => {
             // updated_at 기준 연도/월 추출 (승인날짜)
             if (!doc.updated_at) return;
-            const { year, month } = extractYearMonthDay(doc.updated_at?.substring(0, 10));
+            const { year, month } = extractYearMonthDay(doc.updated_at || '');
             const revenueAmount = typeof doc.revenue_amount === 'string'
                 ? (parseInt(doc.revenue_amount) || 0)
                 : Number(doc.revenue_amount) || 0;
@@ -472,9 +583,7 @@ export async function GET(request: NextRequest) {
                 monthlyApprovalAmount: monthlyApprovalAmount,
                 monthlyApprovedCount: ownMonthlyApproved.length,
                 newRegistrations,
-                conversionRate: newRegistrations > 0
-                    ? Math.round((ownMonthlyApproved.length / newRegistrations) * 100)
-                    : 0,
+                conversionRate: currentConversionRate,
                 totalApprovedCount: ownDocs.filter(d => d.progress_details === '승인').length,
                 totalApprovalAmount: ownDocs
                     .filter(d => d.progress_details === '승인')
@@ -484,6 +593,9 @@ export async function GET(request: NextRequest) {
                         return sum + numAmount;
                     }, 0) / 10000,
                 totalRevenueAmount: totalRevenueAmountForReturn,
+                prevMonthChangeRate,
+                prevYearChangeRate,
+                conversionChangeRate,
             },
             settlementData: filteredSettlementData,
             revenueChartData,

@@ -152,8 +152,8 @@ export default function StaffPerformanceTable({
                     <thead>
                         <tr>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>담당자{getSortIcon('name')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('consult')} style={{ cursor: 'pointer' }}>상담수{getSortIcon('consult')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('case')} style={{ cursor: 'pointer' }}>케이스수{getSortIcon('case')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('consult')} style={{ cursor: 'pointer' }}>등록{getSortIcon('consult')}</th>
+                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('case')} style={{ cursor: 'pointer' }}>승인{getSortIcon('case')}</th>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('amount')} style={{ cursor: 'pointer' }}>승인금액{getSortIcon('amount')}</th>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('rate')} style={{ cursor: 'pointer' }}>전환율{getSortIcon('rate')}</th>
                         </tr>
