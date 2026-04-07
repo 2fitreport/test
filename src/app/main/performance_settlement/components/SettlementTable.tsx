@@ -152,8 +152,9 @@ export default function SettlementTable({
     const formatFeeInMillions = (amount: any): string => {
         const manwon = typeof amount === 'number' ? amount : Number(amount) || 0;
         if (manwon === 0) return '0백만원';
-        const millions = Math.floor(manwon / 100); // 천원 아래 제외
-        return `${millions}백만원`;
+        const millions = manwon / 100;
+        const rounded = Math.round(millions * 100) / 100;
+        return `${rounded}백만원`;
     };
 
     return (

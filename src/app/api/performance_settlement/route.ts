@@ -329,7 +329,7 @@ export async function GET(request: NextRequest) {
             return fee;
         };
 
-        // === 현재달 통계 (stats는 항상 현재 달 기준) ===
+        // === 현재달 통계 (stats는 항상 현재 달 기준 - 사용자 요청) ===
         // 수수료 계산용: myDocs 전체 (소개받은 영업자 문서 포함)
         const monthlyApprovedForStats = myDocs.filter(d => {
             if (d.progress_details !== '승인') return false;
@@ -356,11 +356,14 @@ export async function GET(request: NextRequest) {
             return sum + numAmount;
         }, 0);
 
-        // === Level 4 일반 영업자: 본인이 받는 수수료 계산 ===
+        // === Level 4 영업자: 상단 대시보드 수수료 일치 로직 ===
         let monthlyRevenueAmount = totalRevenueAmountRaw;
 
-        if (userLevel === 4 && !isAffiliationRep) {
-            // 영업자 정보 조회 (이번달 문서들)
+        if (userLevel === 4) {
+            // 이번 달(현재 월) 기준의 정산 데이터를 미리 계산하여 상단 대시보드와 맞춤
+            const currentMonthSettlement = []; // 이번달 정산행들
+            
+            // 영업자 정보 조회 (이번달 문서들 기준)
             const statsDocUserIds = [...new Set([
                 ...monthlyApprovedForStats.map(d => d.user_id),
                 ...monthlyApprovedForStats.map(d => d.submitter_id),
@@ -368,46 +371,55 @@ export async function GET(request: NextRequest) {
             const statsUserInfoMap: Record<string, { introducer?: string }> = {};
             if (statsDocUserIds.length > 0) {
                 const { data: statsUsersData } = await supabase
-                    .from('users')
-                    .select('user_id, introducer')
-                    .in('user_id', statsDocUserIds);
+                    .from('users').select('user_id, introducer').in('user_id', statsDocUserIds);
                 for (const u of statsUsersData || []) {
                     statsUserInfoMap[u.user_id] = { introducer: u.introducer };
                 }
             }
 
-            // 이번달 본인 수수료 계산
-            let monthlyFeeRaw = 0;
+            let currentMonthFeeSum = 0;
             for (const doc of monthlyApprovedForStats) {
-                const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
-                if (doc.submitter_id === userId) {
-                    // 상담요청 A영업자: 20%
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.2 * 10) / 10;
-                } else if (doc.user_id === userId && !doc.submitter_id) {
-                    // 기업등록 영업자: 40%
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.4 * 10) / 10;
-                } else if (doc.user_id === userId && doc.submitter_id === userId) {
-                    // 자신이 작성한 상담요청 (이미 20% 계산됨, 중복 제외)
-                    monthlyFeeRaw += 0;
-                }
-                // 소개자 인센티브: 5%
-                const docUserId = doc.submitter_id || doc.user_id;
-                const userInfo = statsUserInfoMap[docUserId] || {};
-                if (userInfo.introducer === userId) {
-                    monthlyFeeRaw += Math.round(revenueAmount * 0.05 * 10) / 10;
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                
+                if (isAffiliationRep) {
+                    // 소속대표: 소속원들의 수수료 합산
+                    if (doc.submitter_id && affMemberUserIds.has(doc.submitter_id)) {
+                        currentMonthFeeSum += Math.round(rev * 0.2 * 10) / 10;
+                    }
+                    const intro = (statsUserInfoMap[doc.submitter_id || doc.user_id] || {}).introducer;
+                    if (intro && affMemberUserIds.has(intro)) {
+                        currentMonthFeeSum += Math.round(rev * 0.05 * 10) / 10;
+                    }
+                    if (!doc.submitter_id && affMemberUserIds.has(doc.user_id)) {
+                        currentMonthFeeSum += Math.round(rev * 0.4 * 10) / 10;
+                    }
+                } else {
+                    // 일반 영업자: 본인 수수료
+                    if (doc.submitter_id === userId) {
+                        currentMonthFeeSum += Math.round(rev * 0.2 * 10) / 10;
+                    } else if (doc.user_id === userId && !doc.submitter_id) {
+                        currentMonthFeeSum += Math.round(rev * 0.4 * 10) / 10;
+                    }
+                    const docUserId = doc.submitter_id || doc.user_id;
+                    if (statsUserInfoMap[docUserId]?.introducer === userId) {
+                        currentMonthFeeSum += Math.round(rev * 0.05 * 10) / 10;
+                    }
                 }
             }
-            monthlyRevenueAmount = monthlyFeeRaw;
-        } else if (userLevel === 4 && isAffiliationRep) {
-            const externalMonthlyApproved = externalIncentiveDocs.filter(d => {
-                const dateStr = toKSTDateStr(d.updated_at || '');
-                return dateStr >= currentMonthStartStr && dateStr <= currentMonthEndStr;
-            });
-            const externalMonthlyIncentive = externalMonthlyApproved.reduce((sum, doc) => {
-                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
-                return sum + Math.round(rev * 0.05 * 10) / 10;
-            }, 0);
-            monthlyRevenueAmount = calcAffilFee(monthlyApprovedForStats) + externalMonthlyIncentive;
+            
+            // 외부 도입 인센티브 (소속대표 전용)
+            if (isAffiliationRep) {
+                const externalMonthly = externalIncentiveDocs.filter(d => {
+                    const dateStr = toKSTDateStr(d.updated_at || '');
+                    return dateStr >= currentMonthStartStr && dateStr <= currentMonthEndStr;
+                });
+                for (const doc of externalMonthly) {
+                    const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                    currentMonthFeeSum += Math.round(rev * 0.05 * 10) / 10;
+                }
+            }
+
+            monthlyRevenueAmount = currentMonthFeeSum;
         }
 
         const monthlyApprovalAmount = totalApprovalAmount / 10000;
@@ -591,17 +603,13 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // level 4이고 현재달 선택 시 settlement 테이블 합계로 monthlyRevenueAmount 일치
+        // level 4인 경우 settlement 테이블의 fee 합계로 monthlyRevenueAmount 일치 (선택한 월 기준)
         if (userLevel === 4) {
-            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const selectedMonthStr = paramMonth || currentMonthStr;
-            if (selectedMonthStr === currentMonthStr) {
-                const settlementMonthlyFee = filteredSettlementData.reduce((sum, row) => {
-                    const fee = typeof row.fee === 'number' ? row.fee : 0;
-                    return sum + fee;
-                }, 0);
-                monthlyRevenueAmount = settlementMonthlyFee; // 만원 단위 그대로
-            }
+            const settlementMonthlyFee = filteredSettlementData.reduce((sum, row) => {
+                const fee = typeof row.fee === 'number' ? row.fee : 0;
+                return sum + fee;
+            }, 0);
+            monthlyRevenueAmount = settlementMonthlyFee; // 만원 단위 그대로
         }
 
         // === 년별 월별 매출 추이 ===
