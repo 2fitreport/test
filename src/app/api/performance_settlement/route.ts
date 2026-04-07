@@ -117,6 +117,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
+        // 소속대표의 실제 소속원 user_id 목록 (인센티브 필터링용, 문서 여부와 무관)
+        let affMemberUserIds = new Set<string>();
+
         // 권한별 문서 조회
         let docsQuery = supabase.from('documents')
             .select('id, user_id, submitter_id, company_name, status, progress_details, approval_amount, revenue_amount, created_at, updated_at, inspector_id, manager_id, payment_date, document_type');
@@ -151,6 +154,8 @@ export async function GET(request: NextRequest) {
                             .select('user_id')
                             .in('id', affDbIds);
                         const affUserIds = (affUsers || []).map((u: any) => u.user_id);
+                        // 소속원 ID 저장 (인센티브 필터링용)
+                        affMemberUserIds = new Set(affUserIds);
                         if (affUserIds.length > 0) {
                             docsQuery = docsQuery.in('user_id', affUserIds);
                         } else {
@@ -177,7 +182,7 @@ export async function GET(request: NextRequest) {
                 docsQuery = docsQuery.or(orParts.join(','));
             }
         } else if (userLevel === 6) {
-            // 검수자: 소속이 같은 영업자의 문서만 (user_affiliations 기준)
+            // 검수자: 소속이 같은 영업자의 문서 + inspector_id로 직접 배정받은 문서
             const { data: myAffiliations } = await supabase
                 .from('user_affiliations')
                 .select('affiliation_id')
@@ -203,8 +208,18 @@ export async function GET(request: NextRequest) {
                 }
             }
 
-            if (allowedUserIds.length > 0) {
-                docsQuery = docsQuery.in('user_id', allowedUserIds);
+            // inspector_id로 직접 배정받은 문서도 포함 (홈과 동일)
+            const { data: assignedDocs } = await supabase
+                .from('documents')
+                .select('id')
+                .eq('inspector_id', userId);
+            const assignedDocIds = (assignedDocs || []).map((d: any) => d.id);
+
+            if (allowedUserIds.length > 0 || assignedDocIds.length > 0) {
+                const conditions: string[] = [];
+                if (allowedUserIds.length > 0) conditions.push(`user_id.in.(${allowedUserIds.join(',')})`);
+                if (assignedDocIds.length > 0) conditions.push(`id.in.(${assignedDocIds.join(',')})`);
+                docsQuery = docsQuery.or(conditions.join(','));
             } else {
                 docsQuery = docsQuery.eq('user_id', 'no_user_found');
             }
@@ -214,13 +229,64 @@ export async function GET(request: NextRequest) {
         const docsResult = await docsQuery;
         const myDocs = docsResult.data || [];
 
+        // 소속대표: 소속원이 소개자인 다른 소속 영업자의 승인 문서 (인센티브 5% 계산용)
+        let externalIncentiveDocs: any[] = [];
+        const externalDocIntroMap: Record<string, string> = {}; // docId → 소속원 소개자 userId
+        const affMemberNameMap: Record<string, string> = {}; // 소속원 userId → name
+
+        if (userLevel === 4 && isAffiliationRep && affMemberUserIds.size > 0) {
+            const { data: introducedUsersRaw } = await supabase
+                .from('users')
+                .select('user_id, introducer')
+                .in('introducer', [...affMemberUserIds]);
+
+            const { data: affMemberNamesData } = await supabase
+                .from('users')
+                .select('user_id, name')
+                .in('user_id', [...affMemberUserIds]);
+            for (const u of affMemberNamesData || []) {
+                affMemberNameMap[u.user_id] = u.name;
+            }
+
+            // 다른 소속 영업자만 (소속원 자신은 제외)
+            const otherAffUsers = (introducedUsersRaw || []).filter((u: any) => !affMemberUserIds.has(u.user_id));
+            const otherAffUserIds = otherAffUsers.map((u: any) => u.user_id);
+            const otherUserIntroMap: Record<string, string> = {};
+            for (const u of otherAffUsers) {
+                otherUserIntroMap[u.user_id] = u.introducer;
+            }
+
+            if (otherAffUserIds.length > 0) {
+                const myDocIds = new Set(myDocs.map((d: any) => d.id));
+                const [{ data: submitterDocs }, { data: userOwnDocs }] = await Promise.all([
+                    supabase.from('documents')
+                        .select('id, user_id, submitter_id, revenue_amount, updated_at, payment_date, company_name, progress_details')
+                        .in('submitter_id', otherAffUserIds)
+                        .eq('progress_details', '승인'),
+                    supabase.from('documents')
+                        .select('id, user_id, submitter_id, revenue_amount, updated_at, payment_date, company_name, progress_details')
+                        .in('user_id', otherAffUserIds)
+                        .is('submitter_id', null)
+                        .eq('progress_details', '승인'),
+                ]);
+                const allExternal = [...(submitterDocs || []), ...(userOwnDocs || [])];
+                externalIncentiveDocs = allExternal.filter((d: any) => !myDocIds.has(d.id));
+                for (const doc of externalIncentiveDocs) {
+                    const docUserId = doc.submitter_id || doc.user_id;
+                    if (otherUserIntroMap[docUserId]) {
+                        externalDocIntroMap[doc.id] = otherUserIntroMap[docUserId];
+                    }
+                }
+            }
+        }
+
         // Level 4 비대표: 본인 직접 문서만 (승인금액/건수 통계용)
         const ownDocsBase = (userLevel === 4 && !isAffiliationRep)
             ? myDocs.filter(d => d.user_id === userId || d.submitter_id === userId)
             : myDocs;
 
         // === Level 4 소속대표: 소속 영업자 지급수수료 합산용 사용자 정보 조회 ===
-        let affUserInfoMap: Record<string, { introducer?: string }> = {};
+        const affUserInfoMap: Record<string, { introducer?: string }> = {};
         if (userLevel === 4 && isAffiliationRep) {
             const affDocUserIds = [...new Set([
                 ...myDocs.map(d => d.user_id),
@@ -237,24 +303,30 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 소속대표: 소속 영업자 전체 지급수수료 합산 헬퍼
+        // 소속대표: 소속 영업자 전체 지급수수료 합산 헬퍼 (소속원에게 귀속되는 수수료만)
         const calcAffilFee = (docs: any[]) => {
             let fee = 0;
             for (const doc of docs) {
                 const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 if (doc.submitter_id) {
-                    fee += Math.round(rev * 0.2 * 10) / 10;
-                    if ((affUserInfoMap[doc.submitter_id] || {}).introducer) {
+                    // 상담요청: submitter가 소속원일 때만 20%
+                    if (affMemberUserIds.has(doc.submitter_id)) {
+                        fee += Math.round(rev * 0.2 * 10) / 10;
+                    }
+                    const intro = (affUserInfoMap[doc.submitter_id] || {}).introducer;
+                    if (intro && affMemberUserIds.has(intro)) {
                         fee += Math.round(rev * 0.05 * 10) / 10;
                     }
                 } else {
+                    // 기업등록: user_id는 항상 소속원 (docsQuery 필터 보장)
                     fee += Math.round(rev * 0.4 * 10) / 10;
-                    if ((affUserInfoMap[doc.user_id] || {}).introducer) {
+                    const intro = (affUserInfoMap[doc.user_id] || {}).introducer;
+                    if (intro && affMemberUserIds.has(intro)) {
                         fee += Math.round(rev * 0.05 * 10) / 10;
                     }
                 }
             }
-            return fee / 10000;
+            return fee;
         };
 
         // === 현재달 통계 (stats는 항상 현재 달 기준) ===
@@ -285,7 +357,7 @@ export async function GET(request: NextRequest) {
         }, 0);
 
         // === Level 4 일반 영업자: 본인이 받는 수수료 계산 ===
-        let monthlyRevenueAmount = totalRevenueAmountRaw / 10000;
+        let monthlyRevenueAmount = totalRevenueAmountRaw;
 
         if (userLevel === 4 && !isAffiliationRep) {
             // 영업자 정보 조회 (이번달 문서들)
@@ -293,7 +365,7 @@ export async function GET(request: NextRequest) {
                 ...monthlyApprovedForStats.map(d => d.user_id),
                 ...monthlyApprovedForStats.map(d => d.submitter_id),
             ].filter(Boolean))];
-            let statsUserInfoMap: Record<string, { introducer?: string }> = {};
+            const statsUserInfoMap: Record<string, { introducer?: string }> = {};
             if (statsDocUserIds.length > 0) {
                 const { data: statsUsersData } = await supabase
                     .from('users')
@@ -309,13 +381,13 @@ export async function GET(request: NextRequest) {
             for (const doc of monthlyApprovedForStats) {
                 const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 if (doc.submitter_id === userId) {
-                    // 상담신청 A영업자: 20%
+                    // 상담요청 A영업자: 20%
                     monthlyFeeRaw += Math.round(revenueAmount * 0.2 * 10) / 10;
                 } else if (doc.user_id === userId && !doc.submitter_id) {
                     // 기업등록 영업자: 40%
                     monthlyFeeRaw += Math.round(revenueAmount * 0.4 * 10) / 10;
                 } else if (doc.user_id === userId && doc.submitter_id === userId) {
-                    // 자신이 작성한 상담신청 (이미 20% 계산됨, 중복 제외)
+                    // 자신이 작성한 상담요청 (이미 20% 계산됨, 중복 제외)
                     monthlyFeeRaw += 0;
                 }
                 // 소개자 인센티브: 5%
@@ -325,9 +397,17 @@ export async function GET(request: NextRequest) {
                     monthlyFeeRaw += Math.round(revenueAmount * 0.05 * 10) / 10;
                 }
             }
-            monthlyRevenueAmount = monthlyFeeRaw / 10000;
+            monthlyRevenueAmount = monthlyFeeRaw;
         } else if (userLevel === 4 && isAffiliationRep) {
-            monthlyRevenueAmount = calcAffilFee(monthlyApprovedForStats);
+            const externalMonthlyApproved = externalIncentiveDocs.filter(d => {
+                const dateStr = toKSTDateStr(d.updated_at || '');
+                return dateStr >= currentMonthStartStr && dateStr <= currentMonthEndStr;
+            });
+            const externalMonthlyIncentive = externalMonthlyApproved.reduce((sum, doc) => {
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                return sum + Math.round(rev * 0.05 * 10) / 10;
+            }, 0);
+            monthlyRevenueAmount = calcAffilFee(monthlyApprovedForStats) + externalMonthlyIncentive;
         }
 
         const monthlyApprovalAmount = totalApprovalAmount / 10000;
@@ -374,7 +454,7 @@ export async function GET(request: NextRequest) {
             ...monthlyApprovedForSettlement.map(d => d.user_id),
             ...monthlyApprovedForSettlement.map(d => d.submitter_id),
         ].filter(Boolean))];
-        let userInfoMap: Record<string, { name: string; introducer?: string }> = {};
+        const userInfoMap: Record<string, { name: string; introducer?: string }> = {};
         if (docUserIds.length > 0) {
             const { data: usersData } = await supabase
                 .from('users')
@@ -389,7 +469,7 @@ export async function GET(request: NextRequest) {
         const introducerIds = [...new Set(
             Object.values(userInfoMap).map(u => u.introducer).filter(Boolean) as string[]
         )];
-        let introducerNameMap: Record<string, string> = {};
+        const introducerNameMap: Record<string, string> = {};
         if (introducerIds.length > 0) {
             const { data: intros } = await supabase
                 .from('users')
@@ -411,7 +491,7 @@ export async function GET(request: NextRequest) {
             const paymentDate = doc.payment_date || toKSTDateStr(doc.updated_at || '');
 
             if (doc.submitter_id) {
-                // 상담신청 케이스: A영업자(submitter_id) 20%, B영업자(user_id) 0%
+                // 상담요청 케이스: A영업자(submitter_id) 20%, B영업자(user_id) 0%
                 const aInfo = userInfoMap[doc.submitter_id] || {};
                 settlementData.push({
                     documentId: doc.id,
@@ -419,7 +499,7 @@ export async function GET(request: NextRequest) {
                     approvalAmount,
                     realSales: revenueAmount,
                     manager: aInfo.name || doc.submitter_id,
-                    inflow: '상담신청',
+                    inflow: '상담요청',
                     fee: Math.round(revenueAmount * 0.2 * 10) / 10,
                     paymentDate,
                     settlementUserId: doc.submitter_id,
@@ -428,8 +508,8 @@ export async function GET(request: NextRequest) {
                 if (aInfo.introducer) {
                     settlementData.push({
                         documentId: doc.id,
-                        company: doc.company_name || '-',
-                        approvalAmount,
+                        company: '외부도입원',
+                        approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[aInfo.introducer] || aInfo.introducer,
                         inflow: '인센티브',
@@ -456,8 +536,8 @@ export async function GET(request: NextRequest) {
                 if (userInfo.introducer) {
                     settlementData.push({
                         documentId: doc.id,
-                        company: doc.company_name || '-',
-                        approvalAmount,
+                        company: '외부도입원',
+                        approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[userInfo.introducer] || userInfo.introducer,
                         inflow: '인센티브',
@@ -469,13 +549,59 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        // 소속대표: 다른 소속 영업자 문서에서 소속원 인센티브(5%) 행 추가
+        if (isAffiliationRep && externalIncentiveDocs.length > 0) {
+            const externalSettlementDocs = externalIncentiveDocs.filter(d => {
+                const dateStr = toKSTDateStr(d.updated_at || '');
+                return dateStr >= targetMonthStartStr && dateStr <= targetMonthEndStr;
+            });
+            for (const doc of externalSettlementDocs) {
+                const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                const paymentDate = doc.payment_date || toKSTDateStr(doc.updated_at || '');
+                const introducerId = externalDocIntroMap[doc.id];
+                if (introducerId) {
+                    settlementData.push({
+                        documentId: doc.id,
+                        company: '외부도입원',
+                        approvalAmount: '-',
+                        realSales: revenueAmount,
+                        manager: affMemberNameMap[introducerId] || introducerId,
+                        inflow: '인센티브',
+                        fee: Math.round(revenueAmount * 0.05 * 10) / 10,
+                        paymentDate,
+                        settlementUserId: introducerId,
+                    });
+                }
+            }
+        }
+
         let filteredSettlementData = settlementData;
 
-        if (userLevel === 4 && !isAffiliationRep) {
-            // 본인이 수수료를 받는 행 + 본인이 소개자인 인센티브 행 모두 포함
-            filteredSettlementData = settlementData.filter((row: any) =>
-                row.settlementUserId === userId
-            );
+        if (userLevel === 4) {
+            if (isAffiliationRep) {
+                // 소속대표: 소속원에게 귀속되는 수수료만 포함 (인센티브 포함)
+                filteredSettlementData = settlementData.filter((row: any) =>
+                    affMemberUserIds.has(row.settlementUserId)
+                );
+            } else {
+                // 일반 영업자: 본인이 수수료를 받는 행만
+                filteredSettlementData = settlementData.filter((row: any) =>
+                    row.settlementUserId === userId
+                );
+            }
+        }
+
+        // level 4이고 현재달 선택 시 settlement 테이블 합계로 monthlyRevenueAmount 일치
+        if (userLevel === 4) {
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const selectedMonthStr = paramMonth || currentMonthStr;
+            if (selectedMonthStr === currentMonthStr) {
+                const settlementMonthlyFee = filteredSettlementData.reduce((sum, row) => {
+                    const fee = typeof row.fee === 'number' ? row.fee : 0;
+                    return sum + fee;
+                }, 0);
+                monthlyRevenueAmount = settlementMonthlyFee; // 만원 단위 그대로
+            }
         }
 
         // === 년별 월별 매출 추이 ===
@@ -487,48 +613,19 @@ export async function GET(request: NextRequest) {
             return dateStr >= thisYearStartStr && dateStr <= currentMonthEndStr;
         });
 
-        // === 누적 매출 계산 (전체 기간) ===
+        // === 누적 매출 계산은 feeUserInfoMap 로드 후 계산 ===
+        const allApprovedDocs = myDocs.filter(d => d.progress_details === '승인');
         let totalRevenueAmountForReturn = 0;
-        let totalUserInfoMap: Record<string, { introducer?: string }> = {};
-        if (userLevel === 4 && !isAffiliationRep) {
-            const totalUserIds = [...new Set([
-                ...approvedDocs.map(d => d.user_id),
-                ...approvedDocs.map(d => d.submitter_id),
-            ].filter(Boolean))];
-            if (totalUserIds.length > 0) {
-                const { data: totalUsersData } = await supabase
-                    .from('users')
-                    .select('user_id, introducer')
-                    .in('user_id', totalUserIds);
-                for (const u of totalUsersData || []) {
-                    totalUserInfoMap[u.user_id] = { introducer: u.introducer };
-                }
-            }
-            let totalFeeRaw = 0;
-            for (const doc of approvedDocs) {
-                const revenueAmount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
-                if (doc.submitter_id === userId) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.2 * 10) / 10;
-                } else if (doc.user_id === userId && !doc.submitter_id) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.4 * 10) / 10;
-                }
-                const docUserId = doc.submitter_id || doc.user_id;
-                const userInfo = totalUserInfoMap[docUserId] || {};
-                if (userInfo.introducer === userId) {
-                    totalFeeRaw += Math.round(revenueAmount * 0.05 * 10) / 10;
-                }
-            }
-            totalRevenueAmountForReturn = totalFeeRaw / 10000;
-        } else if (userLevel === 4 && isAffiliationRep) {
-            totalRevenueAmountForReturn = calcAffilFee(approvedDocs);
-        } else {
-            // 나머지 직급: 실제 매출 (전체 기간)
-            totalRevenueAmountForReturn = approvedDocs.reduce((sum, doc) => {
-                const amount = doc.revenue_amount;
-                const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
-                return sum + numAmount;
-            }, 0) / 10000;
+
+        // level 4 isAffiliationRep: calculated later (after extIncentive)
+        // non-level-4: calculate now
+        if (userLevel !== 4) {
+            totalRevenueAmountForReturn = allApprovedDocs.reduce((sum, doc) => {
+                const amt = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                return sum + amt;
+            }, 0);
         }
+        // level 4 !isAffiliationRep: calculated after feeUserInfoMap is populated
 
         // === 전월/전년도 매출 계산 (변화율용) ===
         const prevMonthApprovedDocs = approvedDocs.filter(d => {
@@ -543,6 +640,7 @@ export async function GET(request: NextRequest) {
         let prevMonthRevenue = 0;
         let prevYearRevenue = 0;
         let ytdRevenue = 0;
+        const feeUserInfoMap: Record<string, { introducer?: string }> = {};
 
         if (userLevel === 4 && !isAffiliationRep) {
             // Level 4 비대표: 수수료 기준
@@ -550,7 +648,6 @@ export async function GET(request: NextRequest) {
                 ...approvedDocs.map(d => d.user_id),
                 ...approvedDocs.map(d => d.submitter_id),
             ].filter(Boolean))];
-            let feeUserInfoMap: Record<string, { introducer?: string }> = {};
             if (allDocUserIds.length > 0) {
                 const { data: feeUsersData } = await supabase
                     .from('users').select('user_id, introducer').in('user_id', allDocUserIds);
@@ -567,20 +664,43 @@ export async function GET(request: NextRequest) {
                     const docUserId = doc.submitter_id || doc.user_id;
                     if ((feeUserInfoMap[docUserId] || {}).introducer === userId) fee += Math.round(rev * 0.05 * 10) / 10;
                 }
-                return fee / 10000;
+                return fee;
             };
             prevMonthRevenue = calcFee(prevMonthApprovedDocs);
             prevYearRevenue = calcFee(prevYearApprovedDocs);
             ytdRevenue = calcFee(ytdApprovedDocs);
+            // 누적 매출 (feeUserInfoMap 로드 후 계산)
+            totalRevenueAmountForReturn = calcFee(allApprovedDocs);
         } else if (userLevel === 4 && isAffiliationRep) {
-            prevMonthRevenue = calcAffilFee(prevMonthApprovedDocs);
-            prevYearRevenue = calcAffilFee(prevYearApprovedDocs);
-            ytdRevenue = calcAffilFee(ytdApprovedDocs);
+            const calcExtIncentive = (docs: any[]) =>
+                docs.reduce((sum, doc) => {
+                    const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                    return sum + Math.round(rev * 0.05 * 10) / 10;
+                }, 0);
+
+            const extPrevMonth = externalIncentiveDocs.filter(d => {
+                const dateStr = toKSTDateStr(d.updated_at || '');
+                return dateStr >= prevMonthStartStr && dateStr <= prevMonthEndStr;
+            });
+            const extPrevYear = externalIncentiveDocs.filter(d => {
+                const dateStr = toKSTDateStr(d.updated_at || '');
+                return dateStr >= `${prevYearNum}-01-01` && dateStr <= prevYearSamePeriodEndStr;
+            });
+            const extYtd = externalIncentiveDocs.filter(d => {
+                const dateStr = toKSTDateStr(d.updated_at || '');
+                return dateStr >= thisYearStartStr && dateStr <= currentMonthEndStr;
+            });
+
+            prevMonthRevenue = calcAffilFee(prevMonthApprovedDocs) + calcExtIncentive(extPrevMonth);
+            prevYearRevenue = calcAffilFee(prevYearApprovedDocs) + calcExtIncentive(extPrevYear);
+            ytdRevenue = calcAffilFee(ytdApprovedDocs) + calcExtIncentive(extYtd);
+            // 누적 매출에도 외부 인센티브 전체 합산
+            totalRevenueAmountForReturn = calcAffilFee(allApprovedDocs) + calcExtIncentive(externalIncentiveDocs);
         } else {
             const sumRevenue = (docs: any[]) => docs.reduce((sum, doc) => {
                 const amt = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 return sum + amt;
-            }, 0) / 10000;
+            }, 0);
             prevMonthRevenue = sumRevenue(prevMonthApprovedDocs);
             prevYearRevenue = sumRevenue(prevYearApprovedDocs);
             ytdRevenue = sumRevenue(ytdApprovedDocs);
@@ -607,7 +727,7 @@ export async function GET(request: NextRequest) {
                     fee = Math.round(revenueAmount * 0.4 * 10) / 10;
                 }
                 const docUserId = doc.submitter_id || doc.user_id;
-                if ((totalUserInfoMap[docUserId] || {}).introducer === userId) {
+                if ((feeUserInfoMap[docUserId] || {}).introducer === userId) {
                     fee += Math.round(revenueAmount * 0.05 * 10) / 10;
                 }
                 chartAmount = fee;
@@ -615,12 +735,14 @@ export async function GET(request: NextRequest) {
                 let fee = 0;
                 if (doc.submitter_id) {
                     fee = Math.round(revenueAmount * 0.2 * 10) / 10;
-                    if ((affUserInfoMap[doc.submitter_id] || {}).introducer) {
+                    const intro = (affUserInfoMap[doc.submitter_id] || {}).introducer;
+                    if (intro && affMemberUserIds.has(intro)) {
                         fee += Math.round(revenueAmount * 0.05 * 10) / 10;
                     }
                 } else {
                     fee = Math.round(revenueAmount * 0.4 * 10) / 10;
-                    if ((affUserInfoMap[doc.user_id] || {}).introducer) {
+                    const intro = (affUserInfoMap[doc.user_id] || {}).introducer;
+                    if (intro && affMemberUserIds.has(intro)) {
                         fee += Math.round(revenueAmount * 0.05 * 10) / 10;
                     }
                 }
@@ -633,16 +755,29 @@ export async function GET(request: NextRequest) {
             }
         });
 
-        // 선택된 연도의 월별 데이터 추출 (실제매출 합산, 억원 단위)
+        // 소속대표: 다른 소속 영업자 문서의 소속원 인센티브를 차트에 반영
+        if (userLevel === 4 && isAffiliationRep) {
+            for (const doc of externalIncentiveDocs) {
+                if (!doc.updated_at) continue;
+                const { year, month } = extractYearMonthDay(doc.updated_at || '');
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                if (year > 0 && month > 0) {
+                    if (!yearData[year]) yearData[year] = {};
+                    yearData[year][month] = (yearData[year][month] || 0) + Math.round(rev * 0.05 * 10) / 10;
+                }
+            }
+        }
+
+        // 선택된 연도의 월별 데이터 추출 (월별 기준, 억원 단위)
         const monthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear]?.[i + 1] || 0;
-            return raw / 10000;
+            return Math.round((raw / 10000) * 10000) / 10000;
         });
 
-        // 이전년도 데이터 추출 (전년도 비교용)
+        // 이전년도 데이터 추출 (월별 기준, 전년도 비교용)
         const previousYearMonthlyRevenues = Array.from({ length: 12 }, (_, i) => {
             const raw = yearData[targetYear - 1]?.[i + 1] || 0;
-            return raw / 10000;
+            return Math.round((raw / 10000) * 10000) / 10000;
         });
 
         const revenueChartData = {
@@ -677,6 +812,7 @@ export async function GET(request: NextRequest) {
             settlementData: filteredSettlementData,
             revenueChartData,
             userLevel,
+            isAffiliationRep,
             currentUserId: userId,
         });
     } catch (error) {

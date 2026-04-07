@@ -135,7 +135,7 @@ export default function ProgressStepsSection({
         return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     };
 
-    const allSteps = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+    const allSteps = ['상담요청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
     const stepOrder = allSteps.slice(0, -1); // '승인' 단계를 진행 단계 목록에서 제외
     // progressDetails가 있으면 사용 (뷰 모드, 수정 모드 모두)
     // 없으면 (신규 등록 모드) 모든 단계가 pending
@@ -143,7 +143,7 @@ export default function ProgressStepsSection({
     const currentStepIndex = stepOrder.indexOf(currentProgress || '');
 
     const steps: Step[] = [
-        { id: 1, label: '상담신청', status: currentStepIndex > 0 ? 'completed' : currentStepIndex === 0 ? 'current' : 'pending' },
+        { id: 1, label: '상담요청', status: currentStepIndex > 0 ? 'completed' : currentStepIndex === 0 ? 'current' : 'pending' },
         { id: 2, label: '서류요청', status: currentStepIndex > 1 ? 'completed' : currentStepIndex === 1 ? 'current' : 'pending' },
         { id: 3, label: '분석', status: currentStepIndex > 2 ? 'completed' : currentStepIndex === 2 ? 'current' : 'pending' },
         { id: 4, label: '심사', status: currentStepIndex > 3 ? 'completed' : currentStepIndex === 3 ? 'current' : 'pending' },
@@ -281,8 +281,8 @@ export default function ProgressStepsSection({
     };
 
     const handleNext = async () => {
-        // 상담신청 단계에서는 영업자 배정 모달 열기
-        if (currentProgress === '상담신청') {
+        // 상담요청 단계에서는 영업자 배정 모달 열기
+        if (currentProgress === '상담요청') {
             setSelectedSalesperson('');
             setSalesAssignModalOpen(true);
             return;
@@ -979,7 +979,7 @@ export default function ProgressStepsSection({
                 </div>
                 )}
 
-                {documentId && currentProgress === '상담신청' && (userLevel === 4 || userLevel === 1 || userLevel === 6) && submitterId && documentUserId && submitterId !== documentUserId && currentUserId !== submitterId && (
+                {documentId && currentProgress === '상담요청' && (userLevel === 4 || userLevel === 1 || userLevel === 6) && submitterId && documentUserId && submitterId !== documentUserId && currentUserId !== submitterId && (
                     <div style={{ padding: '12px 16px', marginBottom: '12px', backgroundColor: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px', fontSize: '20px', color: '#f57c00', fontWeight: 500 }}>
                         수정버튼을 눌러 사업자를 선택하고 필수 첨부파일 서류를 업로드해주세요.
                     </div>
@@ -987,7 +987,7 @@ export default function ProgressStepsSection({
 
                 {documentId && (
                     <div className={styles.actionButtons}>
-                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담신청' && userLevel !== 1 && userLevel !== 6) && !(currentProgress === '상담신청' && submitterId && documentUserId && submitterId !== documentUserId) && (
+                        {userLevel !== 4 && documentStatus !== '보류' && !(userLevel === 2 && progressDetails === '승인요청') && !(currentProgress === '승인요청' && userLevel !== 1) && !(currentProgress === '승인' && !userLevel) && !(userLevel === 6 && currentProgress === '분석' && documentStatus !== '보완') && !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) && !(currentProgress === '진행' && userLevel === 2 && currentUserId !== managerId) && !(currentProgress === '상담요청' && userLevel !== 1 && userLevel !== 6) && !(currentProgress === '상담요청' && submitterId && documentUserId && submitterId !== documentUserId) && (
                             <div className={styles.buttonGroup}>
                                 {!(userLevel === 6 && (currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청')) && <h4>단계 관리</h4>}
                                 <div className={styles.groupButtons}>
@@ -1013,7 +1013,7 @@ export default function ProgressStepsSection({
                         {!(userLevel === 1 && currentProgress === '승인') &&
                          !(userLevel === 4 && (documentStatus !== '보완' || progressDetails === '분석')) &&
                          !(currentProgress === '승인' && !userLevel) &&
-                         !(userLevel === 6 && progressDetails !== '서류요청' && progressDetails !== '상담신청' && documentStatus !== '보완') &&
+                         !(userLevel === 6 && progressDetails !== '서류요청' && progressDetails !== '상담요청' && documentStatus !== '보완') &&
                          !(currentProgress === '승인요청') &&
                          !(currentProgress === '심사' && userLevel !== 1 && currentUserId !== managerId) &&
                          !(currentProgress === '진행' && userLevel === 2 && documentStatus !== '보완' && currentUserId !== managerId) && (
@@ -1027,10 +1027,10 @@ export default function ProgressStepsSection({
                                             보안완료
                                         </button>
                                     )
-                                ) : (userLevel === 6 || (userLevel === 1 && currentProgress === '상담신청')) ? (
+                                ) : (userLevel === 6 || (userLevel === 1 && currentProgress === '상담요청')) ? (
                                     <>
-                                        {/* 상담신청 단계: 보완요청, 진행불가 */}
-                                        {progressDetails === '상담신청' && documentStatus !== '보류' && (
+                                        {/* 상담요청 단계: 보완요청, 진행불가 */}
+                                        {progressDetails === '상담요청' && documentStatus !== '보류' && (
                                             <>
                                                 <button className={`${styles.btn} ${styles.btnWarning}`} onClick={handleRevision} disabled={isLoading}>
                                                     보완요청
@@ -1141,22 +1141,22 @@ export default function ProgressStepsSection({
                                                 보완요청
                                             </button>
                                         )}
-                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담요청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnInspect}`} onClick={handleSecurityComplete} disabled={isLoading}>
                                                 검수완료
                                             </button>
                                         )}
-                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담요청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnApprove}`} onClick={() => console.log('승인')} disabled={isLoading}>
                                                 승인
                                             </button>
                                         )}
-                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담요청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnInfo}`} onClick={handleStaffAssign} disabled={isLoading}>
                                                 실무자배정
                                             </button>
                                         )}
-                                        {!(currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
+                                        {!(currentProgress === '상담요청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행' || currentProgress === '승인요청') && (
                                             <button className={`${styles.btn} ${styles.btnProceed}`} onClick={handleProceed} disabled={isLoading}>
                                                 진행
                                             </button>
@@ -1448,7 +1448,7 @@ export default function ProgressStepsSection({
                 </div>
             )}
 
-            {/* 영업자 배정 모달 (상담신청 → 서류요청) */}
+            {/* 영업자 배정 모달 (상담요청 → 서류요청) */}
             {salesAssignModalOpen && (
                 <div style={{
                     position: 'fixed',

@@ -105,7 +105,7 @@ export async function PATCH(
 
     // 자기 자신의 기본 필터 설정 변경인 경우 (모든 직급 허용)
     if (requesterId === userId && body.default_progress_filter !== undefined && Object.keys(body).length === 1) {
-      const validValues = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인', null];
+      const validValues = ['상담요청', '서류요청', '분석', '심사', '진행', '승인요청', '승인', null];
       if (!validValues.includes(body.default_progress_filter)) {
         return NextResponse.json({ message: '유효하지 않은 필터 값입니다.' }, { status: 400 });
       }

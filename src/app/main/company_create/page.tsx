@@ -42,6 +42,7 @@ function Company1Content() {
     const [currentUserId, setCurrentUserId] = useState('');
     const [currentUserName, setCurrentUserName] = useState('');
     const [currentUserPosition, setCurrentUserPosition] = useState<any>(null);
+    const [isAffiliationRep, setIsAffiliationRep] = useState(false);
     const [memos, setMemos] = useState<any[]>([]);
     const [isFirstLoad, setIsFirstLoad] = useState(true);
 
@@ -88,8 +89,17 @@ function Company1Content() {
             setCurrentUserId(adminData.user_id || '');
             setCurrentUserName(adminData.name || '');
             setCurrentUserPosition(adminData.position || null);
+            if (adminData.position?.level === 4 && adminData.is_affiliation_representative) {
+                setIsAffiliationRep(true);
+            }
+
+            // 소속대표는 문서 작성 불가
+            if (isCreateMode && adminData.position?.level === 4 && adminData.is_affiliation_representative) {
+                setAccessDenied(true);
+                router.replace('/main/performance_settlement');
+            }
         }
-    }, []);
+    }, [router, isCreateMode]);
 
     // 수정 모드에서 페이지 이탈 방지 (브라우저 새로고침/닫기)
     useEffect(() => {
@@ -198,7 +208,7 @@ function Company1Content() {
         }
 
         // 수정 불가 조건 시 리다이렉트 (분석 단계는 추가서류/메모 편집 가능)
-        if (editParam === 'true' && viewId && (isSubmitterOnly || isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
+        if (editParam === 'true' && viewId && (isAffiliationRep || isSubmitterOnly || isBowan || ((documentData?.progress_details === '승인요청' || documentData?.progress_details === '승인') && currentUserPosition?.level !== 1))) {
             router.replace(`?view=${viewId}`);
         }
     }, [editParam, viewId, documentData, router, fromAdditionalParam, fromCompanyFileParam]);
@@ -343,8 +353,8 @@ function Company1Content() {
                 return false;
             }
 
-            // 2. CompanyFile 유효성 검사 (상담신청 단계 제외)
-            if (documentData?.progress_details !== '상담신청') {
+            // 2. CompanyFile 유효성 검사 (상담요청 단계 제외)
+            if (documentData?.progress_details !== '상담요청') {
                 const companyFileValidation = companyFileRef.current?.validateFormData();
                 if (!companyFileValidation?.valid) {
                     setErrorMessage(companyFileValidation?.message || '첨부파일을 모두 업로드해주세요.');
@@ -353,8 +363,8 @@ function Company1Content() {
                 }
             }
 
-            // 3. CretabInfo 유효성 검사 (상담신청 단계 제외)
-            if (documentData?.progress_details !== '상담신청') {
+            // 3. CretabInfo 유효성 검사 (상담요청 단계 제외)
+            if (documentData?.progress_details !== '상담요청') {
                 const cretabValidation = cretabInfoRef.current?.validateFormData();
                 if (!cretabValidation?.valid) {
                     setErrorMessage(cretabValidation?.message || '크레탑 정보를 모두 입력해주세요.');
@@ -404,7 +414,7 @@ function Company1Content() {
 
     const getProgressBadgeStyle = (progress: string | null | undefined) => {
         const styleMap: Record<string, React.CSSProperties> = {
-            '상담신청': { backgroundColor: '#9e9e9e', color: '#ffffff' },
+            '상담요청': { backgroundColor: '#9e9e9e', color: '#ffffff' },
             '서류요청': { backgroundColor: '#ffc107', color: '#ffffff' },
             '분석': { backgroundColor: '#2196f3', color: '#ffffff' },
             '심사': { backgroundColor: '#9c27b0', color: '#ffffff' },
@@ -412,7 +422,7 @@ function Company1Content() {
             '승인요청': { backgroundColor: '#ff9800', color: '#ffffff' },
             '승인': { backgroundColor: '#4caf50', color: '#ffffff' },
         };
-        return styleMap[progress || '상담신청'] || styleMap['상담신청'];
+        return styleMap[progress || '상담요청'] || styleMap['상담요청'];
     };
 
     const handleSave = async (skipSuccessModal?: boolean) => {
@@ -455,8 +465,8 @@ function Company1Content() {
                 throw new Error('연락처를 정확히 입력해주세요.');
             }
 
-            // 크레탑 정보 검증 (상담신청 단계 제외, level 4 제외)
-            if (viewId && currentUserPosition?.level !== 4 && documentData?.progress_details !== '상담신청') {
+            // 크레탑 정보 검증 (상담요청 단계 제외, level 4 제외)
+            if (viewId && currentUserPosition?.level !== 4 && documentData?.progress_details !== '상담요청') {
                 // 크레탑 폼 데이터 검증
                 const cretabValidation = cretabInfoRef.current?.validateFormData();
                 if (!cretabValidation?.valid) {
@@ -497,7 +507,7 @@ function Company1Content() {
             const existingFiles = companyFileRef.current?.getExistingFiles() || [];
             const additionalFiles = additionalFilesRef.current?.getFilesForUpload() || [];
 
-            // 4. 사업자 유형 검증 (상담신청 모드에서는 스킵)
+            // 4. 사업자 유형 검증 (상담요청 모드에서는 스킵)
             const businessType = companyFileRef.current?.getBusinessType();
             if (!isConsultationMode && !businessType) {
                 throw new Error('사업자를 선택해주세요.');
@@ -506,7 +516,7 @@ function Company1Content() {
             const isCompany = businessType === 'business';
             const isIndividual = businessType === 'individual';
 
-            // 5. 필수 서류 검증 (상담신청 모드에서는 스킵)
+            // 5. 필수 서류 검증 (상담요청 모드에서는 스킵)
             if (!isConsultationMode) {
                 const requiredDocs = isCompany
                     ? ['business_license', 'financial_statement', 'vat_certificate']
@@ -608,13 +618,13 @@ function Company1Content() {
             // 기존 파일과 새 파일 합치기
             const allFiles = [...existingFiles, ...uploadedFiles];
 
-            // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 상담신청 모드면 '상담', 신규면 '서류요청')
-            let progressDetails = isConsultationMode ? '상담신청' : '서류요청';
+            // 진행 단계 결정 (수정 모드면 기존 progress_details 유지, 상담요청 모드면 '상담', 신규면 '서류요청')
+            let progressDetails = isConsultationMode ? '상담요청' : '서류요청';
             let progressStartDate: string | null = null;
             if (isEditMode && viewId && documentData?.progress_details) {
                 progressDetails = documentData.progress_details;
-                // 상담신청 문서에서 B영업자가 필수서류 등록 후 저장 시 → 서류요청으로 변경
-                if (progressDetails === '상담신청' && businessType && !isConsultationMode) {
+                // 상담요청 문서에서 B영업자가 필수서류 등록 후 저장 시 → 서류요청으로 변경
+                if (progressDetails === '상담요청' && businessType && !isConsultationMode) {
                     progressDetails = '서류요청';
                 }
                 // 서류요청 → 분석으로 변경되는 경우 시간 경과 시작
@@ -630,9 +640,9 @@ function Company1Content() {
                 ...(viewId ? {} : { user_id: userId }),
                 // 수정 모드에서는 user_name도 원본 저자 유지
                 ...(viewId ? { user_name: documentData?.user_name } : { user_name: adminData.name || userId }),
-                document_type: isConsultationMode ? '상담신청' : '기업등록',
+                document_type: isConsultationMode ? '상담요청' : '기업등록',
                 title: formData.company_name,
-                // 상담신청 모드에서는 submitter_id에 최초 등록자 기록
+                // 상담요청 모드에서는 submitter_id에 최초 등록자 기록
                 ...(isConsultationMode && !viewId ? { submitter_id: userId } : {}),
                 // 생성 모드에서만 status 설정, 수정 모드에서는 기존 상태 유지
                 ...(viewId ? {} : { status: '정상' }),
@@ -900,14 +910,14 @@ function Company1Content() {
                         <h2>
                             {documentData?.company_name || '기업명'}
                             <b className={styles.progressBadge} style={getProgressBadgeStyle(documentData?.progress_details)}>
-                                {documentData?.progress_details || '상담신청'}
+                                {documentData?.progress_details || '상담요청'}
                             </b>
                         </h2>
                         <p>고객사 상세 정보 및 업무 진행 현황</p>
                     </>
                 ) : (
                     <>
-                        <h2>{isConsultationMode ? '상담신청' : '기업등록'}</h2>
+                        <h2>{isConsultationMode ? '상담요청' : '기업등록'}</h2>
                         <p>{isConsultationMode ? '상담 신청 정보를 입력하세요.' : '고객사 상세 정보 및 서류를 등록하여 심사를 진행하세요.'}</p>
                     </>
                 )}
@@ -1025,7 +1035,7 @@ function Company1Content() {
                                         {isSaving ? '처리 중...' : '보완완료'}
                                     </button>
                                 ) : (
-                                    documentData?.progress_details !== '승인' && (documentData?.progress_details !== '승인요청' || currentUserPosition?.level === 1) && !(documentData?.submitter_id && documentData?.submitter_id === currentUserId && documentData?.user_id !== currentUserId) && (
+                                    !isAffiliationRep && documentData?.progress_details !== '승인' && (documentData?.progress_details !== '승인요청' || currentUserPosition?.level === 1) && !(documentData?.submitter_id && documentData?.submitter_id === currentUserId && documentData?.user_id !== currentUserId) && (
                                         <button
                                             className={styles.saveBtn}
                                             onClick={() => router.push(`?view=${viewId}&edit=true`)}

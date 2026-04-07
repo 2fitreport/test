@@ -23,7 +23,7 @@ export async function PUT(
         }
 
         // 유효한 진행단계인지 확인
-        const validProgressDetails = ['상담신청', '서류요청', '분석', '심사', '진행', '승인'];
+        const validProgressDetails = ['상담요청', '서류요청', '분석', '심사', '진행', '승인'];
         if (!validProgressDetails.includes(progress_details)) {
             return NextResponse.json(
                 { error: '유효하지 않은 진행단계입니다.' },

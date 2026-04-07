@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
         const userIds = salespeople.map((p: any) => p.user_id);
 
         // 문서 조회 (user_id 기준, 대표실무자는 admin 배정 문서 제외)
-        // 영업자 성과: 상담신청 문서는 B영업자(user_id)에게 귀속
+        // 영업자 성과: 상담요청 문서는 B영업자(user_id)에게 귀속
         let docQuery = supabase
             .from('documents')
             .select('user_id, progress_details, approval_amount, created_at, updated_at')

@@ -18,13 +18,11 @@ export default function StatisticsWrap({ data }: Props) {
         return undefined;
     };
 
-    const formatManwon = (manwon: number): string => {
-        if (manwon === 0) return '0만원';
-        const rounded = Math.round(manwon * 10) / 10;
-        const intPart = Math.floor(rounded);
-        const decPart = Math.round((rounded - intPart) * 10);
-        const intFormatted = intPart.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        return decPart > 0 ? `${intFormatted}.${decPart}만원` : `${intFormatted}만원`;
+    const formatFeeInMillions = (manwon: number): string => {
+        if (manwon === 0) return '0백만원';
+        const millions = manwon / 100;
+        const rounded = Math.round(millions * 100) / 100;
+        return `${rounded}백만원`;
     };
 
     const formatAmount = (num: number): string => {
@@ -74,9 +72,7 @@ export default function StatisticsWrap({ data }: Props) {
     const newRegistrations = stats?.newRegistrations || 0;
     const approvedCount = stats?.approvedCount || 0;
 
-    const revenueFormatted = userLevel === 4
-        ? formatManwon(monthlyRevenue * 10000)
-        : formatAmount(monthlyRevenue);
+    const revenueFormatted = formatFeeInMillions(monthlyRevenue);
 
     return (
         <div className={styles.statisticsWrap}>

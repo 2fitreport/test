@@ -102,22 +102,17 @@ export default function CreateUserForm({
 
     useEffect(() => {
         if (currentLevel !== 4) return;
-        if (!selectedAffiliation) {
-            setSalespeople([]);
-            return;
-        }
         fetch('/api/users')
             .then(r => r.json())
             .then((data: any[]) => {
                 const filtered = (data || []).filter(
                     (u: any) => u.position?.level === 4 &&
-                                u.user_id !== formData.user_id &&
-                                u.affiliation_name === selectedAffiliation
+                                u.user_id !== formData.user_id
                 );
                 setSalespeople(filtered.map((u: any) => ({ user_id: u.user_id, name: u.name })));
             })
             .catch(console.error);
-    }, [currentLevel, formData.user_id, selectedAffiliation]);
+    }, [currentLevel, formData.user_id]);
 
     useEffect(() => {
         if (currentLevel !== 4 || !selectedAffiliation) {
@@ -566,56 +561,48 @@ export default function CreateUserForm({
                                     zIndex: 10,
                                     marginTop: '-4px',
                                 }}>
-                                    {!selectedAffiliation ? (
-                                        <div style={{ padding: '10px 12px', fontSize: '13px', color: '#999' }}>
-                                            소속을 먼저 선택해주세요.
-                                        </div>
-                                    ) : (
-                                        <>
-                                        <div
-                                            style={{
-                                                padding: '8px 12px',
-                                                cursor: 'pointer',
-                                                backgroundColor: formData.introducer === '' ? '#f0f0f0' : 'transparent',
-                                                fontSize: '14px',
-                                            }}
-                                            onMouseDown={() => {
-                                                onUpdateField('introducer', '');
-                                                setIntroducerSearch('');
-                                                setShowIntroducerDropdown(false);
-                                            }}
-                                        >
-                                            소개자 없음
-                                        </div>
-                                        {salespeople
-                                            .filter(u =>
-                                                introducerSearch === '' ||
-                                                u.user_id.toLowerCase().includes(introducerSearch.toLowerCase()) ||
-                                                u.name.toLowerCase().includes(introducerSearch.toLowerCase())
-                                            )
-                                            .map(u => (
-                                                <div
-                                                    key={u.user_id}
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        cursor: 'pointer',
-                                                        backgroundColor: formData.introducer === u.user_id ? '#e3f2fd' : 'transparent',
-                                                        fontSize: '14px',
-                                                        borderBottom: '1px solid #f0f0f0',
-                                                    }}
-                                                    onMouseDown={() => {
-                                                        onUpdateField('introducer', u.user_id);
-                                                        setIntroducerSearch(u.user_id);
-                                                        setShowIntroducerDropdown(false);
-                                                    }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = formData.introducer === u.user_id ? '#e3f2fd' : 'transparent'}
-                                                >
-                                                    {u.user_id} ({u.name})
-                                                </div>
-                                            ))}
-                                        </>
-                                    )}
+                                    <div
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            backgroundColor: formData.introducer === '' ? '#f0f0f0' : 'transparent',
+                                            fontSize: '14px',
+                                        }}
+                                        onMouseDown={() => {
+                                            onUpdateField('introducer', '');
+                                            setIntroducerSearch('');
+                                            setShowIntroducerDropdown(false);
+                                        }}
+                                    >
+                                        소개자 없음
+                                    </div>
+                                    {salespeople
+                                        .filter(u =>
+                                            introducerSearch === '' ||
+                                            u.user_id.toLowerCase().includes(introducerSearch.toLowerCase()) ||
+                                            u.name.toLowerCase().includes(introducerSearch.toLowerCase())
+                                        )
+                                        .map(u => (
+                                            <div
+                                                key={u.user_id}
+                                                style={{
+                                                    padding: '8px 12px',
+                                                    cursor: 'pointer',
+                                                    backgroundColor: formData.introducer === u.user_id ? '#e3f2fd' : 'transparent',
+                                                    fontSize: '14px',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                }}
+                                                onMouseDown={() => {
+                                                    onUpdateField('introducer', u.user_id);
+                                                    setIntroducerSearch(u.user_id);
+                                                    setShowIntroducerDropdown(false);
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = formData.introducer === u.user_id ? '#e3f2fd' : 'transparent'}
+                                            >
+                                                {u.user_id} ({u.name})
+                                            </div>
+                                        ))}
                                 </div>
                             )}
                         </div>

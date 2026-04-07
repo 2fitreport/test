@@ -52,7 +52,7 @@ export async function PUT(
             );
         }
 
-        // 문서 조회 - 상담신청 단계인지 확인
+        // 문서 조회 - 상담요청 단계인지 확인
         const { data: doc } = await supabase
             .from('documents')
             .select('progress_details, user_id, company_name, title')
@@ -66,9 +66,9 @@ export async function PUT(
             );
         }
 
-        if (doc.progress_details !== '상담신청') {
+        if (doc.progress_details !== '상담요청') {
             return NextResponse.json(
-                { error: '상담신청 단계에서만 영업자를 배정할 수 있습니다.' },
+                { error: '상담요청 단계에서만 영업자를 배정할 수 있습니다.' },
                 { status: 403 }
             );
         }

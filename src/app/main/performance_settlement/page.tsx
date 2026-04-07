@@ -17,6 +17,7 @@ export default function PerformanceSettlementPage() {
     const [salesPerformanceData, setSalesPerformanceData] = useState<any[]>([]);
     const [staffPerformanceData, setStaffPerformanceData] = useState<any[]>([]);
     const [userLevel, setUserLevel] = useState<number>(0);
+    const [isAffiliationRep, setIsAffiliationRep] = useState<boolean>(false);
 
     useEffect(() => {
         const adminData = getAdminData();
@@ -47,6 +48,7 @@ export default function PerformanceSettlementPage() {
                 if (response.ok) {
                     const data = await response.json();
                     setSettleData(data);
+                    setIsAffiliationRep(data.isAffiliationRep || false);
                 }
             } catch (error) {
                 console.error('성과정산 데이터 조회 실패:', error);
@@ -197,6 +199,35 @@ export default function PerformanceSettlementPage() {
         }
     };
 
+    const formatFeeInMillions = (manwon: number): string => {
+        if (manwon === 0) return '0백만원';
+        const millions = manwon / 100;
+        const rounded = Math.round(millions * 100) / 100;
+        return `${rounded}백만원`;
+    };
+
+    const formatTotalRevenueAmount = (manwon: number): string => {
+        // manwon은 이미 만원 단위
+        if (manwon === 0) return '0원';
+
+        // 백만원 단위로 버림
+        const baekmanValue = Math.floor(manwon / 100);
+
+        // 백만원 미만이면 "X만원" 형태로 표시
+        if (baekmanValue === 0) {
+            return `${Math.floor(manwon)}만원`;
+        }
+
+        // 백만원 단위를 억/천/백으로 변환
+        // 1억 = 100백만원, 1천 = 10백만원, 1백 = 1백만원
+        const eok = Math.floor(baekmanValue / 100);
+        const remaining = baekmanValue % 100;
+        const cheonman = Math.floor(remaining / 10);
+        const baekman = remaining % 10;
+
+        return `${eok}억 ${cheonman}천 ${baekman}백만원`;
+    };
+
     if (loading) {
         return <Spinner fullScreen />;
     }
@@ -210,10 +241,12 @@ export default function PerformanceSettlementPage() {
                     <h1 className={styles.mainTitle}>성과, 정산</h1>
                     <p className={styles.subTitle}>성과 관리 및 정산</p>
                 </div>
-                <div className={styles.btnWrap}>
-                    <a href="/main/company_create?create=true&consultation=true">상담신청</a>
-                    <a href="/main/company_create?create=true">기업 생성</a>
-                </div>
+                {!(userLevel === 4 && isAffiliationRep) && (
+                    <div className={styles.btnWrap}>
+                        <a href="/main/company_create?create=true&consultation=true">상담요청</a>
+                        <a href="/main/company_create?create=true">기업등록</a>
+                    </div>
+                )}
             </div>
 
             <div className={styles.contentWrap}>
@@ -221,7 +254,7 @@ export default function PerformanceSettlementPage() {
                 <div className={styles.statsGrid}>
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>이번달 매출</p>
-                        <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.monthlyRevenue || 0) * 10000) : formatApprovalAmount(stats.monthlyRevenue || 0)}</p>
+                        <p className={styles.statValue}>{formatFeeInMillions(stats.monthlyRevenue || 0)}</p>
                         <p className={styles.statSubValue}>전월 대비 <span style={{ color: getRateColor(stats.prevMonthChangeRate) }}>{stats.prevMonthChangeRate ?? '-'}</span></p>
                     </div>
                     <div className={styles.statCard}>
@@ -231,7 +264,7 @@ export default function PerformanceSettlementPage() {
                     </div>
                     <div className={styles.statCard}>
                         <p className={styles.statLabel}>누적 매출</p>
-                        <p className={styles.statValue}>{settleData?.userLevel === 4 ? formatManwon((stats.totalRevenueAmount || 0) * 10000) : formatApprovalAmount(stats.totalRevenueAmount || 0)}</p>
+                        <p className={styles.statValue}>{formatTotalRevenueAmount(stats.totalRevenueAmount || 0)}</p>
                         <p className={styles.statSubValue}>전년도 대비 <span style={{ color: getRateColor(stats.prevYearChangeRate) }}>{stats.prevYearChangeRate ?? '-'}</span></p>
                     </div>
                     <div className={styles.statCard}>

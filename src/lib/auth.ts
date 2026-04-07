@@ -8,6 +8,7 @@ export interface AdminData {
   };
   company_name?: string;
   is_affiliation_representative?: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 

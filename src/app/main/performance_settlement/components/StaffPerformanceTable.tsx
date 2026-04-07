@@ -43,7 +43,7 @@ export default function StaffPerformanceTable({
         order: 'asc' | 'desc',
         page: number
     ) => {
-        let filtered = items.filter(item =>
+        const filtered = items.filter(item =>
             item.name.toString().toLowerCase().includes(term.toLowerCase())
         );
 

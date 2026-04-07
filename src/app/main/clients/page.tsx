@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getAdminData } from '@/lib/auth';
 import styles from './clients.module.css';
 import ClientCard from './components/ClientCard';
 import StatCard from './components/StatCard';
@@ -30,6 +31,8 @@ interface Client {
 export default function ClientsPage() {
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
+    const adminData = getAdminData();
+    const isAffiliationRep = adminData?.position?.level === 4 && adminData?.is_affiliation_representative === true;
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(6);
@@ -121,10 +124,12 @@ export default function ClientsPage() {
                     <h1 className={styles.mainTitle}>고객사</h1>
                     <p className={styles.subTitle}>등록된 고객사 현황을 한눈에 확인하세요.</p>
                 </div>
-                <div className={styles.btnWrap}>
-                    <a href="/main/company_create?create=true&consultation=true">상담신청</a>
-                    <a href="/main/company_create?create=true">기업 생성</a>
-                </div>
+                {!isAffiliationRep && (
+                    <div className={styles.btnWrap}>
+                        <a href="/main/company_create?create=true&consultation=true">상담요청</a>
+                        <a href="/main/company_create?create=true">기업등록</a>
+                    </div>
+                )}
             </div>
 
             <div className={styles.contentWrap}>

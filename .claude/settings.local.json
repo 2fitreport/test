@@ -88,7 +88,20 @@
       "Bash(python3:*)",
       "Bash(powershell:*)",
       "Bash(sed:*)",
-      "Bash(ssh:*)"
+      "Bash(ssh:*)",
+      "Bash(NEXT_BUILD_PRESET=nodejs npm run:*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)",
+      "Bash(cp src/proxy.ts src/middleware.ts)",
+      "Bash(rm src/proxy.ts)",
+      "Bash(cp src/middleware.ts src/proxy.ts)",
+      "Bash(rm src/middleware.ts)",
+      "Bash(NODE_OPTIONS=\"--async-context-frame\" npm run build)",
+      "Bash(npm --version)",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); files=[f for f in data.get\\('files',[]\\) if 'metadata' in f or 'resolve' in f.lower\\(\\)]; print\\('\\\\n'.join\\(files[:20]\\)\\)\")",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); files=data.get\\('files',[]\\); [print\\(f\\) for f in files if 'meta' in f.lower\\(\\) or 'workAsync' in f or 'params' in f.lower\\(\\) or 'request' in f.lower\\(\\)]\")",
+      "Bash(cp proxy.ts middleware.ts)",
+      "Bash(rm proxy.ts)"
     ],
     "deny": [],
     "ask": []

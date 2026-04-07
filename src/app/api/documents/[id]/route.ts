@@ -254,24 +254,24 @@ export async function PUT(
                 );
             }
 
-            // 상담신청 단계 제한
-            if (currentProgress === '상담신청') {
+            // 상담요청 단계 제한
+            if (currentProgress === '상담요청') {
                 if (body.progress_details !== undefined && body.progress_details !== '서류요청') {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                        { error: '상담요청 단계에서는 서류요청으로만 이동 가능합니다.' },
                         { status: 403 }
                     );
                 }
                 const allowedStatusValues = ['보완', '보류'];
                 if (body.status !== undefined && !allowedStatusValues.includes(body.status)) {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 보완요청과 진행불가만 가능합니다.' },
+                        { error: '상담요청 단계에서는 보완요청과 진행불가만 가능합니다.' },
                         { status: 403 }
                     );
                 }
                 if (body.manager_id !== undefined || body.manager_name !== undefined) {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 실무자를 배정할 수 없습니다.' },
+                        { error: '상담요청 단계에서는 실무자를 배정할 수 없습니다.' },
                         { status: 403 }
                     );
                 }
@@ -301,12 +301,12 @@ export async function PUT(
             const isStatusChange = body.status !== undefined && Object.keys(body).length === 1;
             const isEndAction = body.progress_details === '보류' && Object.keys(body).length === 1;
 
-            // 상담신청 단계 제한
-            if (currentProgress === '상담신청') {
+            // 상담요청 단계 제한
+            if (currentProgress === '상담요청') {
                 // progress_details 변경은 서류요청으로만 가능
                 if (hasProgressDetailsChange && body.progress_details !== '서류요청') {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 서류요청으로만 이동 가능합니다.' },
+                        { error: '상담요청 단계에서는 서류요청으로만 이동 가능합니다.' },
                         { status: 403 }
                     );
                 }
@@ -314,14 +314,14 @@ export async function PUT(
                 const allowedStatusValues = ['보완', '보류'];
                 if (body.status !== undefined && !allowedStatusValues.includes(body.status)) {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 보완요청과 진행불가만 가능합니다.' },
+                        { error: '상담요청 단계에서는 보완요청과 진행불가만 가능합니다.' },
                         { status: 403 }
                     );
                 }
                 // 실무자배정 차단
                 if (body.manager_id !== undefined || body.manager_name !== undefined) {
                     return NextResponse.json(
-                        { error: '상담신청 단계에서는 실무자를 배정할 수 없습니다.' },
+                        { error: '상담요청 단계에서는 실무자를 배정할 수 없습니다.' },
                         { status: 403 }
                     );
                 }
@@ -342,8 +342,8 @@ export async function PUT(
                     { status: 403 }
                 );
             }
-            // 상담신청, 서류요청, 분석, 심사, 진행 단계에서는 status 변경도 자유롭게 가능 (보완, 보류, 정상 등)
-            else if (currentProgress === '상담신청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행') {
+            // 상담요청, 서류요청, 분석, 심사, 진행 단계에서는 status 변경도 자유롭게 가능 (보완, 보류, 정상 등)
+            else if (currentProgress === '상담요청' || currentProgress === '서류요청' || currentProgress === '분석' || currentProgress === '심사' || currentProgress === '진행') {
                 // OK - 이 단계들에서는 모든 status 변경 가능
             }
             // 보완 상태: 보안완료(status='검수')만 가능
@@ -386,7 +386,7 @@ export async function PUT(
 
                 if (!isGoingBackToAnalysis) {
                     // 다음 단계로 이동만 가능 (이전 단계나 초기화는 불가)
-                    const stepOrder = ['상담신청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
+                    const stepOrder = ['상담요청', '서류요청', '분석', '심사', '진행', '승인요청', '승인'];
                     const currentIndex = stepOrder.indexOf(currentProgress);
                     const newIndex = stepOrder.indexOf(body.progress_details);
                     if (newIndex !== currentIndex + 1) {
@@ -418,8 +418,8 @@ export async function PUT(
             }
         }
 
-        // 상담신청 → 서류요청 전환 시 필수 조건 검증
-        if (prevDoc?.progress_details === '상담신청' && body.progress_details === '서류요청') {
+        // 상담요청 → 서류요청 전환 시 필수 조건 검증
+        if (prevDoc?.progress_details === '상담요청' && body.progress_details === '서류요청') {
             const bizType = body.type ?? prevDoc?.type;
             if (!bizType) {
                 return NextResponse.json(

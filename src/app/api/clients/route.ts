@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
         let userId = 'unknown';
         let userLevel = 0;
         let userDbId = 0;
+        let isAffiliationRep = false;
 
         try {
             const tokenData = JSON.parse(Buffer.from(authToken, 'base64').toString('utf-8'));
@@ -23,13 +24,14 @@ export async function GET(request: NextRequest) {
 
             const { data: userData } = await supabase
                 .from('users')
-                .select('id, position(level)')
+                .select('id, is_affiliation_representative, position(level)')
                 .eq('user_id', userId)
                 .single();
 
             if (userData) {
                 userLevel = (userData.position as any)?.level || 0;
                 userDbId = userData.id || 0;
+                isAffiliationRep = userData.is_affiliation_representative || false;
             }
         } catch (e) {
             console.error('토큰 파싱 실패:', e);
@@ -51,8 +53,41 @@ export async function GET(request: NextRequest) {
             // 실무자: manager_id로 배정받은 문서만
             query = query.eq('manager_id', userId);
         } else if (userLevel === 4) {
-            // 영업자: 자신이 올린 문서만
-            query = query.eq('user_id', userId);
+            if (isAffiliationRep) {
+                // 소속대표: 같은 소속 영업자들 문서 조회
+                const { data: myAffiliations } = await supabase
+                    .from('user_affiliations')
+                    .select('affiliation_id')
+                    .eq('user_id', userDbId);
+
+                const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id).filter(Boolean);
+
+                let allowedUserIds: string[] = [];
+                if (myAffIds.length > 0) {
+                    const { data: affUserLinks } = await supabase
+                        .from('user_affiliations')
+                        .select('user_id')
+                        .in('affiliation_id', myAffIds);
+                    const affDbIds = [...new Set((affUserLinks || []).map((a: any) => a.user_id))];
+                    if (affDbIds.length > 0) {
+                        const { data: usersData } = await supabase
+                            .from('users')
+                            .select('user_id')
+                            .in('id', affDbIds);
+                        allowedUserIds = (usersData || []).map((u: any) => u.user_id);
+                    }
+                }
+
+                if (allowedUserIds.length > 0) {
+                    const allIds = [...new Set([...allowedUserIds, userId])];
+                    query = query.in('user_id', allIds);
+                } else {
+                    query = query.eq('user_id', userId);
+                }
+            } else {
+                // 일반영업자: 자신이 올린 문서만
+                query = query.eq('user_id', userId);
+            }
         } else if (userLevel === 6) {
             // 검수자: 소속이 같은 영업자의 문서만
             // 먼저 소속 조회

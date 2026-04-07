@@ -47,7 +47,7 @@ export default function SettlementTable({
         order: 'asc' | 'desc',
         page: number
     ) => {
-        let filtered = items.filter(item =>
+        const filtered = items.filter(item =>
             item.company.toString().toLowerCase().includes(term.toLowerCase())
         );
 
@@ -149,6 +149,13 @@ export default function SettlementTable({
         }
     };
 
+    const formatFeeInMillions = (amount: any): string => {
+        const manwon = typeof amount === 'number' ? amount : Number(amount) || 0;
+        if (manwon === 0) return '0백만원';
+        const millions = Math.floor(manwon / 100); // 천원 아래 제외
+        return `${millions}백만원`;
+    };
+
     return (
         <div className={pageStyles.bottomTableCard}>
             <div className={styles.header}>
@@ -210,7 +217,7 @@ export default function SettlementTable({
                         <tr>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('company')} style={{ cursor: 'pointer' }}>업체명{getSortIcon('company')}</th>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('approvalAmount')} style={{ cursor: 'pointer' }}>승인금액{getSortIcon('approvalAmount')}</th>
-                            <th className={pageStyles.sortableHeader} onClick={() => handleSort('realSales')} style={{ cursor: 'pointer' }}>실제매출{getSortIcon('realSales')}</th>
+                            {userLevel !== 4 && <th className={pageStyles.sortableHeader} onClick={() => handleSort('realSales')} style={{ cursor: 'pointer' }}>실제매출{getSortIcon('realSales')}</th>}
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('manager')} style={{ cursor: 'pointer' }}>영업자{getSortIcon('manager')}</th>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('inflow')} style={{ cursor: 'pointer' }}>유입방식{getSortIcon('inflow')}</th>
                             <th className={pageStyles.sortableHeader} onClick={() => handleSort('fee')} style={{ cursor: 'pointer' }}>지급수수료{getSortIcon('fee')}</th>
@@ -222,10 +229,10 @@ export default function SettlementTable({
                             <tr key={i}>
                                 <td>{row.company}</td>
                                 <td>{formatAmount(row.approvalAmount)}</td>
-                                <td className={pageStyles.realSalesText}>{formatAmount(row.realSales)}</td>
+                                {userLevel !== 4 && <td className={pageStyles.realSalesText}>{formatAmount(row.realSales)}</td>}
                                 <td>{row.manager}</td>
                                 <td>{row.inflow}</td>
-                                <td className={pageStyles.incentiveText}>{userLevel === 4 ? formatManwon(row.fee) : formatAmount(row.fee)}</td>
+                                <td className={pageStyles.incentiveText}>{formatFeeInMillions(row.fee)}</td>
                                 <td>{row.paymentDate}</td>
                             </tr>
                         ))}
@@ -257,21 +264,23 @@ export default function SettlementTable({
                             }, 0);
                         })())}</span>
                     </div>
-                    <div className={styles.summaryItem}>
-                        <span>실제매출</span>
-                        <span className={styles.summaryValueBlue}>{formatAmount((() => {
-                            const seen = new Set();
-                            return processed.allFiltered.reduce((sum, row) => {
-                                if (row.documentId && seen.has(row.documentId)) return sum;
-                                if (row.documentId) seen.add(row.documentId);
-                                const amount = typeof row.realSales === 'number' ? row.realSales : 0;
-                                return sum + amount;
-                            }, 0);
-                        })())}</span>
-                    </div>
+                    {userLevel !== 4 && (
+                        <div className={styles.summaryItem}>
+                            <span>실제매출</span>
+                            <span className={styles.summaryValueBlue}>{formatAmount((() => {
+                                const seen = new Set();
+                                return processed.allFiltered.reduce((sum, row) => {
+                                    if (row.documentId && seen.has(row.documentId)) return sum;
+                                    if (row.documentId) seen.add(row.documentId);
+                                    const amount = typeof row.realSales === 'number' ? row.realSales : 0;
+                                    return sum + amount;
+                                }, 0);
+                            })())}</span>
+                        </div>
+                    )}
                     <div className={styles.summaryItem}>
                         <span>지급수수료</span>
-                        <span className={styles.summaryValueGreen}>{(userLevel === 4 ? formatManwon : formatAmount)(processed.allFiltered.reduce((sum, row) => {
+                        <span className={styles.summaryValueGreen}>{formatFeeInMillions(processed.allFiltered.reduce((sum, row) => {
                             const amount = typeof row.fee === 'number' ? row.fee : 0;
                             return sum + amount;
                         }, 0))}</span>

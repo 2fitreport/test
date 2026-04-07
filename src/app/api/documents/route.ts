@@ -69,11 +69,42 @@ export async function GET(request: NextRequest) {
         else if (userLevel === 3) {
             filteredDocuments = data.filter((doc: any) => doc.manager_id === userId);
         }
-        // Level 4 (영업자): 자신의 문서 + 자신이 등록한 상담신청 문서(submitter_id)
+        // Level 4 (영업자): 소속대표는 같은 소속 영업자 전체, 일반영업자는 자신의 문서
         else if (userLevel === 4) {
-            filteredDocuments = data.filter((doc: any) =>
-                doc.user_id === userId || doc.submitter_id === userId
-            );
+            const isAffiliationRep = currentUser.is_affiliation_representative || false;
+            if (isAffiliationRep) {
+                const { data: affiliationsData } = await supabase
+                    .from('user_affiliations')
+                    .select('affiliation_id')
+                    .eq('user_id', userIdNumber);
+
+                const affiliationIds = (affiliationsData || []).map((a: any) => a.affiliation_id);
+
+                if (affiliationIds.length > 0) {
+                    const { data: affUserLinks } = await supabase
+                        .from('user_affiliations')
+                        .select('user_id')
+                        .in('affiliation_id', affiliationIds);
+
+                    const affDbIds = (affUserLinks || []).map((u: any) => u.user_id);
+
+                    const { data: userIdData } = await supabase
+                        .from('users')
+                        .select('user_id')
+                        .in('id', affDbIds);
+
+                    const affUserIds = (userIdData || []).map((u: any) => u.user_id);
+                    filteredDocuments = data.filter((doc: any) =>
+                        affUserIds.includes(doc.user_id) || doc.user_id === userId || doc.submitter_id === userId
+                    );
+                } else {
+                    filteredDocuments = data.filter((doc: any) => doc.user_id === userId || doc.submitter_id === userId);
+                }
+            } else {
+                filteredDocuments = data.filter((doc: any) =>
+                    doc.user_id === userId || doc.submitter_id === userId
+                );
+            }
         }
         // Level 6 (검수자): 자신의 소속에 해당하는 영업자 문서만
         else if (userLevel === 6) {
@@ -117,7 +148,7 @@ export async function GET(request: NextRequest) {
         // Level 2 (대표실무자): 서류요청 단계 이전의 문서는 제외
         else if (userLevel === 2) {
             filteredDocuments = data.filter((doc: any) =>
-                doc.progress_details !== '서류요청' && doc.progress_details !== '상담신청'
+                doc.progress_details !== '서류요청' && doc.progress_details !== '상담요청'
             );
         }
 

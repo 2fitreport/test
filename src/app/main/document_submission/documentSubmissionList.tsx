@@ -60,7 +60,7 @@ export default function DocumentSubmissionList() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [statusFilter, setStatusFilter] = useState<'all' | '정상' | '보완' | '보류' | '검수'>('all');
-    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담신청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인'>('all');
+    const [progressDetailsFilter, setProgressDetailsFilter] = useState<'all' | '상담요청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인'>('all');
     const [successModalOpen, setSuccessModalOpen] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
     const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -78,6 +78,7 @@ export default function DocumentSubmissionList() {
     const [selectedManager, setSelectedManager] = useState<string>('');
     const [workers, setWorkers] = useState<Worker[]>([]);
     const [isUserSalesManager, setIsUserSalesManager] = useState(false);
+    const [isAffiliationRep, setIsAffiliationRep] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string>('');
     const [userRoleLevel, setUserRoleLevel] = useState<number | undefined>();
     const [errorModalOpen, setErrorModalOpen] = useState(false);
@@ -98,6 +99,9 @@ export default function DocumentSubmissionList() {
         if (userLevel === 4) {
             setIsUserSalesManager(true);
             setCurrentUserId(userId || '');
+            if (adminData?.is_affiliation_representative) {
+                setIsAffiliationRep(true);
+            }
         }
 
         // DB에서 최신 사용자 정보를 가져와 기본 필터 적용
@@ -883,7 +887,7 @@ export default function DocumentSubmissionList() {
 
     const getProgressDetailsBadgeClass = (progressDetails: string) => {
         switch (progressDetails) {
-            case '상담신청':
+            case '상담요청':
                 return styles.progressBadgeConsultation;
             case '서류요청':
                 return styles.progressBadgeWaiting;
@@ -988,12 +992,12 @@ export default function DocumentSubmissionList() {
                                     className={styles.itemsSelect}
                                     value={progressDetailsFilter}
                                     onChange={(e) => {
-                                        setProgressDetailsFilter(e.target.value as 'all' | '상담신청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인');
+                                        setProgressDetailsFilter(e.target.value as 'all' | '상담요청' | '서류요청' | '분석' | '심사' | '진행' | '승인요청' | '승인');
                                         setCurrentPage(1);
                                     }}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="상담신청">상담신청</option>
+                                    <option value="상담요청">상담요청</option>
                                     <option value="서류요청">서류요청</option>
                                     <option value="분석">분석</option>
                                     <option value="심사">심사</option>
@@ -1048,7 +1052,7 @@ export default function DocumentSubmissionList() {
                                     onChange={(e) => setDefaultProgressFilter(e.target.value)}
                                 >
                                     <option value="all">전체</option>
-                                    <option value="상담신청">상담신청</option>
+                                    <option value="상담요청">상담요청</option>
                                     <option value="서류요청">서류요청</option>
                                     <option value="분석">분석</option>
                                     <option value="심사">심사</option>
@@ -1201,22 +1205,22 @@ export default function DocumentSubmissionList() {
                                         시간 경과{getSortIcon('progress_start_date')}
                                     </th>
                                     <th>승인금액</th>
-                                    {!isUserSalesManager && (
+                                    {(!isUserSalesManager || isAffiliationRep) && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('user_name')}>
                                             작성자{getSortIcon('user_name')}
                                         </th>
                                     )}
-                                    {!isUserSalesManager && (
+                                    {(!isUserSalesManager || isAffiliationRep) && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('user_id')}>
                                             작성자 ID{getSortIcon('user_id')}
                                         </th>
                                     )}
-                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                    {(!isUserSalesManager || isAffiliationRep) && userRoleLevel !== 6 && (
                                         <th className={styles.sortableHeader} onClick={() => handleSort('manager_name')}>
                                             실무자{getSortIcon('manager_name')}
                                         </th>
                                     )}
-                                    {!isUserSalesManager && userRoleLevel !== 6 && (
+                                    {(!isUserSalesManager || isAffiliationRep) && userRoleLevel !== 6 && (
                                         <th className={styles.sortableHeader}>
                                             실무자 ID
                                         </th>
@@ -1285,16 +1289,16 @@ export default function DocumentSubmissionList() {
                                         <td className={styles.approvalAmount}>
                                             {doc.approval_amount ? formatApprovalAmount(doc.approval_amount) : '-'}
                                         </td>
-                                        {!isUserSalesManager && (
+                                        {(!isUserSalesManager || isAffiliationRep) && (
                                             <td className={styles.userName}>{doc.user_name}</td>
                                         )}
-                                        {!isUserSalesManager && (
+                                        {(!isUserSalesManager || isAffiliationRep) && (
                                             <td className={styles.userId}>{doc.user_id}</td>
                                         )}
-                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        {(!isUserSalesManager || isAffiliationRep) && userRoleLevel !== 6 && (
                                             <td className={styles.managerName}>{doc.manager_name || '-'}</td>
                                         )}
-                                        {!isUserSalesManager && userRoleLevel !== 6 && (
+                                        {(!isUserSalesManager || isAffiliationRep) && userRoleLevel !== 6 && (
                                             <td className={styles.managerId}>{doc.manager_id || '-'}</td>
                                         )}
                                         <td className={styles.status}>

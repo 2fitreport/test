@@ -52,9 +52,11 @@ export async function GET(
         const userIdNumber = currentUser.id;
 
         // 영업자(level 4)는 users 데이터 조회 안 함 (보안)
+        // 소속대표는 작성자 정보 표시를 위해 조회
         // 검수자(level 6)와 대표/대표실무자(level 1,2)는 필요시 조회
         let users = null;
-        if (userLevel !== 4) {
+        const isAffiliationRep = userLevel === 4 && (currentUser.is_affiliation_representative || false);
+        if (userLevel !== 4 || isAffiliationRep) {
             const { data: usersData } = await supabase
                 .from('users')
                 .select('id, user_id, name, position_id, position(id, name, level), company_name, supervisor_id');
@@ -63,8 +65,49 @@ export async function GET(
 
         // 권한 확인
         // 영업자(level=4)는 자신이 작성한 문서 또는 submitter_id가 본인인 문서만
+        // 소속대표는 같은 소속 영업자의 문서도 열람 가능
         if (userLevel === 4 && userId !== document.user_id && userId !== document.submitter_id) {
-            return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            // 소속대표 여부 및 소속 확인
+            const isAffiliationRep = currentUser.is_affiliation_representative || false;
+            if (!isAffiliationRep) {
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
+
+            // 소속대표: 같은 소속의 영업자 문서인지 확인
+            const { data: myAffiliations } = await supabase
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userIdNumber);
+
+            const myAffIds = (myAffiliations || []).map((a: any) => a.affiliation_id);
+
+            if (myAffIds.length === 0) {
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
+
+            // 문서 작성자의 DB id 조회
+            const { data: docAuthor } = await supabase
+                .from('users')
+                .select('id')
+                .eq('user_id', document.user_id)
+                .single();
+
+            if (!docAuthor) {
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
+
+            // 문서 작성자가 같은 소속인지 확인
+            const { data: authorAffiliations } = await supabase
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', docAuthor.id);
+
+            const authorAffIds = (authorAffiliations || []).map((a: any) => a.affiliation_id);
+            const isSameAffiliation = myAffIds.some((id: number) => authorAffIds.includes(id));
+
+            if (!isSameAffiliation) {
+                return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
+            }
         }
 
         // 검수자(level=6) 권한 확인
@@ -93,8 +136,8 @@ export async function GET(
             }
         }
 
-        // 대표실무자(level 2) 권한 확인: 서류요청, 상담신청 단계 문서 접근 불가
-        if (userLevel === 2 && (document.progress_details === '서류요청' || document.progress_details === '상담신청')) {
+        // 대표실무자(level 2) 권한 확인: 서류요청, 상담요청 단계 문서 접근 불가
+        if (userLevel === 2 && (document.progress_details === '서류요청' || document.progress_details === '상담요청')) {
             return NextResponse.json({ error: '접근 권한이 없습니다.' }, { status: 403 });
         }
 
