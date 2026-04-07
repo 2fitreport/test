@@ -219,6 +219,44 @@ export async function GET(request: NextRequest) {
             ? myDocs.filter(d => d.user_id === userId || d.submitter_id === userId)
             : myDocs;
 
+        // === Level 4 소속대표: 소속 영업자 지급수수료 합산용 사용자 정보 조회 ===
+        let affUserInfoMap: Record<string, { introducer?: string }> = {};
+        if (userLevel === 4 && isAffiliationRep) {
+            const affDocUserIds = [...new Set([
+                ...myDocs.map(d => d.user_id),
+                ...myDocs.map(d => d.submitter_id),
+            ].filter(Boolean))];
+            if (affDocUserIds.length > 0) {
+                const { data: affUsersData } = await supabase
+                    .from('users')
+                    .select('user_id, introducer')
+                    .in('user_id', affDocUserIds);
+                for (const u of affUsersData || []) {
+                    affUserInfoMap[u.user_id] = { introducer: u.introducer };
+                }
+            }
+        }
+
+        // 소속대표: 소속 영업자 전체 지급수수료 합산 헬퍼
+        const calcAffilFee = (docs: any[]) => {
+            let fee = 0;
+            for (const doc of docs) {
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                if (doc.submitter_id) {
+                    fee += Math.round(rev * 0.2 * 10) / 10;
+                    if ((affUserInfoMap[doc.submitter_id] || {}).introducer) {
+                        fee += Math.round(rev * 0.05 * 10) / 10;
+                    }
+                } else {
+                    fee += Math.round(rev * 0.4 * 10) / 10;
+                    if ((affUserInfoMap[doc.user_id] || {}).introducer) {
+                        fee += Math.round(rev * 0.05 * 10) / 10;
+                    }
+                }
+            }
+            return fee / 10000;
+        };
+
         // === 현재달 통계 (stats는 항상 현재 달 기준) ===
         // 수수료 계산용: myDocs 전체 (소개받은 영업자 문서 포함)
         const monthlyApprovedForStats = myDocs.filter(d => {
@@ -288,6 +326,8 @@ export async function GET(request: NextRequest) {
                 }
             }
             monthlyRevenueAmount = monthlyFeeRaw / 10000;
+        } else if (userLevel === 4 && isAffiliationRep) {
+            monthlyRevenueAmount = calcAffilFee(monthlyApprovedForStats);
         }
 
         const monthlyApprovalAmount = totalApprovalAmount / 10000;
@@ -479,6 +519,8 @@ export async function GET(request: NextRequest) {
                 }
             }
             totalRevenueAmountForReturn = totalFeeRaw / 10000;
+        } else if (userLevel === 4 && isAffiliationRep) {
+            totalRevenueAmountForReturn = calcAffilFee(approvedDocs);
         } else {
             // 나머지 직급: 실제 매출 (전체 기간)
             totalRevenueAmountForReturn = approvedDocs.reduce((sum, doc) => {
@@ -530,6 +572,10 @@ export async function GET(request: NextRequest) {
             prevMonthRevenue = calcFee(prevMonthApprovedDocs);
             prevYearRevenue = calcFee(prevYearApprovedDocs);
             ytdRevenue = calcFee(ytdApprovedDocs);
+        } else if (userLevel === 4 && isAffiliationRep) {
+            prevMonthRevenue = calcAffilFee(prevMonthApprovedDocs);
+            prevYearRevenue = calcAffilFee(prevYearApprovedDocs);
+            ytdRevenue = calcAffilFee(ytdApprovedDocs);
         } else {
             const sumRevenue = (docs: any[]) => docs.reduce((sum, doc) => {
                 const amt = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
@@ -563,6 +609,20 @@ export async function GET(request: NextRequest) {
                 const docUserId = doc.submitter_id || doc.user_id;
                 if ((totalUserInfoMap[docUserId] || {}).introducer === userId) {
                     fee += Math.round(revenueAmount * 0.05 * 10) / 10;
+                }
+                chartAmount = fee;
+            } else if (userLevel === 4 && isAffiliationRep) {
+                let fee = 0;
+                if (doc.submitter_id) {
+                    fee = Math.round(revenueAmount * 0.2 * 10) / 10;
+                    if ((affUserInfoMap[doc.submitter_id] || {}).introducer) {
+                        fee += Math.round(revenueAmount * 0.05 * 10) / 10;
+                    }
+                } else {
+                    fee = Math.round(revenueAmount * 0.4 * 10) / 10;
+                    if ((affUserInfoMap[doc.user_id] || {}).introducer) {
+                        fee += Math.round(revenueAmount * 0.05 * 10) / 10;
+                    }
                 }
                 chartAmount = fee;
             }
