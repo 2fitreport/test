@@ -101,7 +101,10 @@
       "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); files=[f for f in data.get\\('files',[]\\) if 'metadata' in f or 'resolve' in f.lower\\(\\)]; print\\('\\\\n'.join\\(files[:20]\\)\\)\")",
       "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); files=data.get\\('files',[]\\); [print\\(f\\) for f in files if 'meta' in f.lower\\(\\) or 'workAsync' in f or 'params' in f.lower\\(\\) or 'request' in f.lower\\(\\)]\")",
       "Bash(cp proxy.ts middleware.ts)",
-      "Bash(rm proxy.ts)"
+      "Bash(rm proxy.ts)",
+      "Bash(cp middleware.ts proxy.ts)",
+      "Bash(rm middleware.ts)",
+      "Bash(sed -i 's/export function middleware/export function proxy/' proxy.ts)"
     ],
     "deny": [],
     "ask": []
