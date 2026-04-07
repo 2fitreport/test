@@ -453,12 +453,45 @@ export async function GET(request: NextRequest) {
             return sum + numAmount;
         }, 0) / 10000;
 
+        // 소속대표: 소속 영업자 전체 지급수수료 합산
+        const calcAffilFee = async (docs: any[]): Promise<number> => {
+            const docUserIds = [...new Set([
+                ...docs.map((d: any) => d.user_id),
+                ...docs.map((d: any) => d.submitter_id),
+            ].filter(Boolean))];
+            let introMap: Record<string, string> = {};
+            if (docUserIds.length > 0) {
+                const { data: usersData } = await supabase
+                    .from('users').select('user_id, introducer').in('user_id', docUserIds);
+                for (const u of usersData || []) {
+                    if (u.introducer) introMap[u.user_id] = u.introducer;
+                }
+            }
+            let fee = 0;
+            for (const doc of docs) {
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                if (doc.submitter_id) {
+                    fee += Math.round(rev * 0.2 * 10) / 10;
+                    if (introMap[doc.submitter_id]) fee += Math.round(rev * 0.05 * 10) / 10;
+                } else {
+                    fee += Math.round(rev * 0.4 * 10) / 10;
+                    if (introMap[doc.user_id]) fee += Math.round(rev * 0.05 * 10) / 10;
+                }
+            }
+            return fee / 10000;
+        };
+
         let monthlyRevenueValue: number;
         let prevMonthRevenueValue: number;
         if (userLevel === 4 && !isRep) {
             [monthlyRevenueValue, prevMonthRevenueValue] = await Promise.all([
                 calcFee(monthlyApproved),
                 calcFee(prevMonthApproved),
+            ]);
+        } else if (userLevel === 4 && isRep) {
+            [monthlyRevenueValue, prevMonthRevenueValue] = await Promise.all([
+                calcAffilFee(monthlyApproved),
+                calcAffilFee(prevMonthApproved),
             ]);
         } else {
             monthlyRevenueValue = sumRevenue(monthlyApproved);
