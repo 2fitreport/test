@@ -520,7 +520,7 @@ export async function GET(request: NextRequest) {
                 if (aInfo.introducer) {
                     settlementData.push({
                         documentId: doc.id,
-                        company: isAffiliationRep ? (doc.company_name || '-') : '외부도입원',
+                        company: (userLevel === 1 || userLevel === 2 || isAffiliationRep) ? (doc.company_name || '-') : '외부도입원',
                         approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[aInfo.introducer] || aInfo.introducer,
@@ -548,7 +548,7 @@ export async function GET(request: NextRequest) {
                 if (userInfo.introducer) {
                     settlementData.push({
                         documentId: doc.id,
-                        company: isAffiliationRep ? (doc.company_name || '-') : '외부도입원',
+                        company: (userLevel === 1 || userLevel === 2 || isAffiliationRep) ? (doc.company_name || '-') : '외부도입원',
                         approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[userInfo.introducer] || userInfo.introducer,
