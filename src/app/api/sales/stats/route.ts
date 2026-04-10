@@ -122,15 +122,35 @@ export async function GET(request: NextRequest) {
 
         const userIds = salespeople.map((p: any) => p.user_id);
 
-        // 문서 조회 (user_id와 submitter_id 둘 다 포함, 대표실무자는 admin 배정 문서 제외)
+        // 문서 조회 (메인홈과 동일하게)
         let docQuery = supabase
             .from('documents')
             .select('user_id, submitter_id, progress_details, revenue_amount, created_at, updated_at');
 
-        const conditions: string[] = [];
-        conditions.push(`user_id.in.(${userIds.join(',')})`);
-        conditions.push(`submitter_id.in.(${userIds.join(',')})`);
-        docQuery = docQuery.or(conditions.join(','));
+        // 일반 영업자: 자신이 소개한 영업자의 문서도 포함 (메인홈과 동일한 로직)
+        if (userLevel === 4 && !isAffiliationRep && userIds.length > 0) {
+            // 본인이 submitter_id인 문서 조회
+            const [{ data: submitterDocs }, { data: introducedUsers }] = await Promise.all([
+                supabase.from('documents').select('id').eq('submitter_id', userId),
+                supabase.from('users').select('user_id').eq('introducer', userId),
+            ]);
+            const submitterIds = (submitterDocs || []).map((d: any) => d.id);
+            const introducedUserIds = (introducedUsers || []).map((u: any) => u.user_id);
+
+            const orParts: string[] = [`user_id.eq.${userId}`];
+            if (submitterIds.length > 0) orParts.push(`id.in.(${submitterIds.join(',')})`);
+            if (introducedUserIds.length > 0) orParts.push(`user_id.in.(${introducedUserIds.join(',')})`);
+            docQuery = docQuery.or(orParts.join(','));
+        } else if (userIds.length > 0) {
+            // 대표자/대표실무자/검수자: 영업자 목록 기준
+            const conditions: string[] = [];
+            conditions.push(`user_id.in.(${userIds.join(',')})`);
+            conditions.push(`submitter_id.in.(${userIds.join(',')})`);
+            docQuery = docQuery.or(conditions.join(','));
+        } else {
+            // 영업자가 없으면 빈 문서 조회
+            docQuery = docQuery.eq('user_id', 'no_user');
+        }
 
         if (userLevel === 2) {
             docQuery = docQuery.neq('manager_id', 'admin');
