@@ -4,8 +4,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  turbopack: {},
   reactCompiler: false,
+  serverExternalPackages: ["better-auth"],
+  output: "standalone",
 };
 
 export default nextConfig;
