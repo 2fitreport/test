@@ -122,12 +122,16 @@ export async function GET(request: NextRequest) {
 
         const userIds = salespeople.map((p: any) => p.user_id);
 
-        // 문서 조회 (user_id 기준, 대표실무자는 admin 배정 문서 제외)
-        // 영업자 성과: 상담요청 문서는 B영업자(user_id)에게 귀속
+        // 문서 조회 (user_id와 submitter_id 둘 다 포함, 대표실무자는 admin 배정 문서 제외)
         let docQuery = supabase
             .from('documents')
-            .select('user_id, submitter_id, progress_details, revenue_amount, created_at, updated_at')
-            .in('user_id', userIds);
+            .select('user_id, submitter_id, progress_details, revenue_amount, created_at, updated_at');
+
+        const conditions: string[] = [];
+        conditions.push(`user_id.in.(${userIds.join(',')})`);
+        conditions.push(`submitter_id.in.(${userIds.join(',')})`);
+        docQuery = docQuery.or(conditions.join(','));
+
         if (userLevel === 2) {
             docQuery = docQuery.neq('manager_id', 'admin');
         }
@@ -151,23 +155,38 @@ export async function GET(request: NextRequest) {
             monthEndStr = `${y}-${String(m).padStart(2, '0')}-${String(endDate).padStart(2, '0')}`;
         }
 
-        // user별 그룹핑
+        // ownerUserId (submitter_id || user_id) 기준으로 그룹핑
         const docsByUser: Record<string, any[]> = {};
         for (const doc of docs) {
-            if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-            docsByUser[doc.user_id].push(doc);
+            const ownerUserId = doc.submitter_id || doc.user_id;
+            if (!docsByUser[ownerUserId]) docsByUser[ownerUserId] = [];
+            docsByUser[ownerUserId].push(doc);
         }
 
-        // introducer 정보 미리 로드
-        const userIds2 = salespeople.map((p: any) => p.user_id);
-        const { data: usersData } = await supabase
-            .from('users')
-            .select('user_id, introducer')
-            .in('user_id', userIds2);
-        const feeUserInfoMap: Record<string, { introducer?: string }> = {};
-        (usersData || []).forEach((u: any) => {
-            feeUserInfoMap[u.user_id] = { introducer: u.introducer };
-        });
+        // 모든 문서 소유자의 introducer 정보 미리 로드
+        const allDocUserIds = [...new Set([
+            ...docs.map((d: any) => d.user_id),
+            ...docs.map((d: any) => d.submitter_id),
+        ].filter(Boolean))];
+        const introducerMap: Record<string, string> = {};
+        if (allDocUserIds.length > 0) {
+            const { data: usersData } = await supabase
+                .from('users')
+                .select('user_id, introducer')
+                .in('user_id', allDocUserIds);
+            for (const u of usersData || []) {
+                if (u.introducer) introducerMap[u.user_id] = u.introducer;
+            }
+        }
+
+        // 월간 승인 문서 전체 (소개 인센티브 계산용)
+        const monthlyApprovedAll = monthStartStr
+            ? docs.filter(d => {
+                if (d.progress_details !== '승인') return false;
+                const date = toKSTDateStr(d.updated_at || '');
+                return date >= monthStartStr && date <= monthEndStr;
+            })
+            : docs.filter(d => d.progress_details === '승인');
 
         const stats = salespeople.map((person: any) => {
             const userDocs = docsByUser[person.user_id] || [];
@@ -180,7 +199,7 @@ export async function GET(request: NextRequest) {
                 })
                 : userDocs;
 
-            // 케이스수/지급수수료: 해당 월에 승인된 문서 (updated_at KST 기준)
+            // 케이스수: 해당 월에 승인된 person의 문서 (updated_at KST 기준)
             const approvedDocs = monthStartStr
                 ? userDocs.filter(d => {
                     if (d.progress_details !== '승인') return false;
@@ -189,14 +208,23 @@ export async function GET(request: NextRequest) {
                 })
                 : userDocs.filter(d => d.progress_details === '승인');
 
-            // 지급수수료 계산
+            // 지급수수료 계산 (기업등록 40%, 상담요청 20%, 소개 인센티브 5%)
             let totalFee = 0;
+
+            // 1. 본인이 진행한 문서 (기업등록 40%) + 상담요청 (20%)
             approvedDocs.forEach((doc: any) => {
                 const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                 if (doc.submitter_id === person.user_id) totalFee += Math.round(rev * 0.2 * 10) / 10;
                 else if (doc.user_id === person.user_id && !doc.submitter_id) totalFee += Math.round(rev * 0.4 * 10) / 10;
-                const docUserId = doc.submitter_id || doc.user_id;
-                if ((feeUserInfoMap[docUserId] || {}).introducer === person.user_id) totalFee += Math.round(rev * 0.05 * 10) / 10;
+            });
+
+            // 2. 소개자 인센티브 (5%) - 월간 모든 승인 문서에서
+            monthlyApprovedAll.forEach((doc: any) => {
+                const docOwner = doc.submitter_id || doc.user_id;
+                if (introducerMap[docOwner] === person.user_id) {
+                    const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                    totalFee += Math.round(rev * 0.05 * 10) / 10;
+                }
             });
 
             const caseCount = approvedDocs.length;

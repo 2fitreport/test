@@ -3,8 +3,6 @@ import { QueryProvider } from '@/components/QueryProvider';
 
 import './globals.css';
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
     title: '2FitReport',
     description: 'User management dashboard',
