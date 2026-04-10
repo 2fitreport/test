@@ -486,7 +486,7 @@ export async function GET(request: NextRequest) {
         if (introducerIds.length > 0) {
             const { data: intros } = await supabase
                 .from('users')
-                .select('u:user_id, name, user_affiliations(affiliation_id)')
+                .select('user_id, name, user_affiliations(affiliation_id)')
                 .in('user_id', introducerIds);
             for (const u of intros || []) {
                 introducerNameMap[u.user_id] = u.name;
