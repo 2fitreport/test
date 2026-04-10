@@ -350,15 +350,28 @@ export async function GET(request: NextRequest) {
                     const approvedCount = monthlyApprovedDocs.length;
                     const registrationCount = monthlyDocs.length;
 
-                    // 지급수수료 계산 (기업등록 40%, 상담요청 20%, 소개 5%)
+                    // 지급수수료 계산 (기업등록 40%, 상담요청 20%)
                     let totalFee = 0;
                     monthlyApprovedDocs.forEach((doc: any) => {
                         const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
                         if (doc.submitter_id === person.user_id) totalFee += Math.round(rev * 0.2 * 10) / 10;
                         else if (doc.user_id === person.user_id && !doc.submitter_id) totalFee += Math.round(rev * 0.4 * 10) / 10;
-                        const docUserId = doc.submitter_id || doc.user_id;
-                        if ((salesFeeUserInfoMap[docUserId] || {}).introducer === person.user_id) totalFee += Math.round(rev * 0.05 * 10) / 10;
                     });
+
+                    // 소개자 인센티브 5% (이번달 모든 승인 문서에서 자신이 소개한 경우)
+                    const monthlyAllApprovedDocs = myDocs.filter(d => {
+                        if (d.progress_details !== '승인') return false;
+                        const date = toKSTDateStr(d.updated_at || '');
+                        return date >= firstDayStr && date < nextMonthFirstStr;
+                    });
+                    monthlyAllApprovedDocs.forEach((doc: any) => {
+                        const docUserId = doc.submitter_id || doc.user_id;
+                        if ((salesFeeUserInfoMap[docUserId] || {}).introducer === person.user_id) {
+                            const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                            totalFee += Math.round(rev * 0.05 * 10) / 10;
+                        }
+                    });
+
                     const feeWon = totalFee * 10000;
                     const amountStr = feeWon > 0 ? feeWon.toLocaleString('ko-KR') + '원' : '-';
 
