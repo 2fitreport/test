@@ -477,19 +477,33 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 소개자 이름 일괄 조회
+        // 소개자 이름 + affiliation 일괄 조회
         const introducerIds = [...new Set(
             Object.values(userInfoMap).map(u => u.introducer).filter(Boolean) as string[]
         )];
         const introducerNameMap: Record<string, string> = {};
+        const introducerAffiliationMap: Record<string, number | null> = {};
         if (introducerIds.length > 0) {
             const { data: intros } = await supabase
                 .from('users')
-                .select('user_id, name')
+                .select('u:user_id, name, user_affiliations(affiliation_id)')
                 .in('user_id', introducerIds);
             for (const u of intros || []) {
                 introducerNameMap[u.user_id] = u.name;
+                const affId = (u.user_affiliations as any)?.[0]?.affiliation_id;
+                introducerAffiliationMap[u.user_id] = affId || null;
             }
+        }
+
+        // 일반 영업자의 소속 정보 (같은 소속 판단용)
+        let myAffiliationId: number | null = null;
+        if (userLevel === 4 && !isAffiliationRep) {
+            const { data: myAff } = await supabase
+                .from('user_affiliations')
+                .select('affiliation_id')
+                .eq('user_id', userDbId)
+                .limit(1);
+            myAffiliationId = (myAff && myAff[0]?.affiliation_id) || null;
         }
 
         const settlementData: any[] = [];
@@ -518,14 +532,9 @@ export async function GET(request: NextRequest) {
                 });
                 // A영업자의 소개자 → 실제매출의 5%
                 if (aInfo.introducer) {
-                    // 대표자(1,2): 회사명 표시
-                    // 일반 영업자(4, !isRep): 외부도입원
-                    // 소속대표: 소속원만 회사명, 아니면 외부도입원
-                    const shouldShowCompany = (userLevel === 1 || userLevel === 2) ||
-                                              (isAffiliationRep && affMemberUserIds && affMemberUserIds.has(aInfo.introducer));
                     settlementData.push({
                         documentId: doc.id,
-                        company: shouldShowCompany ? (doc.company_name || '-') : '외부도입원',
+                        company: doc.company_name || '-',
                         approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[aInfo.introducer] || aInfo.introducer,
@@ -533,6 +542,7 @@ export async function GET(request: NextRequest) {
                         fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: aInfo.introducer,
+                        introducerAffiliationId: introducerAffiliationMap[aInfo.introducer] || null,
                     });
                 }
             } else {
@@ -551,14 +561,9 @@ export async function GET(request: NextRequest) {
                 });
                 // 영업자의 소개자 → 실제매출의 5%
                 if (userInfo.introducer) {
-                    // 대표자(1,2): 회사명 표시
-                    // 일반 영업자(4, !isRep): 외부도입원
-                    // 소속대표: 소속원만 회사명, 아니면 외부도입원
-                    const shouldShowCompany = (userLevel === 1 || userLevel === 2) ||
-                                              (isAffiliationRep && affMemberUserIds && affMemberUserIds.has(userInfo.introducer));
                     settlementData.push({
                         documentId: doc.id,
-                        company: shouldShowCompany ? (doc.company_name || '-') : '외부도입원',
+                        company: doc.company_name || '-',
                         approvalAmount: '-',
                         realSales: revenueAmount,
                         manager: introducerNameMap[userInfo.introducer] || userInfo.introducer,
@@ -566,6 +571,7 @@ export async function GET(request: NextRequest) {
                         fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: userInfo.introducer,
+                        introducerAffiliationId: introducerAffiliationMap[userInfo.introducer] || null,
                     });
                 }
             }
@@ -605,11 +611,33 @@ export async function GET(request: NextRequest) {
                 filteredSettlementData = settlementData.filter((row: any) =>
                     affMemberUserIds.has(row.settlementUserId)
                 );
+                // 인센티브 행의 company 조정 (소속원만 회사명, 아니면 외부도입원)
+                filteredSettlementData = filteredSettlementData.map((row: any) => {
+                    if (row.inflow === '인센티브' && row.introducerAffiliationId !== null && myAffiliationId !== null) {
+                        const shouldShowCompany = myAffiliationId === row.introducerAffiliationId;
+                        return {
+                            ...row,
+                            company: shouldShowCompany ? row.company : '외부도입원'
+                        };
+                    }
+                    return row;
+                });
             } else {
                 // 일반 영업자: 본인이 수수료를 받는 행만
                 filteredSettlementData = settlementData.filter((row: any) =>
                     row.settlementUserId === userId
                 );
+                // 인센티브 행의 company 조정 (같은 소속만 회사명, 아니면 외부도입원)
+                filteredSettlementData = filteredSettlementData.map((row: any) => {
+                    if (row.inflow === '인센티브' && row.introducerAffiliationId !== null && myAffiliationId !== null) {
+                        const shouldShowCompany = myAffiliationId === row.introducerAffiliationId;
+                        return {
+                            ...row,
+                            company: shouldShowCompany ? row.company : '외부도입원'
+                        };
+                    }
+                    return row;
+                });
             }
         }
 
