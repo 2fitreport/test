@@ -18,19 +18,27 @@ export default function StatisticsWrap({ data }: Props) {
         return undefined;
     };
 
-    const formatFeeInMillions = (manwon: number): string => {
-        if (manwon === 0) return '0백만원';
-        const millions = manwon / 100;
-        const rounded = Math.round(millions * 100) / 100;
-        return `${rounded}백만원`;
+    const formatWon = (manwon: number): string => {
+        if (manwon === 0) return '0원';
+        const won = manwon * 10000;
+        return won.toLocaleString('ko-KR') + '원';
     };
 
-    const formatAmount = (num: number): string => {
-        if (!num) return '0원';
-        const eok = Math.floor(num);
-        const decimal = (num - eok) * 10;
-        const cheonman = Math.floor(decimal);
-        const baekman = Math.floor((decimal - cheonman) * 10);
+    const formatSettlementAmount = (manwon: number): string => {
+        if (manwon === 0) return '0원';
+
+        // 십만원 단위 절삭
+        const baekmanValue = Math.floor(manwon / 100);
+
+        if (baekmanValue === 0) {
+            return `${Math.floor(manwon)}만원`;
+        }
+
+        const eok = Math.floor(baekmanValue / 100);
+        const remaining = baekmanValue % 100;
+        const cheonman = Math.floor(remaining / 10);
+        const baekman = remaining % 10;
+
         if (eok > 0) {
             if (cheonman > 0) {
                 if (baekman > 0) return `${eok}억 ${cheonman}천 ${baekman}백만원`;
@@ -72,7 +80,7 @@ export default function StatisticsWrap({ data }: Props) {
     const newRegistrations = stats?.newRegistrations || 0;
     const approvedCount = stats?.approvedCount || 0;
 
-    const revenueFormatted = formatFeeInMillions(monthlyRevenue);
+    const revenueFormatted = formatWon(monthlyRevenue);
 
     return (
         <div className={styles.statisticsWrap}>
@@ -86,7 +94,7 @@ export default function StatisticsWrap({ data }: Props) {
                 </div>
                 <div className={styles.statCard}>
                     <p className={styles.statLabel}>이번달 승인금액</p>
-                    <p className={styles.statValue}>{formatAmount(approvalAmount)}</p>
+                    <p className={styles.statValue}>{formatSettlementAmount(approvalAmount)}</p>
                     <p className={styles.statSubValue}>{approvedCount}건</p>
                 </div>
                 <div className={styles.statCard}>

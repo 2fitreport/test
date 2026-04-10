@@ -41,6 +41,7 @@ interface Props {
     onPrevYear: () => void;
     onNextYear: () => void;
     revenueData?: any;
+    userLevel?: number;
 }
 
 export default function RevenueChart({
@@ -48,30 +49,73 @@ export default function RevenueChart({
     onYearChange,
     onPrevYear,
     onNextYear,
-    revenueData
+    revenueData,
+    userLevel = 0
 }: Props) {
     const [chartData, setChartData] = useState<any>(null);
     const [hasData, setHasData] = useState<boolean>(false);
     const [prevYearData, setPrevYearData] = useState<number[]>(Array(12).fill(0));
     const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
+    const [currentYearData, setCurrentYearData] = useState<number[]>(Array(12).fill(0));
+    const [yearlyApprovalAmount, setYearlyApprovalAmount] = useState<number>(0);
+    const [yearlyRealSales, setYearlyRealSales] = useState<number>(0);
+    const [yearlyFee, setYearlyFee] = useState<number>(0);
+
+    const formatSettlementAmount = (manwon: number): string => {
+        if (manwon === 0) return '0원';
+
+        // 십만원 단위 절삭
+        const baekmanValue = Math.floor(manwon / 100);
+
+        if (baekmanValue === 0) {
+            return `${Math.floor(manwon)}만원`;
+        }
+
+        const eok = Math.floor(baekmanValue / 100);
+        const remaining = baekmanValue % 100;
+        const cheonman = Math.floor(remaining / 10);
+        const baekman = remaining % 10;
+
+        if (eok > 0) {
+            if (cheonman > 0) {
+                if (baekman > 0) return `${eok}억 ${cheonman}천 ${baekman}백만원`;
+                return `${eok}억 ${cheonman}천만원`;
+            } else {
+                if (baekman > 0) return `${eok}억 ${baekman}백만원`;
+                return `${eok}억원`;
+            }
+        } else {
+            if (cheonman > 0) {
+                if (baekman > 0) return `${cheonman}천 ${baekman}백만원`;
+                return `${cheonman}천만원`;
+            } else {
+                if (baekman > 0) return `${baekman}백만원`;
+                return '0원';
+            }
+        }
+    };
 
     useEffect(() => {
         const labels = revenueData?.labels || ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
-        const currentYearData = revenueData?.currentYearData || revenueData?.data || Array(12).fill(0);
+        const yearData = revenueData?.currentYearData || revenueData?.data || Array(12).fill(0);
         const previousYearData = revenueData?.previousYearData || Array(12).fill(0);
         const currentMonth = revenueData?.currentMonth || new Date().getMonth() + 1;
         const currentYearFromApi = revenueData?.currentYear || new Date().getFullYear();
         const selectedYearVal = revenueData?.selectedYear || new Date().getFullYear();
 
-        // 전년도 데이터를 상태로 저장 (tooltip에서 사용)
+        // 상태로 저장
+        setCurrentYearData(yearData);
         setPrevYearData(previousYearData);
         setPrevYear(selectedYearVal - 1);
+        setYearlyApprovalAmount(revenueData?.yearlyApprovalAmount || 0);
+        setYearlyRealSales(revenueData?.yearlyRealSales || 0);
+        setYearlyFee(revenueData?.yearlyFee || 0);
 
         // 데이터 존재 여부 확인
-        const hasData = currentYearData.some((value: number) => value > 0);
+        const hasData = yearData.some((value: number) => value > 0);
 
         // 현재월만 메인 컬러, 나머지는 회색
-        const barColors = currentYearData.map((_: number, index: number) => {
+        const barColors = yearData.map((_: number, index: number) => {
             // index는 0부터 시작, currentMonth는 1부터 시작
             return (index + 1 === currentMonth && currentYearFromApi === selectedYearVal)
                 ? '#0f1a4d'
@@ -81,7 +125,7 @@ export default function RevenueChart({
         const datasets: any[] = [
             {
                 label: `${selectedYearVal}년`,
-                data: currentYearData,
+                data: yearData,
                 backgroundColor: hasData ? barColors : '#e0e0e0',
                 borderRadius: 8,
             }
@@ -100,7 +144,7 @@ export default function RevenueChart({
 
         setHasData(hasData);
         setChartData({ labels, datasets });
-    }, [selectedYear, revenueData]);
+    }, [revenueData]);
 
     const chartOptions = useMemo(() => {
         // y축 최대값 자동 계산
@@ -248,6 +292,25 @@ export default function RevenueChart({
                         plugins={[dataLabelsPlugin]}
                     />
                 ) : null}
+            </div>
+            <div className={pageStyles.summarySection} style={{ padding: '16px' }}>
+                <div className={pageStyles.summaryTitle} style={{ textAlign: 'right' }}>합계</div>
+                <div className={pageStyles.summaryValues}>
+                    <div className={pageStyles.summaryItem}>
+                        <span>승인금액</span>
+                        <span className={pageStyles.summaryValueBlue}>{formatSettlementAmount(yearlyApprovalAmount)}</span>
+                    </div>
+                    {userLevel !== 4 && (
+                        <div className={pageStyles.summaryItem}>
+                            <span>실제매출</span>
+                            <span className={pageStyles.summaryValueBlue}>{(yearlyRealSales * 10000).toLocaleString('ko-KR') + '원'}</span>
+                        </div>
+                    )}
+                    <div className={pageStyles.summaryItem}>
+                        <span>지급수수료</span>
+                        <span className={pageStyles.summaryValueGreen}>{(yearlyFee * 10000).toLocaleString('ko-KR') + '원'}</span>
+                    </div>
+                </div>
             </div>
         </div>
     );

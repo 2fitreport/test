@@ -104,18 +104,27 @@ export default function SettlementTable({
         return decPart > 0 ? `${intFormatted}.${decPart}만원` : `${intFormatted}만원`;
     };
 
-    const formatAmount = (amount: any): string => {
+    const formatSettlementAmount = (amount: any): string => {
         if (typeof amount === 'string') {
             return amount;
         }
-        // amount는 만원 단위 (예: 14578만원 = 1.4578억원)
+        // amount는 만원 단위
         const manwon = Number(amount) || 0;
-        const eokValue = manwon / 10000;
-        const eok = Math.floor(eokValue);
-        const decimal = (eokValue - eok) * 10; // 소수점 첫자리
-        const cheonman = Math.floor(decimal);
-        const baekman = Math.floor((decimal - cheonman) * 10);
+        if (manwon === 0) return '0원';
 
+        // 십만원 단위 절삭
+        const baekmanValue = Math.floor(manwon / 100);
+
+        if (baekmanValue === 0) {
+            return `${Math.floor(manwon)}만원`;
+        }
+
+        const eok = Math.floor(baekmanValue / 100);
+        const remaining = baekmanValue % 100;
+        const cheonman = Math.floor(remaining / 10);
+        const baekman = remaining % 10;
+
+        // 불필요한 부분 생략
         if (eok > 0) {
             if (cheonman > 0) {
                 if (baekman > 0) {
@@ -140,8 +149,6 @@ export default function SettlementTable({
             } else {
                 if (baekman > 0) {
                     return `${baekman}백만원`;
-                } else if (manwon > 0) {
-                    return `${manwon}만원`;
                 } else {
                     return '0원';
                 }
@@ -149,12 +156,11 @@ export default function SettlementTable({
         }
     };
 
-    const formatFeeInMillions = (amount: any): string => {
+    const formatWon = (amount: any): string => {
         const manwon = typeof amount === 'number' ? amount : Number(amount) || 0;
-        if (manwon === 0) return '0백만원';
-        const millions = manwon / 100;
-        const rounded = Math.round(millions * 100) / 100;
-        return `${rounded}백만원`;
+        if (manwon === 0) return '0원';
+        const won = manwon * 10000;
+        return won.toLocaleString('ko-KR') + '원';
     };
 
     return (
@@ -229,11 +235,11 @@ export default function SettlementTable({
                         {processed.data.map((row, i) => (
                             <tr key={i}>
                                 <td>{row.company}</td>
-                                <td>{formatAmount(row.approvalAmount)}</td>
-                                {userLevel !== 4 && <td className={pageStyles.realSalesText}>{formatAmount(row.realSales)}</td>}
+                                <td>{formatSettlementAmount(row.approvalAmount)}</td>
+                                {userLevel !== 4 && <td className={pageStyles.realSalesText}>{formatWon(row.realSales)}</td>}
                                 <td>{row.manager}</td>
                                 <td>{row.inflow}</td>
-                                <td className={pageStyles.incentiveText}>{formatFeeInMillions(row.fee)}</td>
+                                <td className={pageStyles.incentiveText}>{formatWon(row.fee)}</td>
                                 <td>{row.paymentDate}</td>
                             </tr>
                         ))}
@@ -251,11 +257,11 @@ export default function SettlementTable({
                 />
             </div>
             <div className={styles.summarySection}>
-                <div className={styles.summaryTitle}>합계</div>
+                <div className={styles.summaryTitle} style={{ textAlign: 'right' }}>합계</div>
                 <div className={styles.summaryValues}>
                     <div className={styles.summaryItem}>
                         <span>승인금액</span>
-                        <span className={styles.summaryValueBlue}>{formatAmount((() => {
+                        <span className={styles.summaryValueBlue}>{formatSettlementAmount((() => {
                             const seen = new Set();
                             return processed.allFiltered.reduce((sum, row) => {
                                 if (row.documentId && seen.has(row.documentId)) return sum;
@@ -268,7 +274,7 @@ export default function SettlementTable({
                     {userLevel !== 4 && (
                         <div className={styles.summaryItem}>
                             <span>실제매출</span>
-                            <span className={styles.summaryValueBlue}>{formatAmount((() => {
+                            <span className={styles.summaryValueBlue}>{formatWon((() => {
                                 const seen = new Set();
                                 return processed.allFiltered.reduce((sum, row) => {
                                     if (row.documentId && seen.has(row.documentId)) return sum;
@@ -281,7 +287,7 @@ export default function SettlementTable({
                     )}
                     <div className={styles.summaryItem}>
                         <span>지급수수료</span>
-                        <span className={styles.summaryValueGreen}>{formatFeeInMillions(processed.allFiltered.reduce((sum, row) => {
+                        <span className={styles.summaryValueGreen}>{formatWon(processed.allFiltered.reduce((sum, row) => {
                             const amount = typeof row.fee === 'number' ? row.fee : 0;
                             return sum + amount;
                         }, 0))}</span>

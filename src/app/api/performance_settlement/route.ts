@@ -422,7 +422,7 @@ export async function GET(request: NextRequest) {
             monthlyRevenueAmount = currentMonthFeeSum;
         }
 
-        const monthlyApprovalAmount = totalApprovalAmount / 10000;
+        const monthlyApprovalAmount = totalApprovalAmount;
 
         const ownDocs = ownDocsBase;
 
@@ -788,14 +788,56 @@ export async function GET(request: NextRequest) {
             return Math.round((raw / 10000) * 10000) / 10000;
         });
 
+        // 선택된 연도의 합계 (승인금액, 실제매출, 지급수수료)
+        // targetYear 기준 승인 문서 필터링
+        const yearlyApprovedDocs = approvedDocs.filter(d => {
+            const { year } = extractYearMonthDay(d.updated_at || '');
+            return year === targetYear;
+        });
+
+        // 승인금액 (중복 제거)
+        const seenYearlyApproval = new Set<number>();
+        let yearlyApprovalAmount = 0;
+        for (const doc of yearlyApprovedDocs) {
+            if (!seenYearlyApproval.has(doc.id)) {
+                seenYearlyApproval.add(doc.id);
+                const amount = typeof doc.approval_amount === 'string' ? (parseInt(doc.approval_amount) || 0) : Number(doc.approval_amount) || 0;
+                yearlyApprovalAmount += amount;
+            }
+        }
+
+        // 실제매출 (중복 제거)
+        const seenYearlyRealSales = new Set<number>();
+        let yearlyRealSales = 0;
+        for (const doc of yearlyApprovedDocs) {
+            if (!seenYearlyRealSales.has(doc.id)) {
+                seenYearlyRealSales.add(doc.id);
+                const amount = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                yearlyRealSales += amount;
+            }
+        }
+
+        // 지급수수료: yearData[targetYear]에 이미 역할별로 정확히 계산되어 있음 (만원 단위)
+        // (소속대표 외부 인센티브도 이미 yearData에 포함됨)
+        const yearlyFee = Object.values(yearData[targetYear] || {}).reduce((sum, val) => sum + val, 0);
+
         const revenueChartData = {
             labels: ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'],
             currentYearData: monthlyRevenues,
             previousYearData: previousYearMonthlyRevenues,
             currentMonth: now.getMonth() + 1,
             currentYear: now.getFullYear(),
-            selectedYear: targetYear
+            selectedYear: targetYear,
+            yearlyApprovalAmount,
+            yearlyRealSales,
+            yearlyFee
         };
+
+        // 대표자의 모든 지급수수료 합계 (모든 건)
+        const totalFeeAmount = filteredSettlementData.reduce((sum, row) => {
+            const fee = typeof row.fee === 'number' ? row.fee : 0;
+            return sum + fee;
+        }, 0);
 
         return NextResponse.json({
             stats: {
@@ -811,8 +853,9 @@ export async function GET(request: NextRequest) {
                         const amount = doc.approval_amount;
                         const numAmount = typeof amount === 'string' ? (parseInt(amount) || 0) : Number(amount) || 0;
                         return sum + numAmount;
-                    }, 0) / 10000,
+                    }, 0),
                 totalRevenueAmount: totalRevenueAmountForReturn,
+                totalFeeAmount: totalFeeAmount,
                 prevMonthChangeRate,
                 prevYearChangeRate,
                 conversionChangeRate,

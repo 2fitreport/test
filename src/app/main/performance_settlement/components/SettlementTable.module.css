@@ -85,8 +85,9 @@
 
 .summarySection {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
+    gap: 40px;
     padding-top: 20px;
     border-top: 1px solid #eee;
     margin-top: 10px;

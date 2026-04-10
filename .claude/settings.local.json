@@ -104,7 +104,8 @@
       "Bash(rm proxy.ts)",
       "Bash(cp middleware.ts proxy.ts)",
       "Bash(rm middleware.ts)",
-      "Bash(sed -i 's/export function middleware/export function proxy/' proxy.ts)"
+      "Bash(sed -i 's/export function middleware/export function proxy/' proxy.ts)",
+      "Bash(npm list:*)"
     ],
     "deny": [],
     "ask": []

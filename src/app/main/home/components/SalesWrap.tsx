@@ -10,7 +10,6 @@ interface SalesData {
     registrations: number;
     inProgress: number;
     approved: number;
-    rejected: number;
     approvalAmount: string;
     approvalAmountRaw: number;
     conversionRate: string;
@@ -119,19 +118,18 @@ export default function SalesWrap({ data }: Props) {
                             <th className={styles.sortableHeader} onClick={() => handleSort('registrations')}>등록{getSortIcon('registrations')}</th>
                             <th className={styles.sortableHeader} onClick={() => handleSort('inProgress')}>진행{getSortIcon('inProgress')}</th>
                             <th className={styles.sortableHeader} onClick={() => handleSort('approved')}>승인{getSortIcon('approved')}</th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('rejected')}>보류{getSortIcon('rejected')}</th>
-                            <th className={styles.sortableHeader} onClick={() => handleSort('approvalAmount')}>승인금액{getSortIcon('approvalAmount')}</th>
+                            <th className={styles.sortableHeader} onClick={() => handleSort('approvalAmount')}>지급수수료{getSortIcon('approvalAmount')}</th>
                             <th className={styles.sortableHeader} onClick={() => handleSort('conversionRate')}>전환율{getSortIcon('conversionRate')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {!data ? (
                             <tr>
-                                <td colSpan={7} style={{ textAlign: 'center' }}>로딩 중...</td>
+                                <td colSpan={6} style={{ textAlign: 'center' }}>로딩 중...</td>
                             </tr>
                         ) : sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={7} style={{ textAlign: 'center' }}>데이터가 없습니다.</td>
+                                <td colSpan={6} style={{ textAlign: 'center' }}>데이터가 없습니다.</td>
                             </tr>
                         ) : (
                             paginatedData.map((row) => (
@@ -140,8 +138,7 @@ export default function SalesWrap({ data }: Props) {
                                     <td style={{ color: '#666', fontWeight: 600, fontSize: '16px' }}>{row.registrations}</td>
                                     <td style={{ color: '#2563eb', fontWeight: 600, fontSize: '16px' }}>{row.inProgress}</td>
                                     <td style={{ color: '#16a34a', fontWeight: 600, fontSize: '16px' }}>{row.approved}</td>
-                                    <td style={{ color: '#dc2626', fontWeight: 600, fontSize: '16px' }}>{row.rejected}</td>
-                                    <td>{row.approvalAmount}</td>
+                                    <td style={{ color: '#2f9e44', fontWeight: 700 }}>{row.approvalAmount}</td>
                                     <td><span style={getConversionRateStyle(row.conversionRate)}>{row.conversionRate}</span></td>
                                 </tr>
                             ))

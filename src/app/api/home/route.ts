@@ -314,6 +314,23 @@ export async function GET(request: NextRequest) {
                     if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
                     docsByUser[doc.user_id].push(doc);
                 }
+
+                // 지급수수료 5% 계산을 위한 소개자 정보 로드
+                const salesDocUserIds = [...new Set([
+                    ...salesDocs.map((d: any) => d.user_id),
+                    ...salesDocs.map((d: any) => d.submitter_id),
+                ].filter(Boolean))];
+                const salesFeeUserInfoMap: Record<string, { introducer?: string }> = {};
+                if (salesDocUserIds.length > 0) {
+                    const { data: salesUsersData } = await supabase
+                        .from('users')
+                        .select('user_id, introducer')
+                        .in('user_id', salesDocUserIds);
+                    for (const u of salesUsersData || []) {
+                        salesFeeUserInfoMap[u.user_id] = { introducer: u.introducer };
+                    }
+                }
+
                 salesData = salespeople.map((person: any) => {
                     const userDocs = docsByUser[person.user_id] || [];
 
@@ -331,20 +348,17 @@ export async function GET(request: NextRequest) {
                     const approvedCount = monthlyApprovedDocs.length;
                     const registrationCount = monthlyDocs.length;
 
-                    const totalApproval = monthlyApprovedDocs.reduce((sum, d) => {
-                        const amt = typeof d.approval_amount === 'string' ? (parseInt(d.approval_amount) || 0) : Number(d.approval_amount) || 0;
-                        return sum + amt;
-                    }, 0);
-
-                    // totalApproval은 만원 단위 → 억 단위 변환
-                    const eok = Math.floor(totalApproval / 10000);
-                    const man = Math.floor((totalApproval % 10000) / 1000);
-                    let amountStr = '-';
-                    if (totalApproval > 0) {
-                        if (eok > 0) amountStr = man > 0 ? `${eok}억 ${man}천만원` : `${eok}억원`;
-                        else if (Math.floor(totalApproval / 1000) > 0) amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
-                        else amountStr = `${totalApproval}만원`;
-                    }
+                    // 지급수수료 계산 (기업등록 40%, 상담요청 20%, 소개 5%)
+                    let totalFee = 0;
+                    monthlyApprovedDocs.forEach((doc: any) => {
+                        const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                        if (doc.submitter_id === person.user_id) totalFee += Math.round(rev * 0.2 * 10) / 10;
+                        else if (doc.user_id === person.user_id && !doc.submitter_id) totalFee += Math.round(rev * 0.4 * 10) / 10;
+                        const docUserId = doc.submitter_id || doc.user_id;
+                        if ((salesFeeUserInfoMap[docUserId] || {}).introducer === person.user_id) totalFee += Math.round(rev * 0.05 * 10) / 10;
+                    });
+                    const feeWon = totalFee * 10000;
+                    const amountStr = feeWon > 0 ? feeWon.toLocaleString('ko-KR') + '원' : '-';
 
                     return {
                         userId: person.user_id,
@@ -352,9 +366,8 @@ export async function GET(request: NextRequest) {
                         registrations: registrationCount,
                         inProgress: userDocs.filter(d => d.progress_details === '진행').length,
                         approved: approvedCount,
-                        rejected: userDocs.filter(d => d.status === '보류').length,
                         approvalAmount: amountStr,
-                        approvalAmountRaw: totalApproval,
+                        approvalAmountRaw: totalFee,
                         conversionRate: registrationCount > 0 ? `${Math.round((approvedCount / registrationCount) * 100)}%` : '-'
                     };
                 });
@@ -571,7 +584,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             stats: {
                 inProgressCount,
-                approvalAmount: totalApprovalAmount / 10000,
+                approvalAmount: totalApprovalAmount,
                 monthlyRevenue: monthlyRevenueValue,
                 newRegistrations,
                 approvedCount,

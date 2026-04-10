@@ -183,7 +183,7 @@ export default function Sidebar() {
             <div className={styles.headerWrapper}>
                 <button
                     className={styles.logoWrapper}
-                    onClick={() => router.push('/main/home')}
+                    onClick={() => window.location.href = '/main/home'}
                     aria-label="메인페이지로 이동"
                 >
                     <Image src="/logo.png" alt="로고" width={220} height={120} className={styles.logoImage} priority />

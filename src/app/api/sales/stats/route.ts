@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         // 영업자 성과: 상담요청 문서는 B영업자(user_id)에게 귀속
         let docQuery = supabase
             .from('documents')
-            .select('user_id, progress_details, approval_amount, created_at, updated_at')
+            .select('user_id, submitter_id, progress_details, revenue_amount, created_at, updated_at')
             .in('user_id', userIds);
         if (userLevel === 2) {
             docQuery = docQuery.neq('manager_id', 'admin');
@@ -158,6 +158,17 @@ export async function GET(request: NextRequest) {
             docsByUser[doc.user_id].push(doc);
         }
 
+        // introducer 정보 미리 로드
+        const userIds2 = salespeople.map((p: any) => p.user_id);
+        const { data: usersData } = await supabase
+            .from('users')
+            .select('user_id, introducer')
+            .in('user_id', userIds2);
+        const feeUserInfoMap: Record<string, { introducer?: string }> = {};
+        (usersData || []).forEach((u: any) => {
+            feeUserInfoMap[u.user_id] = { introducer: u.introducer };
+        });
+
         const stats = salespeople.map((person: any) => {
             const userDocs = docsByUser[person.user_id] || [];
 
@@ -169,7 +180,7 @@ export async function GET(request: NextRequest) {
                 })
                 : userDocs;
 
-            // 케이스수/승인금액: 해당 월에 승인된 문서 (updated_at KST 기준)
+            // 케이스수/지급수수료: 해당 월에 승인된 문서 (updated_at KST 기준)
             const approvedDocs = monthStartStr
                 ? userDocs.filter(d => {
                     if (d.progress_details !== '승인') return false;
@@ -178,23 +189,25 @@ export async function GET(request: NextRequest) {
                 })
                 : userDocs.filter(d => d.progress_details === '승인');
 
-            const totalApproval = approvedDocs.reduce((sum: number, d: any) => {
-                const amt = typeof d.approval_amount === 'string' ? (parseInt(d.approval_amount) || 0) : Number(d.approval_amount) || 0;
-                return sum + amt;
-            }, 0);
+            // 지급수수료 계산
+            let totalFee = 0;
+            approvedDocs.forEach((doc: any) => {
+                const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                if (doc.submitter_id === person.user_id) totalFee += Math.round(rev * 0.2 * 10) / 10;
+                else if (doc.user_id === person.user_id && !doc.submitter_id) totalFee += Math.round(rev * 0.4 * 10) / 10;
+                const docUserId = doc.submitter_id || doc.user_id;
+                if ((feeUserInfoMap[docUserId] || {}).introducer === person.user_id) totalFee += Math.round(rev * 0.05 * 10) / 10;
+            });
 
             const caseCount = approvedDocs.length;
             const consultCount = consultDocs.length;
             const rate = consultCount > 0 ? Math.round((caseCount / consultCount) * 100) : 0;
 
-            // 금액 포맷
-            const eok = Math.floor(totalApproval / 10000);
-            const man = Math.floor((totalApproval % 10000) / 1000);
+            // 금액 포맷 (원단위)
+            const feeWon = totalFee * 10000;
             let amountStr = '-';
-            if (totalApproval > 0) {
-                if (eok > 0) amountStr = man > 0 ? `${eok}억 ${man}천만원` : `${eok}억원`;
-                else if (Math.floor(totalApproval / 1000) > 0) amountStr = `${Math.floor(totalApproval / 1000)}천만원`;
-                else amountStr = `${totalApproval}만원`;
+            if (feeWon > 0) {
+                amountStr = feeWon.toLocaleString('ko-KR') + '원';
             }
 
             return {
@@ -202,7 +215,7 @@ export async function GET(request: NextRequest) {
                 consult: consultCount,
                 case: caseCount,
                 amount: amountStr,
-                amountNum: totalApproval,
+                amountNum: totalFee,
                 rate: `${rate}%`,
                 rateNum: rate
             };
