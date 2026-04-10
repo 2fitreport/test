@@ -518,9 +518,11 @@ export async function GET(request: NextRequest) {
                 });
                 // A영업자의 소개자 → 실제매출의 5%
                 if (aInfo.introducer) {
-                    // 소속대표: 소속원 인센티브만 회사명 표시, 아니면 외부도입원
+                    // 대표자(1,2): 회사명 표시
+                    // 일반 영업자(4, !isRep): 외부도입원
+                    // 소속대표: 소속원만 회사명, 아니면 외부도입원
                     const shouldShowCompany = (userLevel === 1 || userLevel === 2) ||
-                                              (isAffiliationRep && affMemberUserIds.has(aInfo.introducer));
+                                              (isAffiliationRep && affMemberUserIds && affMemberUserIds.has(aInfo.introducer));
                     settlementData.push({
                         documentId: doc.id,
                         company: shouldShowCompany ? (doc.company_name || '-') : '외부도입원',
@@ -549,9 +551,11 @@ export async function GET(request: NextRequest) {
                 });
                 // 영업자의 소개자 → 실제매출의 5%
                 if (userInfo.introducer) {
-                    // 소속대표: 소속원 인센티브만 회사명 표시, 아니면 외부도입원
+                    // 대표자(1,2): 회사명 표시
+                    // 일반 영업자(4, !isRep): 외부도입원
+                    // 소속대표: 소속원만 회사명, 아니면 외부도입원
                     const shouldShowCompany = (userLevel === 1 || userLevel === 2) ||
-                                              (isAffiliationRep && affMemberUserIds.has(userInfo.introducer));
+                                              (isAffiliationRep && affMemberUserIds && affMemberUserIds.has(userInfo.introducer));
                     settlementData.push({
                         documentId: doc.id,
                         company: shouldShowCompany ? (doc.company_name || '-') : '외부도입원',
