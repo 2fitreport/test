@@ -465,6 +465,8 @@ export async function GET(request: NextRequest) {
         const docUserIds = [...new Set([
             ...monthlyApprovedForSettlement.map(d => d.user_id),
             ...monthlyApprovedForSettlement.map(d => d.submitter_id),
+            ...externalIncentiveDocs.map(d => d.user_id),
+            ...externalIncentiveDocs.map(d => d.submitter_id),
         ].filter(Boolean))];
         const userInfoMap: Record<string, { name: string; introducer?: string }> = {};
         if (docUserIds.length > 0) {
@@ -482,7 +484,6 @@ export async function GET(request: NextRequest) {
             Object.values(userInfoMap).map(u => u.introducer).filter(Boolean) as string[]
         )];
         const introducerNameMap: Record<string, string> = {};
-        const introducerAffiliationMap: Record<string, number | null> = {};
         if (introducerIds.length > 0) {
             const { data: intros } = await supabase
                 .from('users')
@@ -490,14 +491,24 @@ export async function GET(request: NextRequest) {
                 .in('user_id', introducerIds);
             for (const u of intros || []) {
                 introducerNameMap[u.user_id] = u.name;
+            }
+        }
+
+        const performerAffiliationMap: Record<string, number | null> = {};
+        if (docUserIds.length > 0) {
+            const { data: docUsers } = await supabase
+                .from('users')
+                .select('user_id, user_affiliations(affiliation_id)')
+                .in('user_id', docUserIds);
+            for (const u of docUsers || []) {
                 const affId = (u.user_affiliations as any)?.[0]?.affiliation_id;
-                introducerAffiliationMap[u.user_id] = affId || null;
+                performerAffiliationMap[u.user_id] = affId || null;
             }
         }
 
         // 일반 영업자의 소속 정보 (같은 소속 판단용)
         let myAffiliationId: number | null = null;
-        if (userLevel === 4 && !isAffiliationRep) {
+        if (userLevel === 4) {
             const { data: myAff } = await supabase
                 .from('user_affiliations')
                 .select('affiliation_id')
@@ -542,7 +553,7 @@ export async function GET(request: NextRequest) {
                         fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: aInfo.introducer,
-                        introducerAffiliationId: introducerAffiliationMap[aInfo.introducer] || null,
+                        performerAffiliationId: performerAffiliationMap[doc.submitter_id] || null,
                     });
                 }
             } else {
@@ -571,7 +582,7 @@ export async function GET(request: NextRequest) {
                         fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: userInfo.introducer,
-                        introducerAffiliationId: introducerAffiliationMap[userInfo.introducer] || null,
+                        performerAffiliationId: performerAffiliationMap[doc.user_id] || null,
                     });
                 }
             }
@@ -598,6 +609,7 @@ export async function GET(request: NextRequest) {
                         fee: Math.round(revenueAmount * 0.05 * 10) / 10,
                         paymentDate,
                         settlementUserId: introducerId,
+                        performerAffiliationId: performerAffiliationMap[doc.submitter_id || doc.user_id] || null,
                     });
                 }
             }
@@ -613,8 +625,8 @@ export async function GET(request: NextRequest) {
                 );
                 // 인센티브 행의 company 조정 (소속원만 회사명, 아니면 외부도입원)
                 filteredSettlementData = filteredSettlementData.map((row: any) => {
-                    if (row.inflow === '인센티브' && row.introducerAffiliationId !== null && myAffiliationId !== null) {
-                        const shouldShowCompany = myAffiliationId === row.introducerAffiliationId;
+                    if (row.inflow === '인센티브' && row.performerAffiliationId !== null && myAffiliationId !== null) {
+                        const shouldShowCompany = myAffiliationId === row.performerAffiliationId;
                         return {
                             ...row,
                             company: shouldShowCompany ? row.company : '외부도입원'
@@ -629,8 +641,8 @@ export async function GET(request: NextRequest) {
                 );
                 // 인센티브 행의 company 조정 (같은 소속만 회사명, 아니면 외부도입원)
                 filteredSettlementData = filteredSettlementData.map((row: any) => {
-                    if (row.inflow === '인센티브' && row.introducerAffiliationId !== null && myAffiliationId !== null) {
-                        const shouldShowCompany = myAffiliationId === row.introducerAffiliationId;
+                    if (row.inflow === '인센티브' && row.performerAffiliationId !== null && myAffiliationId !== null) {
+                        const shouldShowCompany = myAffiliationId === row.performerAffiliationId;
                         return {
                             ...row,
                             company: shouldShowCompany ? row.company : '외부도입원'

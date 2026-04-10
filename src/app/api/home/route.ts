@@ -335,6 +335,48 @@ export async function GET(request: NextRequest) {
             }
         }
 
+        const externalMonthlyFeeByUser: Record<string, number> = {};
+        if (userLevel === 4 && isRep && salespeople && salespeople.length > 0) {
+                const affMemberUserIds = new Set(salespeople.map((p: any) => p.user_id));
+                const { data: introducedUsersRaw } = await supabase
+                    .from('users')
+                    .select('user_id, introducer')
+                    .in('introducer', [...affMemberUserIds]);
+
+                const otherAffUsers = (introducedUsersRaw || []).filter((u: any) => !affMemberUserIds.has(u.user_id));
+                const otherAffUserIds = otherAffUsers.map((u: any) => u.user_id);
+                const otherUserIntroMap: Record<string, string> = {};
+                for (const u of otherAffUsers) {
+                    otherUserIntroMap[u.user_id] = u.introducer;
+                }
+
+                if (otherAffUserIds.length > 0) {
+                    const myDocIds = new Set(myDocs.map((d: any) => d.id));
+                    const [{ data: submitterDocs }, { data: userOwnDocs }] = await Promise.all([
+                        supabase.from('documents')
+                            .select('id, user_id, submitter_id, revenue_amount, updated_at, progress_details')
+                            .in('submitter_id', otherAffUserIds)
+                            .eq('progress_details', '승인'),
+                        supabase.from('documents')
+                            .select('id, user_id, submitter_id, revenue_amount, updated_at, progress_details')
+                            .in('user_id', otherAffUserIds)
+                            .is('submitter_id', null)
+                            .eq('progress_details', '승인'),
+                    ]);
+
+                    const allExternal = [...(submitterDocs || []), ...(userOwnDocs || [])].filter((d: any) => !myDocIds.has(d.id));
+                    for (const doc of allExternal) {
+                        const date = toKSTDateStr(doc.updated_at || '');
+                        if (date < firstDayStr || date >= nextMonthFirstStr) continue;
+                        const docOwner = doc.submitter_id || doc.user_id;
+                        const introducerId = otherUserIntroMap[docOwner];
+                        if (!introducerId || !affMemberUserIds.has(introducerId)) continue;
+                        const rev = typeof doc.revenue_amount === 'string' ? (parseInt(doc.revenue_amount) || 0) : Number(doc.revenue_amount) || 0;
+                        externalMonthlyFeeByUser[introducerId] = (externalMonthlyFeeByUser[introducerId] || 0) + (Math.round(rev * 0.05 * 10) / 10);
+                    }
+                }
+        }
+
         if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
                 // 영업자 현황: user_id 기준 + submitter_id 기준 (상담요청 문서도 포함)
@@ -380,6 +422,8 @@ export async function GET(request: NextRequest) {
                             totalFee += Math.round(rev * 0.05 * 10) / 10;
                         }
                     });
+
+                    totalFee += externalMonthlyFeeByUser[person.user_id] || 0;
 
                     const feeWon = totalFee * 10000;
                     const amountStr = feeWon > 0 ? feeWon.toLocaleString('ko-KR') + '원' : '-';

@@ -56,9 +56,11 @@ export default function SettlementTable({
             const bValue = b[column];
 
             if (typeof aValue === 'number' && typeof bValue === 'number') {
+                if (aValue === bValue) return 0;
                 return order === 'asc' ? aValue - bValue : bValue - aValue;
             }
 
+            if (aValue === bValue) return 0;
             if (order === 'asc') {
                 return aValue > bValue ? 1 : -1;
             } else {
@@ -74,6 +76,40 @@ export default function SettlementTable({
     };
 
     const processed = processTableData(data, searchTerm, sortColumn, sortOrder, currentPage);
+
+    const approvalAmountSummary = (() => {
+        const approvalByDocument = new Map<any, number>();
+
+        for (const row of processed.allFiltered) {
+            if (!row.documentId) continue;
+
+            const amount = typeof row.approvalAmount === 'number' ? row.approvalAmount : 0;
+            const current = approvalByDocument.get(row.documentId) || 0;
+
+            if (amount > current) {
+                approvalByDocument.set(row.documentId, amount);
+            }
+        }
+
+        return Array.from(approvalByDocument.values()).reduce((sum, amount) => sum + amount, 0);
+    })();
+
+    const realSalesSummary = (() => {
+        const realSalesByDocument = new Map<any, number>();
+
+        for (const row of processed.allFiltered) {
+            if (!row.documentId) continue;
+
+            const amount = typeof row.realSales === 'number' ? row.realSales : 0;
+            const current = realSalesByDocument.get(row.documentId) || 0;
+
+            if (amount > current) {
+                realSalesByDocument.set(row.documentId, amount);
+            }
+        }
+
+        return Array.from(realSalesByDocument.values()).reduce((sum, amount) => sum + amount, 0);
+    })();
 
     const handleSort = (column: string) => {
         if (sortColumn === column) {
@@ -261,28 +297,12 @@ export default function SettlementTable({
                 <div className={styles.summaryValues}>
                     <div className={styles.summaryItem}>
                         <span>승인금액</span>
-                        <span className={styles.summaryValueBlue}>{formatSettlementAmount((() => {
-                            const seen = new Set();
-                            return processed.allFiltered.reduce((sum, row) => {
-                                if (row.documentId && seen.has(row.documentId)) return sum;
-                                if (row.documentId) seen.add(row.documentId);
-                                const amount = typeof row.approvalAmount === 'number' ? row.approvalAmount : 0;
-                                return sum + amount;
-                            }, 0);
-                        })())}</span>
+                        <span className={styles.summaryValueBlue}>{formatSettlementAmount(approvalAmountSummary)}</span>
                     </div>
                     {userLevel !== 4 && (
                         <div className={styles.summaryItem}>
                             <span>실제매출</span>
-                            <span className={styles.summaryValueBlue}>{formatWon((() => {
-                                const seen = new Set();
-                                return processed.allFiltered.reduce((sum, row) => {
-                                    if (row.documentId && seen.has(row.documentId)) return sum;
-                                    if (row.documentId) seen.add(row.documentId);
-                                    const amount = typeof row.realSales === 'number' ? row.realSales : 0;
-                                    return sum + amount;
-                                }, 0);
-                            })())}</span>
+                            <span className={styles.summaryValueBlue}>{formatWon(realSalesSummary)}</span>
                         </div>
                     )}
                     <div className={styles.summaryItem}>
