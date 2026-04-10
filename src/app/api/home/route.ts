@@ -307,12 +307,14 @@ export async function GET(request: NextRequest) {
 
         if (salespeople && salespeople.length > 0) {
                 const salesUserIds = new Set(salespeople.map((p: any) => p.user_id));
-                // 영업자 현황: user_id 기준만 (상담요청 문서는 B영업자에게 귀속)
-                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id));
+                // 영업자 현황: user_id 기준 + submitter_id 기준 (상담요청 문서도 포함)
+                const salesDocs = myDocs.filter(d => salesUserIds.has(d.user_id) || salesUserIds.has(d.submitter_id));
                 const docsByUser: Record<string, any[]> = {};
                 for (const doc of salesDocs) {
-                    if (!docsByUser[doc.user_id]) docsByUser[doc.user_id] = [];
-                    docsByUser[doc.user_id].push(doc);
+                    // user_id 기준으로 그룹핑 (상담요청은 submitter_id가 user_id 역할)
+                    const ownerUserId = doc.submitter_id || doc.user_id;
+                    if (!docsByUser[ownerUserId]) docsByUser[ownerUserId] = [];
+                    docsByUser[ownerUserId].push(doc);
                 }
 
                 // 지급수수료 5% 계산을 위한 소개자 정보 로드
